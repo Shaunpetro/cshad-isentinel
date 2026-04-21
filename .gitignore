@@ -1,0 +1,56 @@
+# ========================
+# PSHAD Sentinel iHub
+# ========================
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Environment (NEVER commit secrets)
+.env
+.env.local
+.env.*.local
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# EAS
+.easignore
+
+# Native builds
+ios/
+android/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Testing
+coverage/
+__snapshots__/
+
+# Build artifacts
+*.tsbuildinfo
+*.log
+
+# Temporary files
+tmp/
+temp/
