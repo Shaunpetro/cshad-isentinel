@@ -24,6 +24,7 @@ import {
   WeatherAlertCard,
   NationalBreakingBanner,
   InfrastructureCard,
+  SuburbPickerModal,
   type HubFilter,
   type FeedItem,
   type Journalist,
@@ -45,6 +46,14 @@ const DEFAULT_NOTIFICATION_SETTINGS: NotificationSetting[] = [
   { id: 'weather', label: 'Weather Alerts', icon: 'cloudy', enabled: true, color: '#FF9800' },
   { id: 'loadshedding', label: 'Load Shedding', icon: 'flash-outline', enabled: true, color: '#9C27B0' },
 ];
+
+// Suburb type for picker
+interface SavedSuburb {
+  id: string;
+  name: string;
+  municipality: string;
+  province: string;
+}
 
 export default function AlertsScreen() {
   const { colors } = useTheme();
@@ -81,6 +90,9 @@ export default function AlertsScreen() {
   const [notificationSettings, setNotificationSettings] = useState<NotificationSetting[]>(
     DEFAULT_NOTIFICATION_SETTINGS
   );
+
+  // Suburb picker modal state
+  const [suburbPickerVisible, setSuburbPickerVisible] = useState(false);
 
   // Filter counts for badges
   const filterCounts: Partial<Record<HubFilter, number>> = {
@@ -174,6 +186,24 @@ export default function AlertsScreen() {
     setFilter('live');
   }, [setFilter]);
 
+  // Suburb picker handlers
+  const handleOpenSuburbPicker = useCallback(() => {
+    setSuburbPickerVisible(true);
+  }, []);
+
+  const handleCloseSuburbPicker = useCallback(() => {
+    setSuburbPickerVisible(false);
+  }, []);
+
+  const handleSuburbSelected = useCallback(
+    (suburb: SavedSuburb | null) => {
+      console.log('Suburb selected:', suburb?.name || 'None');
+      // Refresh to get new local schedule
+      refresh();
+    },
+    [refresh]
+  );
+
   // Render feed item
   const renderFeedItem = useCallback(
     ({ item }: { item: FeedItem }) => (
@@ -217,7 +247,7 @@ export default function AlertsScreen() {
           <InfrastructureCard
             loadshedding={loadshedding}
             onPress={() => setFilter('infrastructure')}
-            compact
+            onChangeArea={handleOpenSuburbPicker}
           />
         )}
 
@@ -274,6 +304,7 @@ export default function AlertsScreen() {
       handleViewIncidents,
       handleViewBreaking,
       handleFilterChange,
+      handleOpenSuburbPicker,
       setFilter,
       feedItems.length,
     ]
@@ -391,6 +422,13 @@ export default function AlertsScreen() {
         }
         showsVerticalScrollIndicator={false}
         contentContainerStyle={feedItems.length === 0 ? styles.emptyList : undefined}
+      />
+
+      {/* Suburb Picker Modal */}
+      <SuburbPickerModal
+        visible={suburbPickerVisible}
+        onClose={handleCloseSuburbPicker}
+        onSuburbSelected={handleSuburbSelected}
       />
     </View>
   );

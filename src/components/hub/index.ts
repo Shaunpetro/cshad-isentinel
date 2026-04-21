@@ -16,3 +16,4 @@ export { NotificationSettings } from './NotificationSettings';
 export { WeatherAlertCard } from './WeatherAlertCard';
 export { NationalBreakingBanner } from './NationalBreakingBanner';
 export { InfrastructureCard } from './InfrastructureCard';
+export { SuburbPickerModal } from './SuburbPickerModal';
