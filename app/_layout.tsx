@@ -1,57 +1,79 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
-import 'react-native-reanimated';
+// app/_layout.tsx
+import React from "react";
+import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { View, StyleSheet } from "react-native";
+import { useAppReady } from "@/hooks/useAppReady";
+import { CustomSplashScreen } from "@/components/core/SplashScreen";
+import { Colors } from "@/config/theme";
+import { useNotifications } from "@/hooks/useNotifications";
+import { ThemeProvider, useTheme } from "@/contexts";
 
-import { useColorScheme } from '@/components/useColorScheme';
+// Inner component that uses theme
+function RootLayoutInner() {
+  const { isReady, showCustomSplash, onLayoutReady, onSplashComplete } =
+    useAppReady();
 
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
-} from 'expo-router';
+  // Get theme
+  const { colors, isDark } = useTheme();
 
-export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
-  initialRouteName: '(tabs)',
-};
+  // Initialize push notifications
+  const { isInitialized: notificationsReady, error: notificationError } =
+    useNotifications();
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
-
-export default function RootLayout() {
-  const [loaded, error] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
-
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
-  useEffect(() => {
-    if (error) throw error;
-  }, [error]);
-
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
+  // Log notification status in development
+  React.useEffect(() => {
+    if (notificationsReady) {
+      if (notificationError) {
+        console.log('[RootLayout] Notifications note:', notificationError);
+      } else {
+        console.log('[RootLayout] Notifications initialized');
+      }
     }
-  }, [loaded]);
+  }, [notificationsReady, notificationError]);
 
-  if (!loaded) {
+  // Still loading fonts/resources — native splash stays visible
+  if (!isReady) {
     return null;
   }
 
-  return <RootLayoutNav />;
+  return (
+    <View 
+      style={[styles.root, { backgroundColor: colors.background }]} 
+      onLayout={onLayoutReady}
+    >
+      {/* Main app navigation */}
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      >
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="+not-found" />
+      </Stack>
+
+      {/* Custom animated splash on top */}
+      {showCustomSplash && (
+        <CustomSplashScreen onComplete={onSplashComplete} />
+      )}
+
+      <StatusBar style={colors.statusBar} />
+    </View>
+  );
 }
 
-function RootLayoutNav() {
-  const colorScheme = useColorScheme();
-
+// Root component with provider
+export default function RootLayout() {
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-      </Stack>
+    <ThemeProvider>
+      <RootLayoutInner />
     </ThemeProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+});

@@ -1,36 +1,78 @@
 {
-  "name": "v1.263_001",
+  "name": "pshad-isentinel",
+  "version": "1.267.0",
+  "description": "South Africa's Privacy-First Community Safety Intelligence App",
+  "author": "ATG Development",
+  "license": "UNLICENSED",
+  "private": true,
   "main": "expo-router/entry",
-  "version": "1.0.0",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
+    "start:clear": "expo start --clear",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "build:android": "eas build --platform android",
+    "build:ios": "eas build --platform ios",
+    "build:all": "eas build --platform all",
+    "test": "jest --watchAll",
+    "test:ci": "jest --ci --coverage",
+    "lint": "expo lint",
+    "doctor": "npx expo doctor",
+    "clean": "rm -rf node_modules .expo dist && npm install"
   },
   "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/native": "^7.1.33",
+    "@supabase/supabase-js": "^2.103.0",
     "expo": "~55.0.8",
-    "expo-symbols": "~55.0.5",
-    "expo-constants": "~55.0.9",
+    "expo-clipboard": "~55.0.13",
+    "expo-constants": "~55.0.14",
+    "expo-crypto": "~55.0.10",
+    "expo-dev-client": "~55.0.23",
+    "expo-device": "~55.0.15",
     "expo-font": "~55.0.4",
+    "expo-image-manipulator": "~55.0.14",
+    "expo-image-picker": "~55.0.17",
     "expo-linking": "~55.0.8",
+    "expo-localization": "~55.0.9",
+    "expo-location": "~55.1.7",
+    "expo-notifications": "~55.0.19",
     "expo-router": "~55.0.7",
+    "expo-secure-store": "~55.0.9",
     "expo-splash-screen": "~55.0.12",
     "expo-status-bar": "~55.0.4",
+    "expo-symbols": "~55.0.5",
     "expo-web-browser": "~55.0.10",
+    "firebase": "^12.11.0",
+    "i18next": "^25.10.9",
+    "leaflet": "^1.9.4",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "react-i18next": "^16.6.6",
+    "react-leaflet": "^5.0.0",
     "react-native": "0.83.2",
-    "react-native-worklets": "0.7.2",
+    "react-native-maps": "1.27.2",
     "react-native-reanimated": "4.2.1",
     "react-native-safe-area-context": "~5.6.2",
     "react-native-screens": "~4.23.0",
-    "react-native-web": "~0.21.0"
+    "react-native-web": "~0.21.0",
+    "react-native-worklets": "0.7.2",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@testing-library/react-native": "^13.3.3",
+    "@types/leaflet": "^1.9.21",
     "@types/react": "~19.2.2",
+    "babel-plugin-module-resolver": "^5.0.3",
+    "jest-expo": "^55.0.11",
+    "react": "19.2.0",
     "typescript": "~5.9.2"
   },
-  "private": true
+  "overrides": {
+    "@testing-library/react-native": {
+      "react": "$react",
+      "react-native": "$react-native"
+    }
+  }
 }
