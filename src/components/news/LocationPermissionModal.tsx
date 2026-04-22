@@ -1,5 +1,5 @@
 // src/components/news/LocationPermissionModal.tsx
-import React from 'react';
+import React from "react";
 import {
   View,
   Text,
@@ -9,10 +9,11 @@ import {
   ScrollView,
   Platform,
   Linking,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '@/contexts';
-import { Colors, Typography, Spacing } from '@/config/theme';
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Typography, Spacing } from "@/config/theme";
 
 interface LocationPermissionModalProps {
   visible: boolean;
@@ -55,11 +56,12 @@ export function LocationPermissionModal({
   onRequestPermission,
   permissionDenied = false,
 }: LocationPermissionModalProps) {
+  const { t } = useTranslation();
   const { colors } = useTheme();
 
   const openSettings = () => {
-    if (Platform.OS === 'ios') {
-      Linking.openURL('app-settings:');
+    if (Platform.OS === "ios") {
+      Linking.openURL("app-settings:");
     } else {
       Linking.openSettings();
     }
@@ -85,35 +87,53 @@ export function LocationPermissionModal({
         <View style={[styles.modalContainer, { backgroundColor: colors.surface }]}>
           {/* Header */}
           <View style={styles.header}>
-            <View style={[styles.iconContainer, { backgroundColor: colors.primary + '20' }]}>
+            <View
+              style={[
+                styles.iconContainer,
+                { backgroundColor: colors.primary + "20" },
+              ]}
+            >
               <Ionicons name="location" size={32} color={colors.primary} />
             </View>
             <Text style={[styles.title, { color: colors.text }]}>
-              Enable Location Services
+              {t("location.currentLocation")}
             </Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              Get news and alerts relevant to your area
+              {t("alerts.loadshedding.willNotify")}
             </Text>
           </View>
 
           {/* Benefits */}
-          <View style={[styles.benefitsContainer, { backgroundColor: colors.background }]}>
+          <View
+            style={[
+              styles.benefitsContainer,
+              { backgroundColor: colors.background },
+            ]}
+          >
             <View style={styles.benefit}>
-              <Ionicons name="newspaper-outline" size={20} color={colors.primary} />
+              <Ionicons
+                name="newspaper-outline"
+                size={20}
+                color={colors.primary}
+              />
               <Text style={[styles.benefitText, { color: colors.text }]}>
-                Local news within your radius
+                {t("news.local")} {t("news.articles")}
               </Text>
             </View>
             <View style={styles.benefit}>
-              <Ionicons name="notifications-outline" size={20} color={colors.primary} />
+              <Ionicons
+                name="notifications-outline"
+                size={20}
+                color={colors.primary}
+              />
               <Text style={[styles.benefitText, { color: colors.text }]}>
-                Area-specific safety alerts
+                {t("alerts.title")}
               </Text>
             </View>
             <View style={styles.benefit}>
               <Ionicons name="map-outline" size={20} color={colors.primary} />
               <Text style={[styles.benefitText, { color: colors.text }]}>
-                Incidents on map near you
+                {t("map.subtitle")}
               </Text>
             </View>
           </View>
@@ -122,44 +142,44 @@ export function LocationPermissionModal({
           {permissionDenied && (
             <ScrollView style={styles.stepsContainer}>
               <Text style={[styles.stepsTitle, { color: colors.text }]}>
-                How to enable location:
+                {t("settings.title")}:
               </Text>
-              
+
               <Step
                 number={1}
                 icon="settings-outline"
-                title="Open Settings"
-                description="Tap the button below to open your device settings"
+                title={t("settings.title")}
+                description={t("common.ok")}
               />
-              
+
               <Step
                 number={2}
                 icon="apps-outline"
-                title="Find iSentinel"
-                description="Look for 'iSentinel' or 'PSHAD' in the app list"
+                title="iSentinel"
+                description={t("common.search")}
               />
-              
+
               <Step
                 number={3}
                 icon="location-outline"
-                title="Enable Location"
-                description="Tap 'Location' and select 'While Using the App'"
+                title={t("location.currentLocation")}
+                description={t("privacy.granted")}
               />
-              
+
               <Step
                 number={4}
                 icon="arrow-back-outline"
-                title="Return to App"
-                description="Come back to iSentinel and enjoy local news!"
+                title={t("common.done")}
+                description={t("common.ok")}
               />
             </ScrollView>
           )}
 
           {/* Privacy Note */}
           <View style={styles.privacyNote}>
-            <Ionicons name="shield-checkmark" size={16} color={Colors.semantic.success} />
+            <Ionicons name="shield-checkmark" size={16} color={colors.success} />
             <Text style={[styles.privacyText, { color: colors.textSecondary }]}>
-              Your location is never stored or shared. It's only used to filter news locally on your device.
+              {t("tip.privacyNote")}
             </Text>
           </View>
 
@@ -169,8 +189,13 @@ export function LocationPermissionModal({
               style={[styles.secondaryButton, { borderColor: colors.border }]}
               onPress={onClose}
             >
-              <Text style={[styles.secondaryButtonText, { color: colors.textSecondary }]}>
-                Not Now
+              <Text
+                style={[
+                  styles.secondaryButtonText,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                {t("common.cancel")}
               </Text>
             </TouchableOpacity>
 
@@ -178,13 +203,13 @@ export function LocationPermissionModal({
               style={[styles.primaryButton, { backgroundColor: colors.primary }]}
               onPress={handleAction}
             >
-              <Ionicons 
-                name={permissionDenied ? "settings-outline" : "location"} 
-                size={18} 
-                color="#FFFFFF" 
+              <Ionicons
+                name={permissionDenied ? "settings-outline" : "location"}
+                size={18}
+                color="#FFFFFF"
               />
               <Text style={styles.primaryButtonText}>
-                {permissionDenied ? 'Open Settings' : 'Enable Location'}
+                {permissionDenied ? t("settings.title") : t("common.ok")}
               </Text>
             </TouchableOpacity>
           </View>
@@ -197,18 +222,18 @@ export function LocationPermissionModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
   },
   modalContainer: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: Spacing.lg,
     paddingBottom: Spacing.xl + 20,
-    maxHeight: '90%',
+    maxHeight: "90%",
   },
   header: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingHorizontal: Spacing.lg,
     marginBottom: Spacing.lg,
   },
@@ -216,20 +241,20 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: Spacing.md,
   },
   title: {
     fontSize: Typography.sizes.title,
     fontFamily: Typography.fonts.bold,
     marginBottom: Spacing.xs,
-    textAlign: 'center',
+    textAlign: "center",
   },
   subtitle: {
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.regular,
-    textAlign: 'center',
+    textAlign: "center",
   },
   benefitsContainer: {
     marginHorizontal: Spacing.lg,
@@ -238,8 +263,8 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   benefit: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.sm,
     paddingVertical: Spacing.xs,
   },
@@ -257,19 +282,19 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   step: {
-    flexDirection: 'row',
+    flexDirection: "row",
     marginBottom: Spacing.md,
   },
   stepNumber: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: Spacing.sm,
   },
   stepNumberText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: Typography.sizes.label,
     fontFamily: Typography.fonts.bold,
   },
@@ -277,8 +302,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stepHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: Spacing.xs,
     marginBottom: 2,
   },
@@ -292,8 +317,8 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   privacyNote: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     gap: Spacing.sm,
@@ -305,7 +330,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   actions: {
-    flexDirection: 'row',
+    flexDirection: "row",
     paddingHorizontal: Spacing.lg,
     gap: Spacing.md,
   },
@@ -314,8 +339,8 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     borderRadius: 12,
     borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   secondaryButtonText: {
     fontSize: Typography.sizes.body,
@@ -323,15 +348,15 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     flex: 2,
-    flexDirection: 'row',
+    flexDirection: "row",
     paddingVertical: Spacing.md,
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     gap: Spacing.xs,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.bold,
   },

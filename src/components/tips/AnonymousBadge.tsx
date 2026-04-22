@@ -1,32 +1,55 @@
-// v1.263_001/src/components/tips/AnonymousBadge.tsx
+// src/components/tips/AnonymousBadge.tsx
 /**
  * Privacy badge showing users their tip is anonymous
  * Builds trust and encourages reporting (Rule 1)
+ * Supports light/dark theme
  */
 
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { Colors, Typography, Spacing, BorderRadius } from "@/config/theme";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Typography, Spacing, BorderRadius } from "@/config/theme";
 
 interface AnonymousBadgeProps {
   variant?: "large" | "compact";
 }
 
 export function AnonymousBadge({ variant = "large" }: AnonymousBadgeProps) {
+  const { t } = useTranslation();
+  const { colors } = useTheme();
   const isLarge = variant === "large";
+
+  // Anonymous badge uses a teal/cyan color that works in both themes
+  const anonymousColor = "#00BFA5";
 
   return (
     <View style={[styles.container, isLarge && styles.containerLarge]}>
       {/* Main Badge */}
-      <View style={[styles.badge, isLarge && styles.badgeLarge]}>
+      <View
+        style={[
+          styles.badge,
+          isLarge && styles.badgeLarge,
+          {
+            backgroundColor: anonymousColor + "20",
+            borderColor: anonymousColor,
+          },
+        ]}
+      >
         <Text style={styles.icon}>🔒</Text>
         <View style={styles.textWrap}>
-          <Text style={[styles.title, isLarge && styles.titleLarge]}>
-            100% Anonymous
+          <Text
+            style={[
+              styles.title,
+              isLarge && styles.titleLarge,
+              { color: anonymousColor },
+            ]}
+          >
+            {t("tip.anonymousBadge.title")}
           </Text>
           {isLarge && (
-            <Text style={styles.subtitle}>
-              Your identity is never collected or stored
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+              {t("tip.anonymousBadge.subtitle")}
             </Text>
           )}
         </View>
@@ -35,21 +58,40 @@ export function AnonymousBadge({ variant = "large" }: AnonymousBadgeProps) {
       {/* Feature List (large variant only) */}
       {isLarge && (
         <View style={styles.features}>
-          <FeatureItem text="No account required" />
-          <FeatureItem text="No IP address logging" />
-          <FeatureItem text="Location rounded for privacy" />
-          <FeatureItem text="Photo metadata removed" />
+          <FeatureItem
+            text={t("tip.anonymousBadge.noAccount")}
+            colors={colors}
+          />
+          <FeatureItem
+            text={t("tip.anonymousBadge.noIpLogging")}
+            colors={colors}
+          />
+          <FeatureItem
+            text={t("tip.anonymousBadge.locationRounded")}
+            colors={colors}
+          />
+          <FeatureItem
+            text={t("tip.anonymousBadge.metadataRemoved")}
+            colors={colors}
+          />
         </View>
       )}
     </View>
   );
 }
 
-function FeatureItem({ text }: { text: string }) {
+interface FeatureItemProps {
+  text: string;
+  colors: ReturnType<typeof useTheme>["colors"];
+}
+
+function FeatureItem({ text, colors }: FeatureItemProps) {
   return (
     <View style={styles.featureRow}>
-      <Text style={styles.checkmark}>✓</Text>
-      <Text style={styles.featureText}>{text}</Text>
+      <Text style={[styles.checkmark, { color: colors.success }]}>✓</Text>
+      <Text style={[styles.featureText, { color: colors.textSecondary }]}>
+        {text}
+      </Text>
     </View>
   );
 }
@@ -64,9 +106,7 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.special.anonymous + "20",
     borderWidth: 1,
-    borderColor: Colors.special.anonymous,
     borderRadius: BorderRadius.md,
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
@@ -83,7 +123,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    color: Colors.special.anonymous,
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.bold,
   },
@@ -91,7 +130,6 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.heading,
   },
   subtitle: {
-    color: Colors.carbon.silver,
     fontSize: Typography.sizes.caption,
     fontFamily: Typography.fonts.regular,
     marginTop: 2,
@@ -106,14 +144,12 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   checkmark: {
-    color: Colors.semantic.success,
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.bold,
     marginRight: Spacing.sm,
     width: 20,
   },
   featureText: {
-    color: Colors.carbon.silver,
     fontSize: Typography.sizes.caption,
     fontFamily: Typography.fonts.regular,
   },

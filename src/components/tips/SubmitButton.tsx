@@ -1,11 +1,14 @@
-// v1.263_001/src/components/tips/SubmitButton.tsx
+// src/components/tips/SubmitButton.tsx
 /**
  * Submit button with loading state and success feedback
+ * Supports light/dark theme
  */
 
 import React from "react";
 import { Pressable, Text, StyleSheet, ActivityIndicator } from "react-native";
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from "@/config/theme";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Typography, Spacing, BorderRadius } from "@/config/theme";
 
 interface SubmitButtonProps {
   onPress: () => void;
@@ -18,9 +21,13 @@ export function SubmitButton({
   onPress,
   isLoading = false,
   isDisabled = false,
-  label = "Submit Tip Anonymously",
+  label,
 }: SubmitButtonProps) {
+  const { t } = useTranslation();
+  const { colors } = useTheme();
   const disabled = isLoading || isDisabled;
+
+  const buttonLabel = label || t("tip.submitTip");
 
   return (
     <Pressable
@@ -28,17 +35,26 @@ export function SubmitButton({
       disabled={disabled}
       style={({ pressed }) => [
         styles.button,
+        {
+          backgroundColor: disabled ? colors.border : colors.primary,
+        },
         pressed && !disabled && styles.buttonPressed,
-        disabled && styles.buttonDisabled,
       ]}
     >
       {isLoading ? (
-        <ActivityIndicator size="small" color={Colors.carbon.black} />
+        <ActivityIndicator size="small" color="#000000" />
       ) : (
         <Text style={styles.icon}>🛡️</Text>
       )}
-      <Text style={[styles.label, disabled && styles.labelDisabled]}>
-        {isLoading ? "Submitting..." : label}
+      <Text
+        style={[
+          styles.label,
+          {
+            color: disabled ? colors.textSecondary : "#000000",
+          },
+        ]}
+      >
+        {isLoading ? t("tip.submitting") : buttonLabel}
       </Text>
     </Pressable>
   );
@@ -49,31 +65,27 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: Colors.semantic.primary,
     borderRadius: BorderRadius.lg,
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.xl,
     gap: Spacing.sm,
-    ...Shadows.md,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   buttonPressed: {
-    backgroundColor: Colors.semantic.primary + "CC",
+    opacity: 0.9,
     transform: [{ scale: 0.98 }],
-  },
-  buttonDisabled: {
-    backgroundColor: Colors.carbon.steel,
   },
   icon: {
     fontSize: 20,
   },
   label: {
-    color: Colors.carbon.black,
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.bold,
     textTransform: "uppercase",
     letterSpacing: 1,
-  },
-  labelDisabled: {
-    color: Colors.carbon.silver,
   },
 });

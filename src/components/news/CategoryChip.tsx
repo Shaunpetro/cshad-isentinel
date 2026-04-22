@@ -1,33 +1,51 @@
 // src/components/news/CategoryChip.tsx
 import React from "react";
 import { Pressable, Text, StyleSheet } from "react-native";
+import { useTranslation } from "react-i18next";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Typography, Spacing, BorderRadius } from "@/config/theme";
 import type { NewsCategory } from "@/types";
 
-const CATEGORY_CONFIG: Record<
-  NewsCategory | "all",
-  { label: string; icon: string }
-> = {
-  all: { label: "All", icon: "📋" },
-  crime: { label: "Crime", icon: "🚨" },
-  safety: { label: "Safety", icon: "🛡️" },
-  community: { label: "Community", icon: "🏘️" },
-  infrastructure: { label: "Infrastructure", icon: "🔧" },
-  weather: { label: "Weather", icon: "⛈️" },
-  traffic: { label: "Traffic", icon: "🚗" },
-  general: { label: "General", icon: "📰" },
+// Icons for all possible categories
+const CATEGORY_ICONS: Record<string, string> = {
+  all: "📋",
+  crime: "🚨",
+  safety: "🛡️",
+  community: "🏘️",
+  infrastructure: "🔧",
+  weather: "⛈️",
+  traffic: "🚗",
+  general: "📰",
+  politics: "🏛️",
+  health: "🏥",
+  accident: "🚧",
+  fire: "🔥",
+  water: "💧",
+  electricity: "⚡",
+  other: "📌",
 };
 
 interface Props {
   category: NewsCategory | "all";
   isActive: boolean;
   onPress: () => void;
+  count?: number; // Optional count badge
 }
 
-export function CategoryChip({ category, isActive, onPress }: Props) {
+export function CategoryChip({ category, isActive, onPress, count }: Props) {
   const { colors } = useTheme();
-  const config = CATEGORY_CONFIG[category];
+  const { t } = useTranslation();
+
+  // Get icon with fallback
+  const icon = CATEGORY_ICONS[category] || "📌";
+  
+  // Get translated label with fallback
+  const labelKey = `news.categories.${category}`;
+  const translated = t(labelKey);
+  // If translation key not found, capitalize the category name
+  const label = translated !== labelKey 
+    ? translated 
+    : category.charAt(0).toUpperCase() + category.slice(1);
 
   return (
     <Pressable
@@ -44,7 +62,7 @@ export function CategoryChip({ category, isActive, onPress }: Props) {
         },
       ]}
     >
-      <Text style={styles.icon}>{config.icon}</Text>
+      <Text style={styles.icon}>{icon}</Text>
       <Text
         style={[
           styles.label,
@@ -52,8 +70,21 @@ export function CategoryChip({ category, isActive, onPress }: Props) {
           isActive && { color: colors.primary },
         ]}
       >
-        {config.label}
+        {label}
       </Text>
+      {count !== undefined && count > 0 && (
+        <Text
+          style={[
+            styles.count,
+            { 
+              color: isActive ? colors.primary : colors.textSecondary,
+              backgroundColor: isActive ? `${colors.primary}30` : colors.border,
+            },
+          ]}
+        >
+          {count > 99 ? "99+" : count}
+        </Text>
+      )}
     </Pressable>
   );
 }
@@ -75,5 +106,14 @@ const styles = StyleSheet.create({
   label: {
     fontSize: Typography.sizes.label,
     fontFamily: Typography.fonts.medium,
+  },
+  count: {
+    fontSize: Typography.sizes.tiny,
+    fontFamily: Typography.fonts.bold,
+    marginLeft: Spacing.xs,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 10,
+    overflow: "hidden",
   },
 });

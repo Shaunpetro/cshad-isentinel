@@ -9,6 +9,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Typography, Spacing } from '@/config/theme';
 import type { NewsItem } from '@/types';
@@ -27,6 +28,7 @@ export function BreakingNewsCarousel({
   onArticlePress,
 }: BreakingNewsCarouselProps) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
 
   if (articles.length === 0) {
     return null;
@@ -39,10 +41,10 @@ export function BreakingNewsCarousel({
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMins / 60);
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${Math.floor(diffHours / 24)}d ago`;
+    if (diffMins < 1) return t('time.justNow');
+    if (diffMins < 60) return t('time.minutesAgo', { count: diffMins });
+    if (diffHours < 24) return t('time.hoursAgo', { count: diffHours });
+    return t('time.daysAgo', { count: Math.floor(diffHours / 24) });
   };
 
   const getSeverityColor = (severity: string): string => {
@@ -58,6 +60,12 @@ export function BreakingNewsCarousel({
     }
   };
 
+  const getSeverityLabel = (severity: string): string => {
+    const key = `news.severity.${severity}`;
+    const translated = t(key);
+    return translated !== key ? translated.toUpperCase() : severity.toUpperCase();
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -65,11 +73,11 @@ export function BreakingNewsCarousel({
         <View style={styles.headerLeft}>
           <View style={[styles.liveIndicator, { backgroundColor: colors.danger }]}>
             <View style={styles.liveDot} />
-            <Text style={styles.liveText}>BREAKING</Text>
+            <Text style={styles.liveText}>{t('news.breaking')}</Text>
           </View>
         </View>
         <Text style={[styles.countText, { color: colors.textSecondary }]}>
-          {articles.length} alerts
+          {articles.length} {t('alerts.title').toLowerCase()}
         </Text>
       </View>
 
@@ -104,7 +112,7 @@ export function BreakingNewsCarousel({
               ]}
             >
               <Text style={styles.severityText}>
-                {article.severity.toUpperCase()}
+                {getSeverityLabel(article.severity)}
               </Text>
             </View>
 
@@ -135,7 +143,7 @@ export function BreakingNewsCarousel({
                   style={[styles.locationText, { color: colors.textSecondary }]}
                   numberOfLines={1}
                 >
-                  {article.locationName || 'Unknown'}
+                  {article.locationName || t('common.unknown')}
                 </Text>
               </View>
               <Text style={[styles.timeText, { color: colors.primary }]}>

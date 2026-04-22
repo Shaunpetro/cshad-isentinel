@@ -2,6 +2,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Typography, Spacing } from '@/config/theme';
 import type { NewsScope } from '@/services/location';
@@ -13,18 +14,19 @@ interface ScopeSelectorProps {
 
 interface ScopeOption {
   id: NewsScope;
-  label: string;
+  labelKey: string;
   icon: keyof typeof Ionicons.glyphMap;
 }
 
 const SCOPE_OPTIONS: ScopeOption[] = [
-  { id: 'local', label: 'Local', icon: 'location' },
-  { id: 'national', label: 'National', icon: 'flag' },
-  { id: 'international', label: 'International', icon: 'globe' },
+  { id: 'local', labelKey: 'news.local', icon: 'location' },
+  { id: 'national', labelKey: 'news.national', icon: 'flag' },
+  { id: 'international', labelKey: 'news.international', icon: 'globe' },
 ];
 
 export function ScopeSelector({ activeScope, onScopeChange }: ScopeSelectorProps) {
   const { colors, isDark } = useTheme();
+  const { t } = useTranslation();
 
   return (
     <View
@@ -38,8 +40,6 @@ export function ScopeSelector({ activeScope, onScopeChange }: ScopeSelectorProps
     >
       {SCOPE_OPTIONS.map((option) => {
         const isActive = activeScope === option.id;
-        // Active state: primary background with dark text
-        // Inactive state: transparent with secondary text
         const iconColor = isActive
           ? (isDark ? '#000000' : '#000000')
           : colors.textSecondary;
@@ -70,7 +70,7 @@ export function ScopeSelector({ activeScope, onScopeChange }: ScopeSelectorProps
                 isActive && styles.labelActive,
               ]}
             >
-              {option.label}
+              {t(option.labelKey)}
             </Text>
           </TouchableOpacity>
         );
@@ -96,9 +96,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
     borderRadius: 10,
   },
-  optionActive: {
-    // backgroundColor set dynamically
-  },
+  optionActive: {},
   icon: {
     marginRight: 4,
   },

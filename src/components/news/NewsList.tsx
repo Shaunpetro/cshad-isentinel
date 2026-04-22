@@ -8,7 +8,9 @@ import {
   RefreshControl,
   StyleSheet,
   ScrollView,
+  TouchableOpacity,
 } from "react-native";
+import { useTranslation } from "react-i18next";
 import { useTheme } from "@/contexts/ThemeContext";
 import { Typography, Spacing } from "@/config/theme";
 import { NewsCard } from "./NewsCard";
@@ -35,6 +37,7 @@ export function NewsList({
   ListHeaderComponent,
 }: Props) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
 
   // Loading state - but still show header
   if (isLoading && articles.length === 0) {
@@ -55,7 +58,7 @@ export function NewsList({
         <View style={styles.stateContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-            Loading news...
+            {t("common.loading")}
           </Text>
         </View>
       </ScrollView>
@@ -81,11 +84,17 @@ export function NewsList({
         <View style={styles.stateContainer}>
           <Text style={styles.stateIcon}>⚠️</Text>
           <Text style={[styles.stateTitle, { color: colors.text }]}>
-            Unable to load news
+            {t("common.error")}
           </Text>
           <Text style={[styles.stateMessage, { color: colors.textSecondary }]}>
             {error}
           </Text>
+          <TouchableOpacity
+            style={[styles.retryButton, { backgroundColor: colors.primary }]}
+            onPress={onRefresh}
+          >
+            <Text style={styles.retryButtonText}>{t("common.retry")}</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     );
@@ -110,10 +119,10 @@ export function NewsList({
         <View style={styles.stateContainer}>
           <Text style={styles.stateIcon}>📰</Text>
           <Text style={[styles.stateTitle, { color: colors.text }]}>
-            No news found
+            {t("news.noNews")}
           </Text>
           <Text style={[styles.stateMessage, { color: colors.textSecondary }]}>
-            Try a different time filter or category
+            {t("news.pullToRefresh")}
           </Text>
         </View>
       </ScrollView>
@@ -178,5 +187,16 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fonts.regular,
     textAlign: "center",
     paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.lg,
+  },
+  retryButton: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: "#FFFFFF",
+    fontSize: Typography.sizes.body,
+    fontFamily: Typography.fonts.bold,
   },
 });

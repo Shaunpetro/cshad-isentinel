@@ -8,6 +8,7 @@ import {
   Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Typography, Spacing, BorderRadius } from '@/config/theme';
 
@@ -25,6 +26,7 @@ export function LiveStatusBanner({
   onViewBreaking,
 }: LiveStatusBannerProps) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // Pulse animation for live indicator
@@ -82,7 +84,7 @@ export function LiveStatusBanner({
               {activeIncidents}
             </Text>
             <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>
-              Active
+              {t('alerts.activeIncidents')}
             </Text>
           </View>
         </Pressable>
@@ -106,7 +108,7 @@ export function LiveStatusBanner({
               {breakingCount}
             </Text>
             <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>
-              Breaking
+              {t('news.breaking')}
             </Text>
           </View>
         </Pressable>
@@ -126,7 +128,7 @@ export function LiveStatusBanner({
             ]}
           />
           <Text style={[styles.liveText, { color: hasActivity ? colors.danger : colors.success }]}>
-            {hasActivity ? 'LIVE' : 'CLEAR'}
+            {hasActivity ? t('time.live').toUpperCase() : t('alerts.allClear').toUpperCase()}
           </Text>
         </View>
       </View>

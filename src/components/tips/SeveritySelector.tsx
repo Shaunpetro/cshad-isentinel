@@ -1,12 +1,15 @@
-// v1.263_001/src/components/tips/SeveritySelector.tsx
+// src/components/tips/SeveritySelector.tsx
 /**
  * Severity level picker with visual indicators
+ * Supports light/dark theme
  */
 
 import React from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
-import { Colors, Typography, Spacing, BorderRadius } from "@/config/theme";
-import { SEVERITIES, getSeverityById } from "@/config/tipCategories";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Typography, Spacing, BorderRadius } from "@/config/theme";
+import { SEVERITIES } from "@/config/tipCategories";
 import type { NewsSeverity } from "@/types";
 
 interface SeveritySelectorProps {
@@ -15,23 +18,42 @@ interface SeveritySelectorProps {
   error?: string;
 }
 
-export function SeveritySelector({ value, onChange, error }: SeveritySelectorProps) {
+export function SeveritySelector({
+  value,
+  onChange,
+  error,
+}: SeveritySelectorProps) {
+  const { t } = useTranslation();
+  const { colors } = useTheme();
+
+  // Get translated severity label
+  const getSeverityLabel = (severityId: string): string => {
+    const key = `news.severity.${severityId}`;
+    const translated = t(key);
+    return translated !== key ? translated : severityId;
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Severity Level *</Text>
-      
+      <Text style={[styles.label, { color: colors.text }]}>
+        {t("tip.severityLevel")} *
+      </Text>
+
       <View style={styles.grid}>
         {SEVERITIES.map((severity) => {
           const isSelected = value === severity.id;
-          
+
           return (
             <Pressable
               key={severity.id}
               onPress={() => onChange(severity.id)}
               style={({ pressed }) => [
                 styles.option,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: isSelected ? severity.color : colors.border,
+                },
                 isSelected && {
-                  borderColor: severity.color,
                   backgroundColor: severity.color + "20",
                 },
                 pressed && styles.optionPressed,
@@ -41,20 +63,24 @@ export function SeveritySelector({ value, onChange, error }: SeveritySelectorPro
               <Text
                 style={[
                   styles.optionLabel,
-                  isSelected && { color: severity.color },
+                  { color: isSelected ? severity.color : colors.text },
                 ]}
               >
-                {severity.label}
+                {getSeverityLabel(severity.id)}
               </Text>
               {isSelected && (
-                <Text style={styles.optionDesc}>{severity.description}</Text>
+                <Text
+                  style={[styles.optionDesc, { color: colors.textSecondary }]}
+                >
+                  {severity.description}
+                </Text>
               )}
             </Pressable>
           );
         })}
       </View>
-      
-      {error && <Text style={styles.error}>{error}</Text>}
+
+      {error && <Text style={[styles.error, { color: colors.danger }]}>{error}</Text>}
     </View>
   );
 }
@@ -64,7 +90,6 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   label: {
-    color: Colors.carbon.white,
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.bold,
     marginBottom: Spacing.sm,
@@ -76,9 +101,7 @@ const styles = StyleSheet.create({
   },
   option: {
     width: "48%",
-    backgroundColor: Colors.carbon.charcoal,
     borderWidth: 2,
-    borderColor: Colors.carbon.steel,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
     alignItems: "center",
@@ -92,20 +115,17 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   optionLabel: {
-    color: Colors.carbon.white,
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.bold,
     textAlign: "center",
   },
   optionDesc: {
-    color: Colors.carbon.silver,
     fontSize: Typography.sizes.tiny,
     fontFamily: Typography.fonts.regular,
     textAlign: "center",
     marginTop: Spacing.xs,
   },
   error: {
-    color: Colors.semantic.danger,
     fontSize: Typography.sizes.caption,
     fontFamily: Typography.fonts.regular,
     marginTop: Spacing.sm,

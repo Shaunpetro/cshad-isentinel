@@ -19,22 +19,16 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { Typography, Spacing, BorderRadius } from '@/config/theme';
 import {
   searchSuburbs,
-  getUserSuburb,
-  saveUserSuburb,
-  clearUserSuburb,
+  getUserArea,
+  saveUserArea,
+  clearUserArea,
+  type SavedArea,
 } from '@/services/infrastructure';
-
-interface SavedSuburb {
-  id: string;
-  name: string;
-  municipality: string;
-  province: string;
-}
 
 interface SuburbPickerModalProps {
   visible: boolean;
   onClose: () => void;
-  onSuburbSelected: (suburb: SavedSuburb | null) => void;
+  onSuburbSelected: (area: SavedArea | null) => void;
 }
 
 export function SuburbPickerModal({
@@ -46,24 +40,24 @@ export function SuburbPickerModal({
   const insets = useSafeAreaInsets();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [results, setResults] = useState<SavedSuburb[]>([]);
+  const [results, setResults] = useState<SavedArea[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [currentSuburb, setCurrentSuburb] = useState<SavedSuburb | null>(null);
+  const [currentArea, setCurrentArea] = useState<SavedArea | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Load current suburb on mount
+  // Load current area on mount
   useEffect(() => {
     if (visible) {
-      loadCurrentSuburb();
+      loadCurrentArea();
       setSearchQuery('');
       setResults([]);
       setError(null);
     }
   }, [visible]);
 
-  const loadCurrentSuburb = async () => {
-    const suburb = await getUserSuburb();
-    setCurrentSuburb(suburb);
+  const loadCurrentArea = async () => {
+    const area = await getUserArea();
+    setCurrentArea(area);
   };
 
   // Debounced search
@@ -79,11 +73,11 @@ export function SuburbPickerModal({
       setError(null);
 
       try {
-        const suburbs = await searchSuburbs(searchQuery);
-        setResults(suburbs);
+        const areas = await searchSuburbs(searchQuery);
+        setResults(areas);
 
-        if (suburbs.length === 0 && searchQuery.length >= 2) {
-          setError('No suburbs found. Try a different search term.');
+        if (areas.length === 0 && searchQuery.length >= 2) {
+          setError('No areas found. Try a different search term.');
         }
       } catch (err) {
         setError('Search failed. Please try again.');
@@ -96,50 +90,50 @@ export function SuburbPickerModal({
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const handleSelectSuburb = useCallback(
-    async (suburb: SavedSuburb) => {
-      await saveUserSuburb(suburb);
-      setCurrentSuburb(suburb);
-      onSuburbSelected(suburb);
+  const handleSelectArea = useCallback(
+    async (area: SavedArea) => {
+      await saveUserArea(area);
+      setCurrentArea(area);
+      onSuburbSelected(area);
       onClose();
     },
     [onSuburbSelected, onClose]
   );
 
-  const handleClearSuburb = useCallback(async () => {
-    await clearUserSuburb();
-    setCurrentSuburb(null);
+  const handleClearArea = useCallback(async () => {
+    await clearUserArea();
+    setCurrentArea(null);
     onSuburbSelected(null);
     onClose();
   }, [onSuburbSelected, onClose]);
 
-  const renderSuburbItem = useCallback(
-    ({ item }: { item: SavedSuburb }) => {
-      const isSelected = currentSuburb?.id === item.id;
+  const renderAreaItem = useCallback(
+    ({ item }: { item: SavedArea }) => {
+      const isSelected = currentArea?.id === item.id;
 
       return (
         <Pressable
           style={[
-            styles.suburbItem,
+            styles.areaItem,
             {
               backgroundColor: isSelected ? colors.primary + '15' : colors.surface,
               borderColor: isSelected ? colors.primary : colors.border,
             },
           ]}
-          onPress={() => handleSelectSuburb(item)}
+          onPress={() => handleSelectArea(item)}
         >
-          <View style={styles.suburbInfo}>
+          <View style={styles.areaInfo}>
             <Text
               style={[
-                styles.suburbName,
+                styles.areaName,
                 { color: isSelected ? colors.primary : colors.text },
               ]}
               numberOfLines={1}
             >
               {item.name}
             </Text>
-            <Text style={[styles.suburbDetails, { color: colors.textSecondary }]} numberOfLines={1}>
-              {item.municipality}, {item.province}
+            <Text style={[styles.areaDetails, { color: colors.textSecondary }]} numberOfLines={1}>
+              {item.region}
             </Text>
           </View>
           {isSelected && (
@@ -148,21 +142,21 @@ export function SuburbPickerModal({
         </Pressable>
       );
     },
-    [currentSuburb, colors, handleSelectSuburb]
+    [currentArea, colors, handleSelectArea]
   );
 
   const renderHeader = useCallback(
     () => (
       <View>
         {/* Current Selection */}
-        {currentSuburb && (
+        {currentArea && (
           <View style={[styles.currentSection, { borderBottomColor: colors.border }]}>
             <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
               CURRENT AREA
             </Text>
             <View
               style={[
-                styles.currentSuburb,
+                styles.currentArea,
                 { backgroundColor: colors.primary + '15', borderColor: colors.primary },
               ]}
             >
@@ -170,16 +164,16 @@ export function SuburbPickerModal({
                 <Ionicons name="location" size={20} color={colors.primary} />
                 <View style={styles.currentText}>
                   <Text style={[styles.currentName, { color: colors.primary }]}>
-                    {currentSuburb.name}
+                    {currentArea.name}
                   </Text>
                   <Text style={[styles.currentDetails, { color: colors.textSecondary }]}>
-                    {currentSuburb.municipality}
+                    {currentArea.region}
                   </Text>
                 </View>
               </View>
               <Pressable
                 style={[styles.clearButton, { backgroundColor: colors.danger + '15' }]}
-                onPress={handleClearSuburb}
+                onPress={handleClearArea}
                 hitSlop={8}
               >
                 <Ionicons name="close" size={16} color={colors.danger} />
@@ -201,17 +195,17 @@ export function SuburbPickerModal({
         )}
 
         {/* Search Hint */}
-        {searchQuery.length < 2 && !currentSuburb && (
+        {searchQuery.length < 2 && !currentArea && (
           <View style={styles.hintContainer}>
             <Ionicons name="information-circle-outline" size={20} color={colors.textSecondary} />
             <Text style={[styles.hintText, { color: colors.textSecondary }]}>
-              Search for your suburb to see local load shedding schedules
+              Search for your area to see local load shedding schedules. Data from EskomCalendar.co.za
             </Text>
           </View>
         )}
       </View>
     ),
-    [currentSuburb, searchQuery, isSearching, results.length, colors, handleClearSuburb]
+    [currentArea, searchQuery, isSearching, results.length, colors, handleClearArea]
   );
 
   const renderEmpty = useCallback(() => {
@@ -220,7 +214,7 @@ export function SuburbPickerModal({
         <View style={styles.emptyContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            Searching Eskom database...
+            Searching areas...
           </Text>
         </View>
       );
@@ -240,10 +234,10 @@ export function SuburbPickerModal({
         <View style={styles.emptyContainer}>
           <Ionicons name="location-outline" size={48} color={colors.textDisabled} />
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            No suburbs found for "{searchQuery}"
+            No areas found for "{searchQuery}"
           </Text>
           <Text style={[styles.emptySubtext, { color: colors.textDisabled }]}>
-            Try searching for a different area name
+            Try searching for a city or suburb name
           </Text>
         </View>
       );
@@ -303,7 +297,7 @@ export function SuburbPickerModal({
             <Ionicons name="search" size={20} color={colors.textSecondary} />
             <TextInput
               style={[styles.searchInput, { color: colors.text }]}
-              placeholder="Search suburb or area name..."
+              placeholder="Search area (e.g., Sandton, Cape Town)..."
               placeholderTextColor={colors.textDisabled}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -322,7 +316,7 @@ export function SuburbPickerModal({
         {/* Results List */}
         <FlatList
           data={results}
-          renderItem={renderSuburbItem}
+          renderItem={renderAreaItem}
           keyExtractor={(item) => item.id}
           ListHeaderComponent={renderHeader}
           ListEmptyComponent={renderEmpty}
@@ -333,6 +327,13 @@ export function SuburbPickerModal({
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         />
+
+        {/* Attribution */}
+        <View style={[styles.attribution, { borderTopColor: colors.border }]}>
+          <Text style={[styles.attributionText, { color: colors.textDisabled }]}>
+            Data from EskomCalendar.co.za
+          </Text>
+        </View>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -359,7 +360,7 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   headerTitle: {
-    fontSize: Typography.sizes.body,
+    fontSize: Typography.sizes.heading,
     fontFamily: Typography.fonts.bold,
   },
   closeButton: {
@@ -399,7 +400,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     marginBottom: Spacing.sm,
   },
-  currentSuburb: {
+  currentArea: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -449,7 +450,7 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fonts.regular,
     lineHeight: Typography.sizes.body * 1.5,
   },
-  suburbItem: {
+  areaItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: Spacing.md,
@@ -457,14 +458,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: Spacing.sm,
   },
-  suburbInfo: {
+  areaInfo: {
     flex: 1,
   },
-  suburbName: {
+  areaName: {
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.bold,
   },
-  suburbDetails: {
+  areaDetails: {
     fontSize: Typography.sizes.caption,
     fontFamily: Typography.fonts.regular,
     marginTop: 2,
@@ -485,6 +486,16 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fonts.regular,
     marginTop: Spacing.xs,
     textAlign: 'center',
+  },
+  attribution: {
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    borderTopWidth: 1,
+    alignItems: 'center',
+  },
+  attributionText: {
+    fontSize: Typography.sizes.tiny,
+    fontFamily: Typography.fonts.regular,
   },
 });
 

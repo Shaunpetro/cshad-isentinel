@@ -11,15 +11,26 @@ import type {
 
 const TAG = '[InfrastructureService]';
 
-// Eskom API endpoints (FREE - no API key needed)
-const ESKOM_API = {
-  status: 'https://loadshedding.eskom.co.za/LoadShedding/GetStatus',
-  suburbs: 'https://loadshedding.eskom.co.za/LoadShedding/GetSurburbData',
-  schedule: 'https://loadshedding.eskom.co.za/LoadShedding/GetScheduleM',
+// Eskom Calendar API (FREE - no API key needed)
+// Attribution required: https://eskomcalendar.co.za
+const ESKOM_CALENDAR_API = {
+  base: 'https://eskom-calendar-api.shuttleapp.rs',
+  listAreas: '/list_areas',
+  outages: '/outages',
 };
 
-// Storage key for user's suburb
-const SUBURB_STORAGE_KEY = 'pshad_loadshedding_suburb';
+// Fallback: Direct Eskom API
+const ESKOM_DIRECT_API = {
+  status: 'https://loadshedding.eskom.co.za/LoadShedding/GetStatus',
+};
+
+// Storage keys
+const AREA_STORAGE_KEY = 'pshad_loadshedding_area';
+const AREA_LIST_CACHE_KEY = 'pshad_loadshedding_area_list';
+
+// Timeouts
+const FETCH_TIMEOUT_MS = 10000; // 10 seconds
+const AREA_LIST_CACHE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // Cache
 interface InfrastructureCache {
@@ -28,28 +39,130 @@ interface InfrastructureCache {
   timestamp: number;
 }
 
-let cache: InfrastructureCache | null = null;
+interface AreaListCache {
+  areas: string[];
+  timestamp: number;
+}
 
-// User's saved suburb
-interface SavedSuburb {
-  id: string;
-  name: string;
-  municipality: string;
-  province: string;
+let cache: InfrastructureCache | null = null;
+let areaListCache: AreaListCache | null = null;
+
+// User's saved area (eskom-calendar format)
+export interface SavedArea {
+  id: string;        // e.g., "gauteng-sandton"
+  name: string;      // e.g., "Sandton"
+  region: string;    // e.g., "Gauteng"
+  fullName: string;  // e.g., "gauteng-sandton"
+}
+
+// Eskom Calendar outage response
+interface EskomCalendarOutage {
+  area_name: string;
+  stage: number;
+  start: string;  // ISO date string
+  finsh: string;  // Note: API typo - "finsh" not "finish"
+  source: string;
 }
 
 /**
- * Search for suburbs by name
+ * Fetch with timeout support
  */
-export async function searchSuburbs(query: string): Promise<SavedSuburb[]> {
-  if (!query || query.length < 2) return [];
-
-  console.log(TAG, `Searching suburbs: "${query}"`);
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs: number = FETCH_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    // Eskom's suburb search endpoint
-    const response = await fetch(
-      `${ESKOM_API.suburbs}?searchText=${encodeURIComponent(query)}&maxResults=20`,
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error(`Request timeout after ${timeoutMs}ms`);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Parse area name into display format
+ * e.g., "gauteng-sandton" -> { region: "Gauteng", name: "Sandton" }
+ */
+function parseAreaName(areaName: string): { region: string; name: string } {
+  const parts = areaName.split('-');
+  if (parts.length >= 2) {
+    const region = parts[0].replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    const name = parts.slice(1).join(' ').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    return { region, name };
+  }
+  return { region: 'South Africa', name: areaName };
+}
+
+/**
+ * Load area list cache from storage
+ */
+async function loadAreaListCache(): Promise<string[] | null> {
+  try {
+    // Check memory cache first
+    if (areaListCache && Date.now() - areaListCache.timestamp < AREA_LIST_CACHE_DURATION_MS) {
+      return areaListCache.areas;
+    }
+
+    // Check persistent storage
+    const stored = await AsyncStorage.getItem(AREA_LIST_CACHE_KEY);
+    if (stored) {
+      const parsed: AreaListCache = JSON.parse(stored);
+      if (Date.now() - parsed.timestamp < AREA_LIST_CACHE_DURATION_MS) {
+        areaListCache = parsed;
+        return parsed.areas;
+      }
+    }
+  } catch (error) {
+    console.warn(TAG, 'Failed to load area list cache:', error);
+  }
+  return null;
+}
+
+/**
+ * Save area list cache
+ */
+async function saveAreaListCache(areas: string[]): Promise<void> {
+  try {
+    const cacheData: AreaListCache = {
+      areas,
+      timestamp: Date.now(),
+    };
+    areaListCache = cacheData;
+    await AsyncStorage.setItem(AREA_LIST_CACHE_KEY, JSON.stringify(cacheData));
+    console.log(TAG, `Cached ${areas.length} areas`);
+  } catch (error) {
+    console.warn(TAG, 'Failed to save area list cache:', error);
+  }
+}
+
+/**
+ * Fetch area list from API (with caching)
+ */
+async function fetchAreaList(): Promise<string[]> {
+  // Try cache first
+  const cached = await loadAreaListCache();
+  if (cached && cached.length > 0) {
+    console.log(TAG, `Using cached area list (${cached.length} areas)`);
+    return cached;
+  }
+
+  // Fetch from API
+  try {
+    console.log(TAG, 'Fetching area list from API...');
+    const response = await fetchWithTimeout(
+      `${ESKOM_CALENDAR_API.base}${ESKOM_CALENDAR_API.listAreas}`,
       {
         headers: {
           'Accept': 'application/json',
@@ -58,91 +171,147 @@ export async function searchSuburbs(query: string): Promise<SavedSuburb[]> {
     );
 
     if (!response.ok) {
-      console.warn(TAG, 'Suburb search failed:', response.status);
-      return [];
+      console.warn(TAG, 'Area list fetch failed:', response.status);
+      return cached || [];
     }
 
-    const data = await response.json();
-
-    // Parse Eskom's response format
-    // Format: { Results: [{ MunicipalityName, Name, ProvinceName, Total, Id }] }
-    if (!data?.Results || !Array.isArray(data.Results)) {
-      return [];
-    }
-
-    const suburbs: SavedSuburb[] = data.Results.map((item: any) => ({
-      id: String(item.Id),
-      name: item.Name,
-      municipality: item.MunicipalityName,
-      province: item.ProvinceName,
-    }));
-
-    console.log(TAG, `Found ${suburbs.length} suburbs`);
-    return suburbs;
+    const areas: string[] = await response.json();
+    
+    // Save to cache
+    await saveAreaListCache(areas);
+    
+    return areas;
   } catch (error) {
-    console.error(TAG, 'Suburb search error:', error);
+    console.error(TAG, 'Area list fetch error:', error);
+    return cached || [];
+  }
+}
+
+/**
+ * Search for areas by name using Eskom Calendar API
+ */
+export async function searchSuburbs(query: string): Promise<SavedArea[]> {
+  if (!query || query.length < 2) return [];
+
+  console.log(TAG, `Searching areas: "${query}"`);
+
+  try {
+    // Get area list (cached or fresh)
+    const areas = await fetchAreaList();
+    
+    if (areas.length === 0) {
+      console.warn(TAG, 'No areas available (API unreachable and no cache)');
+      return [];
+    }
+
+    // Filter areas by query
+    const queryLower = query.toLowerCase();
+    const filtered = areas
+      .filter((area) => area.toLowerCase().includes(queryLower))
+      .slice(0, 20);
+
+    // Convert to SavedArea format
+    const results: SavedArea[] = filtered.map((areaName) => {
+      const { region, name } = parseAreaName(areaName);
+      return {
+        id: areaName,
+        name,
+        region,
+        fullName: areaName,
+      };
+    });
+
+    console.log(TAG, `Found ${results.length} areas matching "${query}"`);
+    return results;
+  } catch (error) {
+    console.error(TAG, 'Area search error:', error);
     return [];
   }
 }
 
 /**
- * Save user's suburb selection
+ * Backwards compatible function name
  */
-export async function saveUserSuburb(suburb: SavedSuburb): Promise<void> {
+export async function getUserSuburb(): Promise<SavedArea | null> {
+  return getUserArea();
+}
+
+/**
+ * Backwards compatible function name
+ */
+export async function saveUserSuburb(area: SavedArea): Promise<void> {
+  return saveUserArea(area);
+}
+
+/**
+ * Backwards compatible function name
+ */
+export async function clearUserSuburb(): Promise<void> {
+  return clearUserArea();
+}
+
+/**
+ * Save user's area selection
+ */
+export async function saveUserArea(area: SavedArea): Promise<void> {
   try {
-    await AsyncStorage.setItem(SUBURB_STORAGE_KEY, JSON.stringify(suburb));
-    console.log(TAG, `Saved suburb: ${suburb.name}`);
-    // Clear cache to force refresh with new suburb
+    await AsyncStorage.setItem(AREA_STORAGE_KEY, JSON.stringify(area));
+    console.log(TAG, `Saved area: ${area.name}`);
+    // Clear cache to force refresh with new area
     cache = null;
   } catch (error) {
-    console.error(TAG, 'Failed to save suburb:', error);
+    console.error(TAG, 'Failed to save area:', error);
   }
 }
 
 /**
- * Get user's saved suburb
+ * Get user's saved area
  */
-export async function getUserSuburb(): Promise<SavedSuburb | null> {
+export async function getUserArea(): Promise<SavedArea | null> {
   try {
-    const stored = await AsyncStorage.getItem(SUBURB_STORAGE_KEY);
+    const stored = await AsyncStorage.getItem(AREA_STORAGE_KEY);
     if (stored) {
       return JSON.parse(stored);
     }
   } catch (error) {
-    console.error(TAG, 'Failed to get suburb:', error);
+    console.error(TAG, 'Failed to get area:', error);
   }
   return null;
 }
 
 /**
- * Clear user's saved suburb
+ * Clear user's saved area
  */
-export async function clearUserSuburb(): Promise<void> {
+export async function clearUserArea(): Promise<void> {
   try {
-    await AsyncStorage.removeItem(SUBURB_STORAGE_KEY);
+    await AsyncStorage.removeItem(AREA_STORAGE_KEY);
     cache = null;
   } catch (error) {
-    console.error(TAG, 'Failed to clear suburb:', error);
+    console.error(TAG, 'Failed to clear area:', error);
   }
 }
 
 /**
- * Fetch national load shedding stage from Eskom
+ * Fetch national load shedding stage from Eskom Direct API
  */
 async function fetchNationalStage(): Promise<number> {
   try {
-    const response = await fetch(ESKOM_API.status, {
-      headers: {
-        'Accept': 'application/json',
+    const response = await fetchWithTimeout(
+      ESKOM_DIRECT_API.status,
+      {
+        headers: {
+          'Accept': 'application/json',
+        },
       },
-    });
+      5000
+    );
 
     if (!response.ok) {
       console.warn(TAG, 'National status fetch failed:', response.status);
       return 0;
     }
 
-    const status = await response.json();
+    const status = await response.text();
     // Eskom returns: 1 = no load shedding, 2 = stage 1, 3 = stage 2, etc.
     const stage = Math.max(0, (parseInt(status, 10) || 1) - 1);
     console.log(TAG, `National stage: ${stage}`);
@@ -154,143 +323,118 @@ async function fetchNationalStage(): Promise<number> {
 }
 
 /**
- * Fetch local schedule for a suburb
+ * Fetch outages for an area from Eskom Calendar API
  */
-async function fetchLocalSchedule(
-  suburbId: string,
-  stage: number
-): Promise<LoadsheddingSlot[]> {
-  if (stage === 0) return [];
-
+async function fetchAreaOutages(areaId: string): Promise<LoadsheddingSlot[]> {
   try {
-    // Eskom schedule endpoint: GetScheduleM/{suburbId}/{stage}/{province}
-    // Province can be 1-9 but we'll try without it first
-    const response = await fetch(
-      `${ESKOM_API.schedule}/${suburbId}/${stage}`,
-      {
-        headers: {
-          'Accept': 'application/json',
-        },
-      }
-    );
+    const url = `${ESKOM_CALENDAR_API.base}${ESKOM_CALENDAR_API.outages}/${areaId}`;
+    console.log(TAG, `Fetching outages from: ${url}`);
+
+    const response = await fetchWithTimeout(url, {
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
 
     if (!response.ok) {
-      console.warn(TAG, 'Schedule fetch failed:', response.status);
+      console.warn(TAG, 'Outages fetch failed:', response.status);
       return [];
     }
 
-    const html = await response.text();
-    
-    // Parse the schedule from Eskom's HTML response
-    const slots = parseEskomSchedule(html, stage);
-    console.log(TAG, `Found ${slots.length} upcoming slots for suburb ${suburbId}`);
+    const outages: EskomCalendarOutage[] = await response.json();
+    const now = new Date();
+
+    // Convert to LoadsheddingSlot format, filter for future/current outages
+    const slots: LoadsheddingSlot[] = outages
+      .map((outage) => ({
+        start: new Date(outage.start),
+        end: new Date(outage.finsh), // Note: API typo
+        stage: outage.stage,
+      }))
+      .filter((slot) => slot.end > now)
+      .sort((a, b) => a.start.getTime() - b.start.getTime())
+      .slice(0, 10);
+
+    console.log(TAG, `Found ${slots.length} upcoming outages for ${areaId}`);
     return slots;
   } catch (error) {
-    console.error(TAG, 'Schedule fetch error:', error);
+    console.error(TAG, 'Outages fetch error:', error);
     return [];
   }
 }
 
 /**
- * Parse Eskom's schedule HTML response
- * Returns upcoming load shedding slots for today and tomorrow
+ * Get the current/maximum stage from outages
  */
-function parseEskomSchedule(html: string, stage: number): LoadsheddingSlot[] {
-  const slots: LoadsheddingSlot[] = [];
+function getStageFromOutages(slots: LoadsheddingSlot[]): number {
+  if (slots.length === 0) return 0;
+
   const now = new Date();
-
-  try {
-    // Eskom returns schedule in format like:
-    // "00:00 - 02:30, 08:00 - 10:30, 16:00 - 18:30"
-    // or as HTML table with times
-
-    // Extract time patterns (HH:MM - HH:MM)
-    const timePattern = /(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})/g;
-    let match;
-
-    while ((match = timePattern.exec(html)) !== null) {
-      const [, startTime, endTime] = match;
-
-      // Create date objects for today
-      const [startHour, startMin] = startTime.split(':').map(Number);
-      const [endHour, endMin] = endTime.split(':').map(Number);
-
-      const start = new Date(now);
-      start.setHours(startHour, startMin, 0, 0);
-
-      const end = new Date(now);
-      end.setHours(endHour, endMin, 0, 0);
-
-      // Handle overnight slots
-      if (end <= start) {
-        end.setDate(end.getDate() + 1);
-      }
-
-      // Only include future slots
-      if (end > now) {
-        slots.push({ start, end, stage });
-      }
-    }
-
-    // If no slots found for today, check if there's a "no load shedding" message
-    if (slots.length === 0) {
-      console.log(TAG, 'No upcoming slots found in schedule');
-    }
-
-    // Sort by start time
-    slots.sort((a, b) => a.start.getTime() - b.start.getTime());
-
-    // Return max 5 upcoming slots
-    return slots.slice(0, 5);
-  } catch (error) {
-    console.error(TAG, 'Schedule parse error:', error);
-    return [];
+  
+  // Check if there's a current outage
+  const currentOutage = slots.find((slot) => slot.start <= now && slot.end >= now);
+  if (currentOutage) {
+    return currentOutage.stage;
   }
+
+  // Return the stage of the next outage
+  return slots[0]?.stage || 0;
 }
 
 /**
  * Fetch current load shedding status (hybrid: national + local)
  */
 export async function fetchLoadsheddingStatus(
-  suburbId?: string
+  areaId?: string
 ): Promise<LoadsheddingStatus> {
-  console.log(TAG, 'Fetching load shedding status', { suburbId });
+  console.log(TAG, 'Fetching load shedding status', { areaId });
 
-  // Get user's suburb if not provided
-  let effectiveSuburbId = suburbId;
-  let suburbName: string | undefined;
+  // Get user's area if not provided
+  let effectiveAreaId = areaId;
+  let areaName: string | undefined;
+  let regionName: string | undefined;
 
-  if (!effectiveSuburbId) {
-    const savedSuburb = await getUserSuburb();
-    if (savedSuburb) {
-      effectiveSuburbId = savedSuburb.id;
-      suburbName = savedSuburb.name;
+  if (!effectiveAreaId) {
+    const savedArea = await getUserArea();
+    if (savedArea) {
+      effectiveAreaId = savedArea.fullName;
+      areaName = savedArea.name;
+      regionName = savedArea.region;
     }
   }
 
-  // Always fetch national stage first
-  const stage = await fetchNationalStage();
+  // Fetch national stage as fallback
+  const nationalStage = await fetchNationalStage();
 
-  // Build status object
+  // Build base status object
   const status: LoadsheddingStatus = {
-    stage,
+    stage: nationalStage,
     stageUpdated: new Date(),
     nextStages: [],
     source: 'Eskom',
     isNational: true,
   };
 
-  // If we have a suburb AND there's active load shedding, fetch local schedule
-  if (effectiveSuburbId && stage > 0) {
-    const localSlots = await fetchLocalSchedule(effectiveSuburbId, stage);
+  // If we have an area, fetch local outages from Eskom Calendar
+  if (effectiveAreaId) {
+    const localSlots = await fetchAreaOutages(effectiveAreaId);
 
     if (localSlots.length > 0) {
+      const localStage = getStageFromOutages(localSlots);
+      
+      status.stage = localStage;
       status.localSchedule = localSlots;
       status.nextOutage = localSlots[0];
-      status.suburbId = effectiveSuburbId;
-      status.suburbName = suburbName;
+      status.suburbId = effectiveAreaId;
+      status.suburbName = areaName || parseAreaName(effectiveAreaId).name;
       status.isNational = false;
-      status.source = `Eskom (${suburbName || 'Local'})`;
+      status.source = `EskomCalendar (${status.suburbName})`;
+    } else {
+      // No outages for this area
+      status.suburbId = effectiveAreaId;
+      status.suburbName = areaName || parseAreaName(effectiveAreaId).name;
+      status.source = `EskomCalendar (${status.suburbName})`;
+      status.isNational = false;
     }
   }
 
@@ -307,7 +451,7 @@ function createLoadsheddingAlert(status: LoadsheddingStatus): InfrastructureAler
 
   // Build description with local info if available
   let description = getLoadsheddingDescription(status.stage);
-  
+
   if (status.nextOutage) {
     const startTime = status.nextOutage.start.toLocaleTimeString('en-ZA', {
       hour: '2-digit',
@@ -437,7 +581,7 @@ export async function fetchInfrastructureAlerts(
     };
   }
 
-  // Fetch load shedding status (with local schedule if suburb is set)
+  // Fetch load shedding status (with local schedule if area is set)
   const loadshedding = await fetchLoadsheddingStatus();
 
   // Build alerts list
@@ -562,4 +706,12 @@ export function getTimeUntilNextOutage(status: LoadsheddingStatus): string | nul
   }
 
   return `Tomorrow`;
+}
+
+/**
+ * Pre-warm area list cache (call on app startup)
+ */
+export async function preloadAreaList(): Promise<void> {
+  console.log(TAG, 'Pre-loading area list...');
+  await fetchAreaList();
 }

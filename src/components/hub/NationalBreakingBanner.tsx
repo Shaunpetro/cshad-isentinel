@@ -10,6 +10,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Typography, Spacing, BorderRadius } from '@/config/theme';
 
@@ -39,6 +40,7 @@ export function NationalBreakingBanner({
   onDismissAll,
 }: NationalBreakingBannerProps) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -80,6 +82,21 @@ export function NationalBreakingBanner({
     onDismissAll?.();
   };
 
+  const formatTimeAgo = (date: Date): string => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+
+    if (diffMins < 1) return t('time.justNow');
+    if (diffMins < 60) return t('time.minutesAgo', { count: diffMins });
+
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return t('time.hoursAgo', { count: diffHours });
+
+    const diffDays = Math.floor(diffHours / 24);
+    return t('time.daysAgo', { count: diffDays });
+  };
+
   if (visibleAlerts.length === 0) {
     return null;
   }
@@ -114,17 +131,17 @@ export function NationalBreakingBanner({
             <Ionicons name="radio" size={16} color="#D32F2F" />
           </Animated.View>
           <Text style={[styles.headerTitle, { color: colors.text }]}>
-            National Alerts
+            {t('alerts.nationalAlerts')}
           </Text>
           <View style={[styles.badge, { backgroundColor: '#D32F2F' }]}>
             <Text style={styles.badgeText}>{visibleAlerts.length}</Text>
           </View>
         </View>
-        
+
         {visibleAlerts.length > 1 && (
           <Pressable onPress={handleDismissAll} hitSlop={8}>
             <Text style={[styles.dismissAllText, { color: colors.textSecondary }]}>
-              Dismiss all
+              {t('alerts.dismissAll')}
             </Text>
           </Pressable>
         )}
@@ -196,21 +213,6 @@ export function NationalBreakingBanner({
       </ScrollView>
     </View>
   );
-}
-
-function formatTimeAgo(date: Date): string {
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-
-  const diffDays = Math.floor(diffHours / 24);
-  return `${diffDays}d ago`;
 }
 
 const styles = StyleSheet.create({

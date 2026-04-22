@@ -27,6 +27,8 @@ export interface SAProvince {
 // ---- News ----
 
 export type NewsSeverity = "low" | "medium" | "high" | "critical";
+
+// All possible news categories from RSS feeds
 export type NewsCategory =
   | "crime"
   | "safety"
@@ -34,7 +36,14 @@ export type NewsCategory =
   | "infrastructure"
   | "weather"
   | "traffic"
-  | "general";
+  | "general"
+  | "politics"
+  | "health"
+  | "accident"
+  | "fire"
+  | "water"
+  | "electricity"
+  | "other";
 
 export type NewsSourceType = "saps" | "metro" | "community" | "media" | "rss";
 

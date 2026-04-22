@@ -1,5 +1,5 @@
 // src/components/news/NewsStats.tsx
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   UIManager,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Typography, Spacing } from '@/config/theme';
 import type { NewsItem, NewsCategory } from '@/types';
@@ -23,9 +24,13 @@ interface NewsStatsProps {
   articles: NewsItem[];
 }
 
+interface CategoryConfig {
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+}
+
 interface CategoryStat {
-  category: NewsCategory;
-  label: string;
+  category: string;
   icon: keyof typeof Ionicons.glyphMap;
   count: number;
   color: string;
@@ -33,32 +38,62 @@ interface CategoryStat {
 
 export function NewsStats({ articles }: NewsStatsProps) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(true);
 
-  // Category config with theme colors
-  const CATEGORY_CONFIG: Record<NewsCategory, { label: string; icon: keyof typeof Ionicons.glyphMap; color: string }> = {
-    crime: { label: 'Crime', icon: 'warning', color: colors.danger },
-    safety: { label: 'Safety', icon: 'shield-checkmark', color: colors.success },
-    traffic: { label: 'Traffic', icon: 'car', color: colors.warning },
-    weather: { label: 'Weather', icon: 'cloud', color: colors.info },
-    infrastructure: { label: 'Infra', icon: 'construct', color: '#9C27B0' },
-    community: { label: 'Community', icon: 'people', color: colors.primary },
-    general: { label: 'General', icon: 'newspaper', color: colors.textSecondary },
+  // Category config with icons and colors
+  const getCategoryConfig = (category: string): CategoryConfig => {
+    const configs: Record<string, CategoryConfig> = {
+      crime: { icon: 'warning', color: colors.danger },
+      safety: { icon: 'shield-checkmark', color: colors.success },
+      traffic: { icon: 'car', color: colors.warning },
+      weather: { icon: 'cloud', color: colors.info },
+      infrastructure: { icon: 'construct', color: '#9C27B0' },
+      community: { icon: 'people', color: colors.primary },
+      general: { icon: 'newspaper', color: colors.textSecondary },
+      politics: { icon: 'megaphone', color: '#FF5722' },
+      health: { icon: 'medical', color: '#E91E63' },
+      accident: { icon: 'alert-circle', color: '#FF9800' },
+      fire: { icon: 'flame', color: '#F44336' },
+      water: { icon: 'water', color: '#03A9F4' },
+      electricity: { icon: 'flash', color: '#FFC107' },
+      other: { icon: 'ellipsis-horizontal', color: '#607D8B' },
+    };
+    return configs[category] || { icon: 'document', color: colors.textSecondary };
   };
 
-  // Calculate stats
-  const stats: CategoryStat[] = Object.entries(CATEGORY_CONFIG).map(([key, config]) => {
-    const category = key as NewsCategory;
-    const count = articles.filter((a) => a.category === category).length;
-    return {
-      category,
-      label: config.label,
-      icon: config.icon,
-      count,
-      color: config.color,
-    };
-  }).filter((stat) => stat.count > 0) // Only show categories with articles
-    .sort((a, b) => b.count - a.count); // Sort by count descending
+  // Get translated category label
+  const getCategoryLabel = (category: string): string => {
+    const key = `news.categories.${category}`;
+    const translated = t(key);
+    return translated !== key 
+      ? translated 
+      : category.charAt(0).toUpperCase() + category.slice(1);
+  };
+
+  // Calculate stats dynamically from articles
+  const stats: CategoryStat[] = useMemo(() => {
+    // Count articles by category
+    const categoryCounts: Record<string, number> = {};
+    articles.forEach((article) => {
+      const cat = article.category || 'other';
+      categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+    });
+
+    // Convert to stats array
+    return Object.entries(categoryCounts)
+      .map(([category, count]) => {
+        const config = getCategoryConfig(category);
+        return {
+          category,
+          icon: config.icon,
+          count,
+          color: config.color,
+        };
+      })
+      .filter((stat) => stat.count > 0)
+      .sort((a, b) => b.count - a.count);
+  }, [articles, colors]);
 
   const maxCount = Math.max(...stats.map((s) => s.count), 1);
   const totalCount = articles.length;
@@ -95,7 +130,7 @@ export function NewsStats({ articles }: NewsStatsProps) {
             color={colors.primary}
           />
           <Text style={[styles.headerTitle, { color: colors.text }]}>
-            News Stats
+            {t('news.stats.title')}
           </Text>
           <View style={[styles.totalBadge, { backgroundColor: colors.primary }]}>
             <Text style={styles.totalText}>{totalCount}</Text>
@@ -122,7 +157,7 @@ export function NewsStats({ articles }: NewsStatsProps) {
                   style={styles.statIcon}
                 />
                 <Text style={[styles.statLabelText, { color: colors.textSecondary }]}>
-                  {stat.label}
+                  {getCategoryLabel(stat.category)}
                 </Text>
               </View>
 
@@ -198,7 +233,7 @@ const styles = StyleSheet.create({
   statLabel: {
     flexDirection: 'row',
     alignItems: 'center',
-    width: 90,
+    width: 100,
   },
   statIcon: {
     marginRight: 6,
@@ -219,7 +254,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   statCount: {
-    width: 24,
+    width: 28,
     textAlign: 'right',
     fontSize: Typography.sizes.caption,
     fontFamily: Typography.fonts.bold,

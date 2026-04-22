@@ -3,9 +3,10 @@ import React from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View, StyleSheet } from "react-native";
+import { I18nextProvider } from "react-i18next";
+import i18n from "@/i18n";
 import { useAppReady } from "@/hooks/useAppReady";
 import { CustomSplashScreen } from "@/components/core/SplashScreen";
-import { Colors } from "@/config/theme";
 import { useNotifications } from "@/hooks/useNotifications";
 import { ThemeProvider, useTheme } from "@/contexts";
 
@@ -15,7 +16,7 @@ function RootLayoutInner() {
     useAppReady();
 
   // Get theme
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
 
   // Initialize push notifications
   const { isInitialized: notificationsReady, error: notificationError } =
@@ -38,8 +39,8 @@ function RootLayoutInner() {
   }
 
   return (
-    <View 
-      style={[styles.root, { backgroundColor: colors.background }]} 
+    <View
+      style={[styles.root, { backgroundColor: colors.background }]}
       onLayout={onLayoutReady}
     >
       {/* Main app navigation */}
@@ -63,12 +64,14 @@ function RootLayoutInner() {
   );
 }
 
-// Root component with provider
+// Root component with providers
 export default function RootLayout() {
   return (
-    <ThemeProvider>
-      <RootLayoutInner />
-    </ThemeProvider>
+    <I18nextProvider i18n={i18n}>
+      <ThemeProvider>
+        <RootLayoutInner />
+      </ThemeProvider>
+    </I18nextProvider>
   );
 }
 

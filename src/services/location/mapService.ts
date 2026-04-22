@@ -1,9 +1,9 @@
 // src/services/map/mapService.ts
 import { supabase } from '../supabase/config';
-import { 
+import {
   geocodeFromMultipleSources,
-  type GeocodedLocation 
 } from '../location/geocoder';
+import { APP } from '@/config/constants';
 
 export interface MapMarker {
   id: string;
@@ -14,7 +14,7 @@ export interface MapMarker {
   severity: 'low' | 'medium' | 'high' | 'critical';
   latitude: number;
   longitude: number;
-  confidence: 'exact' | 'city' | 'province' | 'extracted';
+  confidence: 'exact' | 'city' | 'province' | 'extracted' | 'approximate';
   matchedLocation: string;
   timestamp: string;
   source?: string;
@@ -29,6 +29,24 @@ export interface MapDataResult {
 }
 
 /**
+ * Get a fallback location for items without coordinates
+ * Adds slight randomization to prevent markers stacking
+ */
+function getFallbackLocation(
+  defaultLat: number = APP.defaultRegion.latitude,
+  defaultLng: number = APP.defaultRegion.longitude
+): { latitude: number; longitude: number } {
+  // Add small random offset (within ~5km) to prevent exact stacking
+  const latOffset = (Math.random() - 0.5) * 0.05;
+  const lngOffset = (Math.random() - 0.5) * 0.05;
+
+  return {
+    latitude: defaultLat + latOffset,
+    longitude: defaultLng + lngOffset,
+  };
+}
+
+/**
  * Fetch all mappable data (news + tips)
  */
 export async function fetchMapData(options?: {
@@ -36,17 +54,25 @@ export async function fetchMapData(options?: {
   categories?: string[];
   includeNews?: boolean;
   includeTips?: boolean;
+  userLatitude?: number;
+  userLongitude?: number;
 }): Promise<MapDataResult> {
   const {
     limit = 100,
     categories,
     includeNews = true,
     includeTips = true,
+    userLatitude,
+    userLongitude,
   } = options || {};
 
   const markers: MapMarker[] = [];
   let newsCount = 0;
   let tipsCount = 0;
+
+  // Use user location as fallback center, or SA center
+  const fallbackLat = userLatitude || APP.defaultRegion.latitude;
+  const fallbackLng = userLongitude || APP.defaultRegion.longitude;
 
   try {
     // Fetch news articles
@@ -67,7 +93,6 @@ export async function fetchMapData(options?: {
         console.error('[MapService] News fetch error:', newsError.message);
       } else if (newsData) {
         for (const article of newsData) {
-          // Try to geocode
           const location = geocodeFromMultipleSources(
             article.location_name,
             article.title,
@@ -76,7 +101,6 @@ export async function fetchMapData(options?: {
             article.longitude
           );
 
-          // Only include if we could geocode it
           if (location) {
             markers.push({
               id: article.id,
@@ -98,7 +122,7 @@ export async function fetchMapData(options?: {
       }
     }
 
-    // Fetch tips
+    // Fetch tips - NOTE: tips table does NOT have location_name column
     if (includeTips) {
       let tipsQuery = supabase
         .from('tips')
@@ -116,17 +140,17 @@ export async function fetchMapData(options?: {
         console.error('[MapService] Tips fetch error:', tipsError.message);
       } else if (tipsData) {
         for (const tip of tipsData) {
-          // Try to geocode (tips use description for location extraction)
+          // Try to get location from coordinates or extract from description
           const location = geocodeFromMultipleSources(
-            null,
+            null, // Tips don't have location_name column
             null,
             tip.description,
             tip.latitude,
             tip.longitude
           );
 
-          // Only include if we could geocode it
           if (location) {
+            // We found a valid location
             markers.push({
               id: tip.id,
               type: 'tip',
@@ -138,6 +162,28 @@ export async function fetchMapData(options?: {
               longitude: location.longitude,
               confidence: location.confidence,
               matchedLocation: location.matchedName,
+              timestamp: tip.created_at,
+              status: tip.status,
+            });
+            tipsCount++;
+          } else {
+            // NO location found - use fallback so tip still appears on map
+            // This ensures tips are NEVER lost, just shown at approximate location
+            const fallback = getFallbackLocation(fallbackLat, fallbackLng);
+
+            console.log(`[MapService] Tip ${tip.id} has no location, using fallback`);
+
+            markers.push({
+              id: tip.id,
+              type: 'tip',
+              title: 'Community Tip',
+              description: tip.description,
+              category: tip.category,
+              severity: tip.severity || 'low',
+              latitude: fallback.latitude,
+              longitude: fallback.longitude,
+              confidence: 'approximate',
+              matchedLocation: 'Location not specified',
               timestamp: tip.created_at,
               status: tip.status,
             });
@@ -171,10 +217,17 @@ export async function fetchMapData(options?: {
  * Subscribe to realtime map updates
  */
 export function subscribeToMapUpdates(
-  onNewMarker: (marker: MapMarker) => void
+  onNewMarker: (marker: MapMarker) => void,
+  options?: {
+    userLatitude?: number;
+    userLongitude?: number;
+  }
 ): () => void {
   const channelId = `map-updates-${Date.now()}`;
-  
+
+  const fallbackLat = options?.userLatitude || APP.defaultRegion.latitude;
+  const fallbackLng = options?.userLongitude || APP.defaultRegion.longitude;
+
   const channel = supabase
     .channel(channelId)
     .on(
@@ -189,7 +242,7 @@ export function subscribeToMapUpdates(
           article.latitude as number | null,
           article.longitude as number | null
         );
-        
+
         if (location) {
           onNewMarker({
             id: article.id as string,
@@ -213,6 +266,7 @@ export function subscribeToMapUpdates(
       { event: 'INSERT', schema: 'public', table: 'tips' },
       (payload) => {
         const tip = payload.new as Record<string, unknown>;
+        // Tips don't have location_name column - extract from description or use coords
         const location = geocodeFromMultipleSources(
           null,
           null,
@@ -220,7 +274,7 @@ export function subscribeToMapUpdates(
           tip.latitude as number | null,
           tip.longitude as number | null
         );
-        
+
         if (location) {
           onNewMarker({
             id: tip.id as string,
@@ -233,6 +287,24 @@ export function subscribeToMapUpdates(
             longitude: location.longitude,
             confidence: location.confidence,
             matchedLocation: location.matchedName,
+            timestamp: tip.created_at as string,
+            status: tip.status as string | undefined,
+          });
+        } else {
+          // Use fallback for tips without location
+          const fallback = getFallbackLocation(fallbackLat, fallbackLng);
+
+          onNewMarker({
+            id: tip.id as string,
+            type: 'tip',
+            title: 'Community Tip',
+            description: tip.description as string | undefined,
+            category: tip.category as string,
+            severity: (tip.severity as MapMarker['severity']) || 'low',
+            latitude: fallback.latitude,
+            longitude: fallback.longitude,
+            confidence: 'approximate',
+            matchedLocation: 'Location not specified',
             timestamp: tip.created_at as string,
             status: tip.status as string | undefined,
           });

@@ -10,6 +10,8 @@ import {
 import MapView, { Marker, Callout, Circle } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useLocation } from "@/hooks/useLocation";
 import {
@@ -20,6 +22,9 @@ import {
 } from "@/config/theme";
 import { APP } from "@/config/constants";
 import { useMapData } from "@/hooks/useMapData";
+import {
+  METRO_QUICK_ACCESS,
+} from "@/services/location/saCities";
 import type { MapMarker } from "@/services/map";
 
 // Default zoom levels
@@ -29,48 +34,15 @@ const ZOOM_LEVELS = {
   country: { latitudeDelta: 12, longitudeDelta: 12 },
 };
 
-// Major cities for the quick-access buttons
-const MAJOR_CITIES: {
-  key: string;
-  label: string;
-  fullName: string;
-  aliases: string[];
-  latitude: number;
-  longitude: number;
-}[] = [
-  { 
-    key: 'johannesburg', 
-    label: 'JHB', 
-    fullName: 'Johannesburg',
-    aliases: ['joburg', 'jozi', 'jhb', 'soweto', 'sandton', 'randburg', 'roodepoort', 'midrand'],
-    latitude: -26.2041, 
-    longitude: 28.0473 
-  },
-  { 
-    key: 'capeTown', 
-    label: 'CPT', 
-    fullName: 'Cape Town',
-    aliases: ['kaapstad', 'cpt', 'bellville', 'stellenbosch', 'paarl', 'table bay'],
-    latitude: -33.9249, 
-    longitude: 18.4241 
-  },
-  { 
-    key: 'durban', 
-    label: 'DBN', 
-    fullName: 'Durban',
-    aliases: ['ethekwini', 'dbn', 'umhlanga', 'pinetown', 'umlazi'],
-    latitude: -29.8587, 
-    longitude: 31.0218 
-  },
-  { 
-    key: 'pretoria', 
-    label: 'PTA', 
-    fullName: 'Pretoria',
-    aliases: ['tshwane', 'pta', 'centurion', 'brits', 'hartbeespoort', 'akasia', 'soshanguve'],
-    latitude: -25.7479, 
-    longitude: 28.2293 
-  },
-];
+// Convert SALocation to the format needed for quick-access buttons
+const MAJOR_CITIES = METRO_QUICK_ACCESS.map((loc) => ({
+  key: loc.key,
+  label: loc.label,
+  fullName: loc.fullName,
+  aliases: loc.aliases,
+  latitude: loc.latitude,
+  longitude: loc.longitude,
+}));
 
 // Marker colors by type and severity
 const getMarkerColor = (marker: MapMarker): string => {
@@ -81,7 +53,7 @@ const getMarkerColor = (marker: MapMarker): string => {
     case 'critical': return '#FF1744';
     case 'high': return '#FF5722';
     case 'medium': return '#FFC107';
-    case 'low': 
+    case 'low':
     default: return '#4CAF50';
   }
 };
@@ -103,7 +75,6 @@ const getCategoryIcon = (category: string): keyof typeof Ionicons.glyphMap => {
 
 /**
  * Find which major city button should be highlighted
- * Based on either direct name match, alias match, or proximity
  */
 const findMatchingMajorCity = (
   cityName: string | undefined,
@@ -116,34 +87,32 @@ const findMatchingMajorCity = (
 
   const lowerCityName = cityName?.toLowerCase() || '';
 
-  // 1. Check for direct name match or alias match
   for (const majorCity of MAJOR_CITIES) {
-    // Direct name match
     if (majorCity.fullName.toLowerCase() === lowerCityName) {
       return majorCity.key;
     }
-    
-    // Alias match (e.g., "Brits" → "Pretoria", "Soweto" → "Johannesburg")
-    if (majorCity.aliases.some(alias => 
-      lowerCityName.includes(alias) || alias.includes(lowerCityName)
-    )) {
+    if (majorCity.label.toLowerCase() === lowerCityName) {
+      return majorCity.key;
+    }
+    if (majorCity.aliases.some(alias => {
+      const aliasLower = alias.toLowerCase();
+      return lowerCityName === aliasLower ||
+             lowerCityName.includes(aliasLower) && aliasLower.length > 4;
+    })) {
       return majorCity.key;
     }
   }
 
-  // 2. If we have coordinates, find closest major city
   if (latitude != null && longitude != null) {
     let closestCity: string | null = null;
     let minDistance = Infinity;
 
     for (const majorCity of MAJOR_CITIES) {
-      const distance = Math.sqrt(
-        Math.pow(majorCity.latitude - latitude, 2) +
-        Math.pow(majorCity.longitude - longitude, 2)
-      );
-      
-      // Only match if within ~150km (roughly 1.5 degrees)
-      if (distance < minDistance && distance < 1.5) {
+      const dLat = majorCity.latitude - latitude;
+      const dLon = majorCity.longitude - longitude;
+      const distance = Math.sqrt(dLat * dLat + dLon * dLon);
+
+      if (distance < minDistance && distance < 0.5) {
         minDistance = distance;
         closestCity = majorCity.key;
       }
@@ -157,6 +126,7 @@ const findMatchingMajorCity = (
 
 export default function MapScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const mapRef = useRef<MapView>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -165,25 +135,32 @@ export default function MapScreen() {
   const [showRadius, setShowRadius] = useState(true);
   const [viewMode, setViewMode] = useState<'myArea' | 'national'>('myArea');
 
-  // Get user location context - now using the full SACity object
+  const hasAnimatedToCity = useRef<string | null>(null);
+
   const {
     currentCity,
     radiusKm,
     isLoading: locationLoading,
     permissionStatus,
+    refresh: refreshLocation,
   } = useLocation();
 
-  // Extract coordinates and name from currentCity
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[MapScreen] Screen focused, refreshing location...');
+      refreshLocation();
+    }, [refreshLocation])
+  );
+
   const userLat = currentCity?.latitude;
   const userLng = currentCity?.longitude;
   const cityName = currentCity?.name;
+  const cityId = currentCity?.id;
 
-  // Determine which major city button to highlight
   const activeCity = useMemo(() => {
     return findMatchingMajorCity(cityName, userLat, userLng);
   }, [cityName, userLat, userLng]);
 
-  // Fetch map data
   const {
     markers,
     newsCount,
@@ -197,9 +174,7 @@ export default function MapScreen() {
     realtime: true,
   });
 
-  // Calculate initial region based on user's location
   const initialRegion = useMemo(() => {
-    // If we have a current city with coordinates, use it
     if (userLat && userLng) {
       return {
         latitude: userLat,
@@ -208,7 +183,6 @@ export default function MapScreen() {
       };
     }
 
-    // Fallback to SA center
     return {
       latitude: APP.defaultRegion.latitude,
       longitude: APP.defaultRegion.longitude,
@@ -216,33 +190,34 @@ export default function MapScreen() {
     };
   }, [userLat, userLng]);
 
-  // Animate to user's location when map is ready and we have location
   useEffect(() => {
     if (mapReady && mapRef.current && userLat && userLng && viewMode === 'myArea') {
-      // Small delay to ensure map is fully ready
-      const timer = setTimeout(() => {
-        mapRef.current?.animateToRegion(
-          {
-            latitude: userLat,
-            longitude: userLng,
-            ...ZOOM_LEVELS.city,
-          },
-          1000
-        );
-      }, 500);
+      if (hasAnimatedToCity.current !== cityId) {
+        console.log(`[MapScreen] City changed to ${cityName}, animating map...`);
+        hasAnimatedToCity.current = cityId || null;
 
-      return () => clearTimeout(timer);
+        const timer = setTimeout(() => {
+          mapRef.current?.animateToRegion(
+            {
+              latitude: userLat,
+              longitude: userLng,
+              ...ZOOM_LEVELS.city,
+            },
+            800
+          );
+        }, 300);
+
+        return () => clearTimeout(timer);
+      }
     }
-  }, [mapReady, userLat, userLng, viewMode]);
+  }, [mapReady, userLat, userLng, viewMode, cityId, cityName]);
 
-  // Filter markers by proximity if in "My Area" mode
   const visibleMarkers = useMemo(() => {
     if (viewMode === 'national' || !userLat || !userLng) {
       return markers;
     }
 
-    // Filter to markers within radius
-    const radiusInDegrees = (radiusKm || 25) / 111; // Rough conversion: 1 degree ≈ 111km
+    const radiusInDegrees = (radiusKm || 25) / 111;
     return markers.filter((marker) => {
       const distance = Math.sqrt(
         Math.pow(marker.latitude - userLat, 2) +
@@ -251,6 +226,19 @@ export default function MapScreen() {
       return distance <= radiusInDegrees;
     });
   }, [markers, viewMode, userLat, userLng, radiusKm]);
+
+  const visibleNewsCount = useMemo(() => {
+    return visibleMarkers.filter(m => m.type === 'news').length;
+  }, [visibleMarkers]);
+
+  const visibleTipsCount = useMemo(() => {
+    return visibleMarkers.filter(m => m.type === 'tip').length;
+  }, [visibleMarkers]);
+
+  const tipsOutsideView = useMemo(() => {
+    if (viewMode === 'national') return 0;
+    return tipsCount - visibleTipsCount;
+  }, [viewMode, tipsCount, visibleTipsCount]);
 
   const handleMarkerPress = useCallback((marker: MapMarker) => {
     setSelectedId(marker.id);
@@ -300,6 +288,40 @@ export default function MapScreen() {
     }
   }, []);
 
+  const handleTipsToggle = useCallback(() => {
+    if (!showTips) {
+      setShowTips(true);
+
+      if (tipsOutsideView > 0 && markers.some(m => m.type === 'tip')) {
+        const tipMarkers = markers.filter(m => m.type === 'tip');
+        if (tipMarkers.length > 0 && mapRef.current) {
+          const lats = tipMarkers.map(m => m.latitude);
+          const lngs = tipMarkers.map(m => m.longitude);
+          const minLat = Math.min(...lats);
+          const maxLat = Math.max(...lats);
+          const minLng = Math.min(...lngs);
+          const maxLng = Math.max(...lngs);
+
+          const centerLat = (minLat + maxLat) / 2;
+          const centerLng = (minLng + maxLng) / 2;
+          const latDelta = Math.max((maxLat - minLat) * 1.5, 0.1);
+          const lngDelta = Math.max((maxLng - minLng) * 1.5, 0.1);
+
+          mapRef.current.animateToRegion({
+            latitude: centerLat,
+            longitude: centerLng,
+            latitudeDelta: latDelta,
+            longitudeDelta: lngDelta,
+          }, 800);
+
+          setViewMode('national');
+        }
+      }
+    } else {
+      setShowTips(false);
+    }
+  }, [showTips, tipsOutsideView, markers]);
+
   const handleMapReady = useCallback(() => {
     setMapReady(true);
   }, []);
@@ -310,36 +332,44 @@ export default function MapScreen() {
     const diffMs = now.getTime() - date.getTime();
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
 
-    if (diffHours < 1) return 'Just now';
-    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffHours < 1) return t('time.justNow');
+    if (diffHours < 24) return t('time.hoursAgo', { count: diffHours });
     return date.toLocaleDateString();
+  };
+
+  const getConfidenceText = (confidence: string) => {
+    switch (confidence) {
+      case 'exact': return t('map.confidence.exact');
+      case 'city': return t('map.confidence.city');
+      case 'province': return t('map.confidence.province');
+      case 'approximate': return t('map.confidence.approximate');
+      default: return confidence;
+    }
   };
 
   const isLoading = locationLoading || dataLoading;
   const errorColor = '#FF4757';
   const currentRadiusKm = radiusKm || 25;
 
-  // Determine location display text
   const locationDisplayText = useMemo(() => {
     if (viewMode === 'national') {
       return '🇿🇦 South Africa';
     }
-    
+
     if (cityName) {
-      // Show city name with province if available
       const province = currentCity?.province;
       if (province && !cityName.includes(province)) {
         return `📍 ${cityName}, ${currentCity?.provinceCode || province}`;
       }
       return `📍 ${cityName}`;
     }
-    
+
     if (permissionStatus === 'denied') {
-      return '📍 Location disabled';
+      return `📍 ${t('location.permissionDenied')}`;
     }
-    
-    return '📍 Detecting...';
-  }, [viewMode, cityName, currentCity, permissionStatus]);
+
+    return `📍 ${t('location.detecting')}`;
+  }, [viewMode, cityName, currentCity, permissionStatus, t]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -411,7 +441,7 @@ export default function MapScreen() {
                     ]}
                   >
                     <Text style={styles.typeBadgeText}>
-                      {marker.type === 'tip' ? '🟣 Community Tip' : '📰 News'}
+                      {marker.type === 'tip' ? `🟣 ${t('map.showTips')}` : `📰 ${t('map.showNews')}`}
                     </Text>
                   </View>
 
@@ -452,7 +482,7 @@ export default function MapScreen() {
                         { color: colors.textSecondary },
                       ]}
                     >
-                      📌 Location: {marker.confidence}
+                      📌 {getConfidenceText(marker.confidence)}
                     </Text>
                   )}
                 </View>
@@ -469,10 +499,10 @@ export default function MapScreen() {
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
             {locationLoading
-              ? 'Getting your location...'
+              ? t('location.detecting')
               : dataLoading
-              ? 'Loading safety data...'
-              : 'Loading map...'}
+              ? t('common.loading')
+              : t('common.loading')}
           </Text>
         </View>
       )}
@@ -482,7 +512,7 @@ export default function MapScreen() {
         <View style={[styles.errorBanner, { backgroundColor: errorColor }]}>
           <Text style={styles.errorText}>{error}</Text>
           <Pressable onPress={refresh}>
-            <Text style={styles.retryText}>Retry</Text>
+            <Text style={styles.retryText}>{t('common.retry')}</Text>
           </Pressable>
         </View>
       )}
@@ -494,7 +524,7 @@ export default function MapScreen() {
       >
         <View style={styles.topBarContent}>
           <View style={styles.topBarLeft}>
-            <Text style={[styles.title, { color: colors.text }]}>Safety Map</Text>
+            <Text style={[styles.title, { color: colors.text }]}>{t('map.title')}</Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
               {locationDisplayText}
               {viewMode === 'myArea' && cityName && ` • ${currentRadiusKm}km`}
@@ -502,7 +532,7 @@ export default function MapScreen() {
           </View>
           <View style={styles.topBarRight}>
             <Text style={[styles.statText, { color: colors.primary }]}>
-              {visibleMarkers.length} pins
+              {visibleMarkers.length} {t('map.markers')}
             </Text>
             {viewMode === 'myArea' && markers.length !== visibleMarkers.length && (
               <Text style={[styles.statSubtext, { color: colors.textSecondary }]}>
@@ -533,7 +563,7 @@ export default function MapScreen() {
               { color: viewMode === 'myArea' ? colors.primary : colors.textSecondary },
             ]}
           >
-            My Area
+            {t('map.myLocation')}
           </Text>
         </Pressable>
 
@@ -554,7 +584,7 @@ export default function MapScreen() {
               },
             ]}
           >
-            All SA
+            {t('map.showAll')}
           </Text>
         </Pressable>
 
@@ -591,12 +621,12 @@ export default function MapScreen() {
               { color: showNews ? colors.primary : colors.textSecondary },
             ]}
           >
-            📰 News ({newsCount})
+            📰 {t('map.showNews')} ({viewMode === 'myArea' ? visibleNewsCount : newsCount})
           </Text>
         </Pressable>
 
         <Pressable
-          onPress={() => setShowTips(!showTips)}
+          onPress={handleTipsToggle}
           style={[
             styles.filterButton,
             showTips && { backgroundColor: '#9C27B0' + '20' },
@@ -608,14 +638,17 @@ export default function MapScreen() {
               { color: showTips ? '#9C27B0' : colors.textSecondary },
             ]}
           >
-            🟣 Tips ({tipsCount})
+            🟣 {t('map.showTips')} ({viewMode === 'myArea' ? visibleTipsCount : tipsCount})
+            {tipsOutsideView > 0 && viewMode === 'myArea' && (
+              <Text style={{ color: colors.textDisabled }}> +{tipsOutsideView}</Text>
+            )}
           </Text>
         </Pressable>
       </View>
 
       {/* Quick city buttons */}
       <View style={styles.cityBar}>
-        {MAJOR_CITIES.map((city) => {
+        {MAJOR_CITIES.slice(0, 4).map((city) => {
           const isActive = activeCity === city.key;
           return (
             <Pressable
@@ -623,7 +656,7 @@ export default function MapScreen() {
               onPress={() => handleZoomToCity(city.key)}
               style={({ pressed }) => [
                 styles.cityButton,
-                { 
+                {
                   backgroundColor: isActive ? colors.primary : colors.surface,
                   borderColor: isActive ? colors.primary : 'transparent',
                 },
@@ -650,36 +683,36 @@ export default function MapScreen() {
 
       {/* Legend */}
       <View style={[styles.legend, { backgroundColor: colors.surface + 'F0' }]}>
-        <Text style={[styles.legendTitle, { color: colors.text }]}>Legend</Text>
+        <Text style={[styles.legendTitle, { color: colors.text }]}>{t('map.filters')}</Text>
         <View style={styles.legendItems}>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#FF1744' }]} />
             <Text style={[styles.legendText, { color: colors.textSecondary }]}>
-              Critical
+              {t('news.severity.critical')}
             </Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#FF5722' }]} />
             <Text style={[styles.legendText, { color: colors.textSecondary }]}>
-              High
+              {t('news.severity.high')}
             </Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#FFC107' }]} />
             <Text style={[styles.legendText, { color: colors.textSecondary }]}>
-              Medium
+              {t('news.severity.medium')}
             </Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#4CAF50' }]} />
             <Text style={[styles.legendText, { color: colors.textSecondary }]}>
-              Low
+              {t('news.severity.low')}
             </Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#9C27B0' }]} />
             <Text style={[styles.legendText, { color: colors.textSecondary }]}>
-              Tip
+              {t('tabs.tip')}
             </Text>
           </View>
         </View>

@@ -2,7 +2,9 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors, Typography, Spacing } from "@/config/theme";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Typography, Spacing } from "@/config/theme";
 import type { NewsSourceType } from "@/types";
 
 interface SourceBadgeProps {
@@ -11,52 +13,71 @@ interface SourceBadgeProps {
   size?: "small" | "medium";
 }
 
-const SOURCE_CONFIG: Record<
-  NewsSourceType,
-  { icon: keyof typeof Ionicons.glyphMap; color: string; label: string }
-> = {
-  saps: {
-    icon: "shield-checkmark",
-    color: "#4A90D9",
-    label: "SAPS",
-  },
-  metro: {
-    icon: "car",
-    color: Colors.semantic.primary,
-    label: "Metro",
-  },
-  community: {
-    icon: "people",
-    color: Colors.semantic.warning,
-    label: "Community",
-  },
-  media: {
-    icon: "newspaper",
-    color: "#9B59B6",
-    label: "Media",
-  },
-  rss: {
-    icon: "globe-outline",
-    color: "#3498DB",
-    label: "News",
-  },
-};
-
-// Fallback config for unknown source types
-const FALLBACK_CONFIG = {
-  icon: "information-circle-outline" as keyof typeof Ionicons.glyphMap,
-  color: "#7F8C8D",
-  label: "Source",
-};
+interface SourceConfig {
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  labelKey: string;
+}
 
 export function SourceBadge({
   sourceType,
   sourceName,
   size = "small",
 }: SourceBadgeProps) {
-  // Use fallback if source type is unknown
-  const config = SOURCE_CONFIG[sourceType] || FALLBACK_CONFIG;
+  const { t } = useTranslation();
+  const { colors } = useTheme();
   const isSmall = size === "small";
+
+  // Get source config with colors
+  const getSourceConfig = (type: NewsSourceType): SourceConfig => {
+    switch (type) {
+      case "saps":
+        return {
+          icon: "shield-checkmark",
+          color: "#4A90D9",
+          labelKey: "news.sources.saps",
+        };
+      case "metro":
+        return {
+          icon: "car",
+          color: colors.primary,
+          labelKey: "news.sources.metro",
+        };
+      case "community":
+        return {
+          icon: "people",
+          color: colors.warning,
+          labelKey: "news.sources.community",
+        };
+      case "media":
+        return {
+          icon: "newspaper",
+          color: "#9B59B6",
+          labelKey: "news.sources.media",
+        };
+      case "rss":
+        return {
+          icon: "globe-outline",
+          color: "#3498DB",
+          labelKey: "news.sources.news",
+        };
+      default:
+        return {
+          icon: "information-circle-outline",
+          color: colors.textSecondary,
+          labelKey: "news.sources.source",
+        };
+    }
+  };
+
+  const config = getSourceConfig(sourceType);
+
+  // Get translated label or use sourceName
+  const getLabel = (): string => {
+    if (sourceName) return sourceName;
+    const translated = t(config.labelKey);
+    return translated !== config.labelKey ? translated : sourceType;
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: `${config.color}20` }]}>
@@ -72,7 +93,7 @@ export function SourceBadge({
         ]}
         numberOfLines={1}
       >
-        {sourceName || config.label}
+        {getLabel()}
       </Text>
     </View>
   );

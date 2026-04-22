@@ -2,16 +2,23 @@
 /**
  * Location Service - Manages user location and city selection
  * Rule 1: Privacy First - Location is optional and user-controlled
- * 
+ *
  * Hybrid approach:
- * - 15 major cities for quick selection
+ * - 8 metros + provincial capitals + regional cities for quick selection
  * - Reverse geocoding for actual GPS location (Brits, not Pretoria)
  * - API search for any SA location
  */
 
 import * as Location from 'expo-location';
 import * as SecureStore from 'expo-secure-store';
-import { SA_CITIES, findNearestCity, createCustomCity, type SACity } from './saCities';
+import {
+  SA_CITIES,
+  findNearestCity,
+  findCityByName,
+  createCustomCity,
+  getCityById,
+  type SACity,
+} from './saCities';
 import type { GeoPoint } from '@/types';
 
 // Storage keys
@@ -32,8 +39,18 @@ export interface LocationState {
   error: string | null;
 }
 
-// Default state
-export const DEFAULT_CITY = SA_CITIES.find((c) => c.id === 'jhb')!;
+// Default state - use 'johannesburg' key (not 'jhb')
+export const DEFAULT_CITY: SACity = SA_CITIES.find((c) => c.id === 'johannesburg') || {
+  id: 'johannesburg',
+  name: 'Johannesburg',
+  province: 'Gauteng',
+  provinceCode: 'GP',
+  latitude: -26.2041,
+  longitude: 28.0473,
+  population: 5635000,
+  aliases: ['joburg', 'jozi', 'jhb'],
+};
+
 export const DEFAULT_RADIUS = 30;
 export const DEFAULT_SCOPE: NewsScope = 'local';
 
@@ -106,7 +123,7 @@ export async function reverseGeocodeLocation(
       return null;
     }
 
-    // Check if this matches a known major city (fuzzy match)
+    // Check if this matches a known city (fuzzy match)
     const matchedCity = findMatchingCity(name, latitude, longitude);
     if (matchedCity) {
       console.log('[LocationService] Matched to known city:', matchedCity.name);
@@ -126,7 +143,7 @@ export async function reverseGeocodeLocation(
 
 /**
  * Try to match a location name to a known city
- * Matches if name is similar AND within 10km
+ * Matches if name is similar AND within 15km
  */
 function findMatchingCity(
   name: string,
@@ -134,20 +151,30 @@ function findMatchingCity(
   longitude: number
 ): SACity | null {
   const nameLower = name.toLowerCase();
-  
+
   for (const city of SA_CITIES) {
     const cityNameLower = city.name.toLowerCase();
-    
+
     // Check name similarity
-    if (nameLower.includes(cityNameLower) || cityNameLower.includes(nameLower)) {
-      // Also check distance - must be within 10km to match
+    let nameMatches = nameLower.includes(cityNameLower) || cityNameLower.includes(nameLower);
+
+    // Also check aliases
+    if (!nameMatches && city.aliases) {
+      nameMatches = city.aliases.some(alias => {
+        const aliasLower = alias.toLowerCase();
+        return nameLower.includes(aliasLower) || aliasLower.includes(nameLower);
+      });
+    }
+
+    if (nameMatches) {
+      // Also check distance - must be within 15km to match
       const distance = calculateDistanceSimple(latitude, longitude, city.latitude, city.longitude);
-      if (distance < 10) {
+      if (distance < 15) {
         return city;
       }
     }
   }
-  
+
   return null;
 }
 
@@ -171,14 +198,14 @@ function calculateDistanceSimple(lat1: number, lon1: number, lat2: number, lon2:
  */
 export async function detectActualLocation(): Promise<SACity | null> {
   const location = await getCurrentLocation();
-  
+
   if (!location) {
     return null;
   }
 
   // Try to get actual place name via reverse geocoding
   const actualCity = await reverseGeocodeLocation(location.latitude, location.longitude);
-  
+
   if (actualCity) {
     return actualCity;
   }
@@ -232,7 +259,7 @@ export async function getSavedCity(): Promise<SACity | null> {
     }
 
     // Check if it's a known city
-    const knownCity = SA_CITIES.find((c) => c.id === cityId);
+    const knownCity = getCityById(cityId);
     if (knownCity) {
       return knownCity;
     }
@@ -242,6 +269,28 @@ export async function getSavedCity(): Promise<SACity | null> {
       const customCityJson = await SecureStore.getItemAsync(CUSTOM_CITY_KEY);
       if (customCityJson) {
         return JSON.parse(customCityJson) as SACity;
+      }
+    }
+
+    // Try to find by name (backwards compatibility with old IDs like 'jhb', 'pta')
+    const legacyMapping: Record<string, string> = {
+      'jhb': 'johannesburg',
+      'pta': 'tshwane',
+      'cpt': 'capeTown',
+      'dbn': 'ethekwini',
+      'eku': 'ekurhuleni',
+      'pe': 'nelsonMandelaBay',
+      'el': 'buffaloCity',
+      'bfn': 'mangaung',
+    };
+
+    const mappedId = legacyMapping[cityId.toLowerCase()];
+    if (mappedId) {
+      const mappedCity = getCityById(mappedId);
+      if (mappedCity) {
+        // Update storage with new ID
+        await saveSelectedCity(mappedId);
+        return mappedCity;
       }
     }
 
@@ -306,7 +355,7 @@ export async function initializeLocation(): Promise<{
     } else {
       await saveSelectedCity(detectedCity.id);
     }
-    
+
     return {
       city: detectedCity,
       radius: savedRadius,

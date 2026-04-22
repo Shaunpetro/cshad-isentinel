@@ -39,7 +39,7 @@ export interface UseLocationResult {
   setCity: (city: SACity) => Promise<void>;
   setRadius: (radiusKm: number) => Promise<void>;
   setScope: (scope: NewsScope) => void;
-  detectLocation: () => Promise<void>;
+  detectLocation: () => Promise<SACity | null>; // ✅ NOW RETURNS CITY OR NULL
   requestPermission: () => Promise<boolean>;
   refresh: () => Promise<void>;
   checkPermission: () => Promise<void>;
@@ -165,7 +165,7 @@ export function useLocation(): UseLocationResult {
     }
   }, []);
 
-  const detectLocation = useCallback(async () => {
+  const detectLocation = useCallback(async (): Promise<SACity | null> => {
     setIsDetecting(true);
     setError(null);
 
@@ -175,7 +175,7 @@ export function useLocation(): UseLocationResult {
       if (status !== 'granted') {
         setPermissionStatus(status === 'denied' ? 'denied' : 'undetermined');
         setError('Location permission not granted');
-        return;
+        return null; // ✅ RETURN NULL ON PERMISSION ERROR
       }
 
       setPermissionStatus('granted');
@@ -192,13 +192,17 @@ export function useLocation(): UseLocationResult {
           await saveSelectedCity(detectedCity.id);
           console.log('[useLocation] Detected major city:', detectedCity.name);
         }
+
+        return detectedCity; // ✅ RETURN THE DETECTED CITY
       } else {
         setError('Could not detect location');
+        return null; // ✅ RETURN NULL IF NO CITY DETECTED
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Detection failed';
       setError(message);
       console.error('[useLocation] Detection error:', message);
+      return null; // ✅ RETURN NULL ON ERROR
     } finally {
       setIsDetecting(false);
     }

@@ -1,65 +1,84 @@
-// v1.263_001/src/components/news/MapCallout.tsx
+// src/components/news/MapCallout.tsx
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import {
-  Colors,
-  Typography,
-  Spacing,
-  BorderRadius,
-  Shadows,
-} from "@/config/theme";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Typography, Spacing, BorderRadius } from "@/config/theme";
 import { SeverityBadge } from "./SeverityBadge";
-import { timeAgo, truncate } from "@utils/formatters";
-import type { NewsItem } from "@typeDefs/index";
+import { timeAgo, truncate } from "@/utils/formatters";
+import type { NewsItem } from "@/types";
 
 interface Props {
   article: NewsItem;
 }
 
 export function MapCallout({ article }: Props) {
+  const { t } = useTranslation();
+  const { colors } = useTheme();
+
+  // Get translated category
+  const getCategoryLabel = (category: string): string => {
+    const key = `news.categories.${category}`;
+    const translated = t(key);
+    return translated !== key ? translated.toUpperCase() : category.toUpperCase();
+  };
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.surface }]}>
       {/* Top row */}
       <View style={styles.topRow}>
-        <Text style={styles.category}>
-          {article.category.toUpperCase()}
+        <Text style={[styles.category, { color: colors.primary }]}>
+          {getCategoryLabel(article.category)}
         </Text>
         <SeverityBadge severity={article.severity} />
       </View>
 
       {/* Title */}
-      <Text style={styles.title} numberOfLines={2}>
+      <Text style={[styles.title, { color: colors.text }]} numberOfLines={2}>
         {article.title}
       </Text>
 
       {/* Summary */}
-      <Text style={styles.summary} numberOfLines={2}>
+      <Text
+        style={[styles.summary, { color: colors.textSecondary }]}
+        numberOfLines={2}
+      >
         {truncate(article.summary, 100)}
       </Text>
 
       {/* Footer */}
       <View style={styles.footer}>
         {article.locationName && (
-          <Text style={styles.location} numberOfLines={1}>
+          <Text
+            style={[styles.location, { color: colors.textSecondary }]}
+            numberOfLines={1}
+          >
             📍 {article.locationName}
           </Text>
         )}
-        <Text style={styles.time}>{timeAgo(article.publishedAt)}</Text>
+        <Text style={[styles.time, { color: colors.textDisabled }]}>
+          {timeAgo(article.publishedAt)}
+        </Text>
       </View>
 
       {/* Tap hint */}
-      <Text style={styles.hint}>Tap for full story →</Text>
+      <Text style={[styles.hint, { color: colors.primary }]}>
+        {t("news.readMore")} →
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.carbon.charcoal,
     borderRadius: BorderRadius.lg,
     padding: Spacing.md,
     width: 260,
-    ...Shadows.md,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   topRow: {
     flexDirection: "row",
@@ -70,21 +89,18 @@ const styles = StyleSheet.create({
   category: {
     fontSize: Typography.sizes.tiny,
     fontFamily: Typography.fonts.mono,
-    color: Colors.semantic.primary,
     letterSpacing: 1,
   },
   title: {
     fontSize: Typography.sizes.caption,
     fontFamily: Typography.fonts.bold,
-    color: Colors.carbon.white,
-    lineHeight: Typography.sizes.caption * Typography.lineHeight.tight,
+    lineHeight: Typography.sizes.caption * 1.3,
     marginBottom: Spacing.xs,
   },
   summary: {
     fontSize: Typography.sizes.label,
     fontFamily: Typography.fonts.regular,
-    color: Colors.carbon.silver,
-    lineHeight: Typography.sizes.label * Typography.lineHeight.normal,
+    lineHeight: Typography.sizes.label * 1.4,
     marginBottom: Spacing.sm,
   },
   footer: {
@@ -96,18 +112,15 @@ const styles = StyleSheet.create({
   location: {
     fontSize: Typography.sizes.tiny,
     fontFamily: Typography.fonts.regular,
-    color: Colors.carbon.silver,
     flex: 1,
   },
   time: {
     fontSize: Typography.sizes.tiny,
     fontFamily: Typography.fonts.mono,
-    color: Colors.carbon.steel,
   },
   hint: {
     fontSize: Typography.sizes.tiny,
     fontFamily: Typography.fonts.medium,
-    color: Colors.semantic.primary,
     textAlign: "right",
     marginTop: Spacing.xs,
   },

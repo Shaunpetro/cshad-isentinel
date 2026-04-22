@@ -9,6 +9,7 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Typography, Spacing, BorderRadius } from '@/config/theme';
 import {
@@ -34,21 +35,33 @@ export function WeatherAlertCard({
   onDismiss,
 }: WeatherAlertCardProps) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
 
   // If there's an active alert, show alert card
   if (alert) {
     const alertColor = getWeatherAlertColor(alert.severity);
     const alertIcon = getWeatherAlertIcon(alert.type);
-    
+
     const timeUntilEnd = alert.end.getTime() - Date.now();
     const hoursLeft = Math.max(0, Math.floor(timeUntilEnd / (1000 * 60 * 60)));
     const minutesLeft = Math.max(0, Math.floor((timeUntilEnd % (1000 * 60 * 60)) / (1000 * 60)));
+
+    // Format time remaining
+    const getTimeLeftText = (): string => {
+      if (hoursLeft > 0) {
+        return `${hoursLeft}h ${minutesLeft}m ${t('alerts.weather.timeLeft')}`;
+      }
+      if (minutesLeft > 0) {
+        return `${minutesLeft}m ${t('alerts.weather.timeLeft')}`;
+      }
+      return '';
+    };
 
     return (
       <Pressable
         style={[
           styles.alertContainer,
-          { 
+          {
             backgroundColor: colors.surface,
             borderLeftColor: alertColor,
           },
@@ -75,13 +88,13 @@ export function WeatherAlertCard({
         <View style={styles.alertContent}>
           <View style={styles.alertHeader}>
             <Text style={[styles.alertSeverity, { color: alertColor }]}>
-              {alert.severity.toUpperCase()} WEATHER ALERT
+              {t('alerts.weather.alert')}
             </Text>
-            {hoursLeft > 0 || minutesLeft > 0 ? (
+            {(hoursLeft > 0 || minutesLeft > 0) && (
               <Text style={[styles.alertTime, { color: colors.textSecondary }]}>
-                {hoursLeft > 0 ? `${hoursLeft}h ` : ''}{minutesLeft}m left
+                {getTimeLeftText()}
               </Text>
-            ) : null}
+            )}
           </View>
 
           <Text style={[styles.alertTitle, { color: colors.text }]} numberOfLines={2}>
@@ -116,7 +129,7 @@ export function WeatherAlertCard({
           source={{ uri: getWeatherIconUrl(currentWeather.icon, '2x') }}
           style={styles.weatherIcon}
         />
-        
+
         <View style={styles.weatherContent}>
           <Text style={[styles.weatherTemp, { color: colors.text }]}>
             {currentWeather.temperature}°C

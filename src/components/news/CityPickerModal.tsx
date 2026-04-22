@@ -1,34 +1,45 @@
 // src/components/news/CityPickerModal.tsx
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   Modal,
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  FlatList,
   TextInput,
   ActivityIndicator,
   StatusBar,
   SectionList,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing } from '@/config/theme';
-import { getAllCities, searchLocations, type SACity } from '@/services/location';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Typography, Spacing } from "@/config/theme";
+import {
+  getAllCities,
+  searchLocations,
+  type SACity,
+} from "@/services/location";
 
 interface CityPickerModalProps {
   visible: boolean;
   onClose: () => void;
   onSelectCity: (city: SACity) => void;
   currentCityId: string;
-  onDetectLocation?: () => void;
+  onDetectLocation?: () => Promise<SACity | null>;
   isDetecting?: boolean;
 }
 
 interface SectionData {
   title: string;
   data: SACity[];
+}
+
+interface DetectedLocationState {
+  city: SACity | null;
+  status: "idle" | "detecting" | "success" | "error";
+  error?: string;
 }
 
 export function CityPickerModal({
@@ -39,36 +50,82 @@ export function CityPickerModal({
   onDetectLocation,
   isDetecting = false,
 }: CityPickerModalProps) {
-  const [searchQuery, setSearchQuery] = useState('');
+  const { t } = useTranslation();
+  const { colors, isDark } = useTheme();
+  const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SACity[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
-  
+
+  // Detected location state
+  const [detectedLocation, setDetectedLocation] = useState<DetectedLocationState>({
+    city: null,
+    status: "idle",
+  });
+
   const allCities = getAllCities();
 
-  // Debounced search function
-  const performSearch = useCallback(async (query: string) => {
-    if (query.trim().length < 2) {
-      setSearchResults([]);
-      setIsSearching(false);
-      return;
-    }
+  // Check if currently detecting (either from prop or internal state)
+  const isCurrentlyDetecting = isDetecting || detectedLocation.status === "detecting";
 
-    setIsSearching(true);
-    setSearchError(null);
+  // Handle detect location with proper feedback
+  const handleDetectLocation = useCallback(async () => {
+    if (!onDetectLocation) return;
+
+    setDetectedLocation({ city: null, status: "detecting" });
 
     try {
-      const results = await searchLocations(query);
-      setSearchResults(results);
-      console.log('[CityPicker] Search results:', results.length);
+      const city = await onDetectLocation();
+
+      if (city) {
+        setDetectedLocation({ city, status: "success" });
+        // Auto-select after a brief moment to show the user what was detected
+        setTimeout(() => {
+          onSelectCity(city);
+          onClose();
+        }, 1500);
+      } else {
+        setDetectedLocation({
+          city: null,
+          status: "error",
+          error: t("location.unavailable"),
+        });
+      }
     } catch (error) {
-      console.error('[CityPicker] Search error:', error);
-      setSearchError('Search failed. Check your internet connection.');
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
+      console.error("[CityPicker] Detect location error:", error);
+      setDetectedLocation({
+        city: null,
+        status: "error",
+        error: t("location.permissionDenied"),
+      });
     }
-  }, []);
+  }, [onDetectLocation, onSelectCity, onClose, t]);
+
+  // Debounced search function
+  const performSearch = useCallback(
+    async (query: string) => {
+      if (query.trim().length < 2) {
+        setSearchResults([]);
+        setIsSearching(false);
+        return;
+      }
+
+      setIsSearching(true);
+      setSearchError(null);
+
+      try {
+        const results = await searchLocations(query);
+        setSearchResults(results);
+      } catch (error) {
+        console.error("[CityPicker] Search error:", error);
+        setSearchError(t("common.error"));
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    },
+    [t]
+  );
 
   // Debounce search - 500ms delay
   useEffect(() => {
@@ -82,13 +139,14 @@ export function CityPickerModal({
   // Reset state when modal closes
   useEffect(() => {
     if (!visible) {
-      setSearchQuery('');
+      setSearchQuery("");
       setSearchResults([]);
       setSearchError(null);
+      setDetectedLocation({ city: null, status: "idle" });
     }
   }, [visible]);
 
-  // Filter major cities by search query (for instant local filtering)
+  // Filter major cities by search query
   const filteredMajorCities = useMemo(() => {
     if (!searchQuery.trim()) {
       return [...allCities].sort((a, b) => b.population - a.population);
@@ -108,36 +166,35 @@ export function CityPickerModal({
   const sections: SectionData[] = useMemo(() => {
     const result: SectionData[] = [];
 
-    // If searching and have results, show them first
     if (searchQuery.trim().length >= 2 && searchResults.length > 0) {
-      // Filter out duplicates (cities already in major cities list)
-      const majorCityNames = new Set(allCities.map(c => c.name.toLowerCase()));
+      const majorCityNames = new Set(
+        allCities.map((c) => c.name.toLowerCase())
+      );
       const uniqueSearchResults = searchResults.filter(
         (city) => !majorCityNames.has(city.name.toLowerCase())
       );
 
       if (uniqueSearchResults.length > 0) {
         result.push({
-          title: '🔍 Search Results',
+          title: `🔍 ${t("common.search")}`,
           data: uniqueSearchResults,
         });
       }
     }
 
-    // Always show major cities (filtered if searching)
     if (filteredMajorCities.length > 0) {
       result.push({
-        title: searchQuery.trim() ? '🏙️ Major Cities (Matching)' : '🏙️ Major Cities',
+        title: `🏙️ ${t("location.selectCity")}`,
         data: filteredMajorCities,
       });
     }
 
     return result;
-  }, [searchQuery, searchResults, filteredMajorCities, allCities]);
+  }, [searchQuery, searchResults, filteredMajorCities, allCities, t]);
 
   const handleSelectCity = (city: SACity) => {
     onSelectCity(city);
-    setSearchQuery('');
+    setSearchQuery("");
     setSearchResults([]);
     onClose();
   };
@@ -148,39 +205,51 @@ export function CityPickerModal({
 
     return (
       <TouchableOpacity
-        style={[styles.cityItem, isSelected && styles.cityItemSelected]}
+        style={[
+          styles.cityItem,
+          {
+            backgroundColor: colors.surface,
+            borderColor: isSelected ? colors.primary : colors.border,
+          },
+          isSelected && { backgroundColor: colors.primary + "10" },
+        ]}
         onPress={() => handleSelectCity(item)}
         activeOpacity={0.7}
       >
         <View style={styles.cityInfo}>
           <View style={styles.cityNameRow}>
-            <Text style={[styles.cityName, isSelected && styles.cityNameSelected]}>
+            <Text
+              style={[
+                styles.cityName,
+                { color: isSelected ? colors.primary : colors.text },
+              ]}
+            >
               {item.name}
             </Text>
             {isCustom && (
-              <View style={styles.customBadge}>
-                <Text style={styles.customBadgeText}>NEW</Text>
+              <View
+                style={[styles.customBadge, { backgroundColor: colors.info }]}
+              >
+                <Text style={styles.customBadgeText}>{t("common.more")}</Text>
               </View>
             )}
           </View>
-          <Text style={styles.provinceName}>
+          <Text style={[styles.provinceName, { color: colors.textSecondary }]}>
             {item.province} • {item.provinceCode}
           </Text>
         </View>
         {isSelected && (
-          <Ionicons
-            name="checkmark-circle"
-            size={24}
-            color={Colors.semantic.primary}
-          />
+          <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
         )}
       </TouchableOpacity>
     );
   };
 
   const renderSectionHeader = ({ section }: { section: SectionData }) => (
-    <View style={styles.sectionHeader}>
-      <Text style={styles.sectionTitle}>{section.title}</Text>
+    <View style={[styles.sectionHeader, { backgroundColor: colors.background }]}>
+      <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+        {section.title}
+      </Text>
     </View>
   );
 
@@ -188,8 +257,10 @@ export function CityPickerModal({
     if (isSearching) {
       return (
         <View style={styles.emptyContainer}>
-          <ActivityIndicator size="large" color={Colors.semantic.primary} />
-          <Text style={styles.emptyText}>Searching...</Text>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            {t("common.loading")}
+          </Text>
         </View>
       );
     }
@@ -200,14 +271,16 @@ export function CityPickerModal({
           <Ionicons
             name="cloud-offline-outline"
             size={48}
-            color={Colors.semantic.warning}
+            color={colors.warning}
           />
-          <Text style={styles.emptyText}>{searchError}</Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            {searchError}
+          </Text>
           <TouchableOpacity
-            style={styles.retryButton}
+            style={[styles.retryButton, { backgroundColor: colors.primary }]}
             onPress={() => performSearch(searchQuery)}
           >
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <Text style={styles.retryButtonText}>{t("common.retry")}</Text>
           </TouchableOpacity>
         </View>
       );
@@ -216,25 +289,114 @@ export function CityPickerModal({
     if (searchQuery.trim().length >= 2) {
       return (
         <View style={styles.emptyContainer}>
-          <Ionicons
-            name="location-outline"
-            size={48}
-            color={Colors.carbon.steel}
-          />
-          <Text style={styles.emptyText}>No locations found for "{searchQuery}"</Text>
-          <Text style={styles.emptySubtext}>Try a different search term</Text>
+          <Ionicons name="location-outline" size={48} color={colors.border} />
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+            {t("common.noResults")}
+          </Text>
         </View>
       );
     }
 
+    return null;
+  };
+
+  // Render detected location feedback
+  const renderDetectedLocationSection = () => {
+    if (detectedLocation.status === "idle") return null;
+
     return (
-      <View style={styles.emptyContainer}>
-        <Ionicons
-          name="location-outline"
-          size={48}
-          color={Colors.carbon.steel}
-        />
-        <Text style={styles.emptyText}>No cities found</Text>
+      <View
+        style={[
+          styles.detectedContainer,
+          {
+            backgroundColor:
+              detectedLocation.status === "success"
+                ? colors.success + "20"
+                : detectedLocation.status === "error"
+                  ? colors.danger + "20"
+                  : colors.surface,
+            borderColor:
+              detectedLocation.status === "success"
+                ? colors.success
+                : detectedLocation.status === "error"
+                  ? colors.danger
+                  : colors.border,
+          },
+        ]}
+      >
+        {detectedLocation.status === "detecting" && (
+          <>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <View style={styles.detectedTextContainer}>
+              <Text style={[styles.detectedTitle, { color: colors.text }]}>
+                {t("location.detecting")}
+              </Text>
+              <Text
+                style={[styles.detectedSubtitle, { color: colors.textSecondary }]}
+              >
+                {t("common.loading")}
+              </Text>
+            </View>
+          </>
+        )}
+
+        {detectedLocation.status === "success" && detectedLocation.city && (
+          <>
+            <View
+              style={[
+                styles.detectedIcon,
+                { backgroundColor: colors.success + "30" },
+              ]}
+            >
+              <Ionicons name="checkmark" size={20} color={colors.success} />
+            </View>
+            <View style={styles.detectedTextContainer}>
+              <Text style={[styles.detectedTitle, { color: colors.text }]}>
+                {detectedLocation.city.name}
+              </Text>
+              <Text
+                style={[styles.detectedSubtitle, { color: colors.textSecondary }]}
+              >
+                {detectedLocation.city.province} •{" "}
+                {detectedLocation.city.latitude.toFixed(4)},{" "}
+                {detectedLocation.city.longitude.toFixed(4)}
+              </Text>
+            </View>
+            <Ionicons
+              name="checkmark-circle"
+              size={24}
+              color={colors.success}
+            />
+          </>
+        )}
+
+        {detectedLocation.status === "error" && (
+          <>
+            <View
+              style={[
+                styles.detectedIcon,
+                { backgroundColor: colors.danger + "30" },
+              ]}
+            >
+              <Ionicons name="close" size={20} color={colors.danger} />
+            </View>
+            <View style={styles.detectedTextContainer}>
+              <Text style={[styles.detectedTitle, { color: colors.text }]}>
+                {t("location.unavailable")}
+              </Text>
+              <Text
+                style={[styles.detectedSubtitle, { color: colors.textSecondary }]}
+              >
+                {detectedLocation.error || t("common.error")}
+              </Text>
+            </View>
+            <TouchableOpacity onPress={handleDetectLocation}>
+              <Text style={[styles.retryLink, { color: colors.primary }]}>
+                {t("common.retry")}
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     );
   };
@@ -246,86 +408,103 @@ export function CityPickerModal({
       presentationStyle="fullScreen"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-        <StatusBar barStyle="light-content" />
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: colors.background }]}
+        edges={["top", "bottom"]}
+      >
+        <StatusBar barStyle={isDark ? "light-content" : "dark-content"} />
 
         {/* Header */}
-        <View style={styles.header}>
+        <View
+          style={[
+            styles.header,
+            {
+              backgroundColor: colors.surface,
+              borderBottomColor: colors.border,
+            },
+          ]}
+        >
           <TouchableOpacity
             style={styles.closeButton}
             onPress={onClose}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="close" size={28} color={Colors.carbon.white} />
+            <Ionicons name="close" size={28} color={colors.text} />
           </TouchableOpacity>
 
-          <Text style={styles.headerTitle}>Select Location</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            {t("location.selectCity")}
+          </Text>
 
           <View style={styles.headerSpacer} />
         </View>
 
         {/* Detect Location Button */}
-        {onDetectLocation && (
+        {onDetectLocation && detectedLocation.status === "idle" && (
           <TouchableOpacity
-            style={styles.detectButton}
-            onPress={onDetectLocation}
-            disabled={isDetecting}
+            style={[
+              styles.detectButton,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.primary,
+              },
+            ]}
+            onPress={handleDetectLocation}
+            disabled={isCurrentlyDetecting}
             activeOpacity={0.7}
           >
-            {isDetecting ? (
-              <ActivityIndicator size="small" color={Colors.semantic.primary} />
-            ) : (
-              <Ionicons
-                name="navigate"
-                size={20}
-                color={Colors.semantic.primary}
-              />
-            )}
-            <Text style={styles.detectButtonText}>
-              {isDetecting ? 'Detecting...' : 'Use my current location'}
+            <Ionicons name="navigate" size={20} color={colors.primary} />
+            <Text style={[styles.detectButtonText, { color: colors.primary }]}>
+              {t("tip.useCurrentLocation")}
             </Text>
           </TouchableOpacity>
         )}
 
+        {/* Detected Location Feedback */}
+        {renderDetectedLocationSection()}
+
         {/* Search Input */}
-        <View style={styles.searchContainer}>
+        <View
+          style={[
+            styles.searchContainer,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
+        >
           <Ionicons
             name="search"
             size={20}
-            color={Colors.carbon.silver}
+            color={colors.textSecondary}
             style={styles.searchIcon}
           />
           <TextInput
-            style={styles.searchInput}
-            placeholder="Search any SA town or city..."
-            placeholderTextColor={Colors.carbon.steel}
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder={t("location.searchCity")}
+            placeholderTextColor={colors.textSecondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoCapitalize="none"
             autoCorrect={false}
           />
           {isSearching && (
-            <ActivityIndicator 
-              size="small" 
-              color={Colors.semantic.primary} 
+            <ActivityIndicator
+              size="small"
+              color={colors.primary}
               style={styles.searchSpinner}
             />
           )}
           {searchQuery.length > 0 && !isSearching && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <TouchableOpacity onPress={() => setSearchQuery("")}>
               <Ionicons
                 name="close-circle"
                 size={20}
-                color={Colors.carbon.silver}
+                color={colors.textSecondary}
               />
             </TouchableOpacity>
           )}
         </View>
-
-        {/* Search hint */}
-        {searchQuery.length > 0 && searchQuery.length < 2 && (
-          <Text style={styles.searchHint}>Type at least 2 characters to search</Text>
-        )}
 
         {/* City List */}
         <SectionList
@@ -346,26 +525,22 @@ export function CityPickerModal({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.carbon.black,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
-    backgroundColor: Colors.carbon.charcoal,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.carbon.steel,
   },
   closeButton: {
     width: 40,
     height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   headerTitle: {
-    color: Colors.carbon.white,
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.bold,
   },
@@ -373,40 +548,68 @@ const styles = StyleSheet.create({
     width: 40,
   },
   detectButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.carbon.charcoal,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     marginHorizontal: Spacing.md,
     marginTop: Spacing.md,
     paddingVertical: Spacing.md,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.semantic.primary,
+    gap: Spacing.sm,
   },
   detectButtonText: {
-    color: Colors.semantic.primary,
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.medium,
-    marginLeft: Spacing.sm,
+  },
+  detectedContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: Spacing.sm,
+  },
+  detectedIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detectedTextContainer: {
+    flex: 1,
+  },
+  detectedTitle: {
+    fontSize: Typography.sizes.body,
+    fontFamily: Typography.fonts.medium,
+  },
+  detectedSubtitle: {
+    fontSize: Typography.sizes.caption,
+    fontFamily: Typography.fonts.regular,
+    marginTop: 2,
+  },
+  retryLink: {
+    fontSize: Typography.sizes.caption,
+    fontFamily: Typography.fonts.bold,
   },
   searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.carbon.charcoal,
+    flexDirection: "row",
+    alignItems: "center",
     marginHorizontal: Spacing.md,
     marginTop: Spacing.md,
     paddingHorizontal: Spacing.md,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.carbon.steel,
   },
   searchIcon: {
     marginRight: Spacing.sm,
   },
   searchInput: {
     flex: 1,
-    color: Colors.carbon.white,
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.regular,
     paddingVertical: Spacing.md,
@@ -414,24 +617,14 @@ const styles = StyleSheet.create({
   searchSpinner: {
     marginLeft: Spacing.sm,
   },
-  searchHint: {
-    color: Colors.carbon.silver,
-    fontSize: Typography.sizes.caption,
-    fontFamily: Typography.fonts.regular,
-    marginHorizontal: Spacing.md,
-    marginTop: Spacing.xs,
-    fontStyle: 'italic',
-  },
   sectionHeader: {
-    backgroundColor: Colors.carbon.black,
     paddingVertical: Spacing.sm,
     paddingTop: Spacing.md,
   },
   sectionTitle: {
-    color: Colors.carbon.silver,
     fontSize: Typography.sizes.caption,
     fontFamily: Typography.fonts.bold,
-    textTransform: 'uppercase',
+    textTransform: "uppercase",
     letterSpacing: 1,
   },
   listContent: {
@@ -440,81 +633,61 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.xxl,
   },
   cityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.carbon.charcoal,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
     borderRadius: 12,
     marginBottom: Spacing.sm,
     borderWidth: 1,
-    borderColor: Colors.carbon.steel,
-  },
-  cityItemSelected: {
-    borderColor: Colors.semantic.primary,
-    backgroundColor: `${Colors.semantic.primary}10`,
   },
   cityInfo: {
     flex: 1,
   },
   cityNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   cityName: {
-    color: Colors.carbon.white,
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.medium,
   },
-  cityNameSelected: {
-    color: Colors.semantic.primary,
-  },
   customBadge: {
-    backgroundColor: Colors.semantic.info,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
     marginLeft: Spacing.sm,
   },
   customBadgeText: {
-    color: Colors.carbon.white,
+    color: "#FFFFFF",
     fontSize: 10,
     fontFamily: Typography.fonts.bold,
   },
   provinceName: {
-    color: Colors.carbon.silver,
     fontSize: Typography.sizes.caption,
     fontFamily: Typography.fonts.regular,
     marginTop: 2,
   },
   emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: Spacing.xxl,
   },
   emptyText: {
-    color: Colors.carbon.silver,
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.regular,
     marginTop: Spacing.md,
-    textAlign: 'center',
-  },
-  emptySubtext: {
-    color: Colors.carbon.steel,
-    fontSize: Typography.sizes.caption,
-    fontFamily: Typography.fonts.regular,
-    marginTop: Spacing.xs,
+    textAlign: "center",
   },
   retryButton: {
     marginTop: Spacing.md,
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
-    backgroundColor: Colors.semantic.primary,
     borderRadius: 8,
   },
   retryButtonText: {
-    color: Colors.carbon.black,
+    color: "#FFFFFF",
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.bold,
   },

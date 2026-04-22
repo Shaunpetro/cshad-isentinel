@@ -2,6 +2,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Typography, Spacing } from '@/config/theme';
 import type { TimeFilter } from '@/services/news';
@@ -14,16 +15,16 @@ interface TimeFilterBarProps {
 
 interface FilterOption {
   id: TimeFilter;
-  label: string;
+  labelKey: string;
   icon: keyof typeof Ionicons.glyphMap;
 }
 
 const FILTER_OPTIONS: FilterOption[] = [
-  { id: 'live', label: 'Live', icon: 'radio' },
-  { id: 'today', label: 'Today', icon: 'today' },
-  { id: 'week', label: 'Week', icon: 'calendar' },
-  { id: 'month', label: 'Month', icon: 'calendar-outline' },
-  { id: 'all', label: 'All', icon: 'time' },
+  { id: 'live', labelKey: 'time.live', icon: 'radio' },
+  { id: 'today', labelKey: 'news.today', icon: 'today' },
+  { id: 'week', labelKey: 'time.week', icon: 'calendar' },
+  { id: 'month', labelKey: 'time.month', icon: 'calendar-outline' },
+  { id: 'all', labelKey: 'news.all', icon: 'time' },
 ];
 
 export function TimeFilterBar({
@@ -32,16 +33,17 @@ export function TimeFilterBar({
   lastUpdated,
 }: TimeFilterBarProps) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
 
   const formatLastUpdated = (date: Date | null): string => {
     if (!date) return '';
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
-    
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    return `${Math.floor(diffMins / 60)}h ago`;
+
+    if (diffMins < 1) return t('time.justNow');
+    if (diffMins < 60) return t('time.minutesAgo', { count: diffMins });
+    return t('time.hoursAgo', { count: Math.floor(diffMins / 60) });
   };
 
   return (
@@ -76,7 +78,7 @@ export function TimeFilterBar({
                   isActive && styles.filterLabelActive,
                 ]}
               >
-                {option.label}
+                {t(option.labelKey)}
               </Text>
             </TouchableOpacity>
           );
@@ -88,7 +90,7 @@ export function TimeFilterBar({
         <View style={styles.lastUpdatedRow}>
           <Ionicons name="sync" size={12} color={colors.textDisabled} />
           <Text style={[styles.lastUpdatedText, { color: colors.textDisabled }]}>
-            Updated {formatLastUpdated(lastUpdated)}
+            {t('news.lastUpdated')} {formatLastUpdated(lastUpdated)}
           </Text>
         </View>
       )}
@@ -115,9 +117,7 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs,
     borderRadius: 8,
   },
-  filterOptionActive: {
-    // backgroundColor set dynamically
-  },
+  filterOptionActive: {},
   liveDot: {
     width: 6,
     height: 6,

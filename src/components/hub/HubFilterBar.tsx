@@ -9,26 +9,26 @@ import {
   Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Typography, Spacing, BorderRadius } from '@/config/theme';
 
-// Filter types only - FeedItem and Journalist types are in their respective component files
 export type HubFilter = 'tips' | 'live' | 'weather' | 'infrastructure' | 'national' | 'all';
 
 interface FilterConfig {
   id: HubFilter;
-  label: string;
+  labelKey: string;
   icon: keyof typeof Ionicons.glyphMap;
   activeColor?: string;
 }
 
 const FILTERS: FilterConfig[] = [
-  { id: 'tips', label: 'Tips', icon: 'chatbubbles', activeColor: '#FF9800' },
-  { id: 'live', label: 'Live', icon: 'radio', activeColor: '#D32F2F' },
-  { id: 'weather', label: 'Weather', icon: 'cloudy', activeColor: '#2196F3' },
-  { id: 'infrastructure', label: 'Infra', icon: 'flash', activeColor: '#9C27B0' },
-  { id: 'national', label: 'National', icon: 'globe', activeColor: '#4CAF50' },
-  { id: 'all', label: 'All', icon: 'list', activeColor: '#757575' },
+  { id: 'tips', labelKey: 'alerts.communityTips', icon: 'chatbubbles', activeColor: '#FF9800' },
+  { id: 'live', labelKey: 'time.live', icon: 'radio', activeColor: '#D32F2F' },
+  { id: 'weather', labelKey: 'alerts.weather.title', icon: 'cloudy', activeColor: '#2196F3' },
+  { id: 'infrastructure', labelKey: 'alerts.infrastructure', icon: 'flash', activeColor: '#9C27B0' },
+  { id: 'national', labelKey: 'news.national', icon: 'globe', activeColor: '#4CAF50' },
+  { id: 'all', labelKey: 'map.showAll', icon: 'list', activeColor: '#757575' },
 ];
 
 interface HubFilterBarProps {
@@ -43,6 +43,16 @@ export function HubFilterBar({
   counts = {},
 }: HubFilterBarProps) {
   const { colors, isDark } = useTheme();
+  const { t } = useTranslation();
+
+  // Get short label for filter
+  const getShortLabel = (filter: FilterConfig): string => {
+    const fullLabel = t(filter.labelKey);
+    // Shorten some labels for the filter bar
+    if (filter.id === 'infrastructure') return t('alerts.infrastructure').substring(0, 5);
+    if (filter.id === 'tips') return t('map.showTips');
+    return fullLabel;
+  };
 
   return (
     <View style={styles.container}>
@@ -85,7 +95,7 @@ export function HubFilterBar({
                   },
                 ]}
               >
-                {filter.label}
+                {getShortLabel(filter)}
               </Text>
               {count !== undefined && count > 0 && (
                 <View

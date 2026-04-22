@@ -1,10 +1,11 @@
 // src/components/news/LocationHeader.tsx
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '@/contexts/ThemeContext';
-import { Typography, Spacing } from '@/config/theme';
-import { type SACity } from '@/services/location';
+import React from "react";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Typography, Spacing } from "@/config/theme";
+import { type SACity } from "@/services/location";
 
 interface LocationHeaderProps {
   city: SACity;
@@ -18,6 +19,7 @@ export function LocationHeader({
   isLoading = false,
 }: LocationHeaderProps) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
 
   return (
     <TouchableOpacity
@@ -38,11 +40,7 @@ export function LocationHeader({
           { backgroundColor: `${colors.primary}20` },
         ]}
       >
-        <Ionicons
-          name="location"
-          size={18}
-          color={colors.primary}
-        />
+        <Ionicons name="location" size={18} color={colors.primary} />
       </View>
 
       <View style={styles.textContainer}>
@@ -50,7 +48,7 @@ export function LocationHeader({
           style={[styles.cityName, { color: colors.text }]}
           numberOfLines={1}
         >
-          {city.name}
+          {isLoading ? t("location.detecting") : city.name}
         </Text>
         <Text
           style={[styles.provinceName, { color: colors.textSecondary }]}
@@ -60,19 +58,15 @@ export function LocationHeader({
         </Text>
       </View>
 
-      <Ionicons
-        name="chevron-down"
-        size={20}
-        color={colors.textSecondary}
-      />
+      <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
     borderRadius: 20,
@@ -82,8 +76,8 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: Spacing.xs,
   },
   textContainer: {

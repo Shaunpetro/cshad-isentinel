@@ -8,6 +8,7 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Typography, Spacing, BorderRadius, Shadows } from '@/config/theme';
 
@@ -34,12 +35,6 @@ interface JournalistCardProps {
   compact?: boolean;
 }
 
-const VERIFICATION_CONFIG: Record<string, { color: string; label: string }> = {
-  journalist: { color: '#9C27B0', label: 'Journalist' },
-  official: { color: '#2196F3', label: 'Official' },
-  community: { color: '#00BCD4', label: 'Community' },
-};
-
 export function JournalistCard({
   journalist,
   onPress,
@@ -47,8 +42,24 @@ export function JournalistCard({
   compact = false,
 }: JournalistCardProps) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
+
+  // Get verification config with translations
+  const getVerificationConfig = (type: string) => {
+    switch (type) {
+      case 'journalist':
+        return { color: '#9C27B0', label: t('journalist.types.journalist', 'Journalist') };
+      case 'official':
+        return { color: '#2196F3', label: t('journalist.types.official', 'Official') };
+      case 'community':
+        return { color: '#00BCD4', label: t('journalist.types.community', 'Community') };
+      default:
+        return { color: '#9C27B0', label: t('journalist.types.journalist', 'Journalist') };
+    }
+  };
+
   const verificationType = journalist.verificationType || 'journalist';
-  const verificationConfig = VERIFICATION_CONFIG[verificationType];
+  const verificationConfig = getVerificationConfig(verificationType);
   const avatarSource = journalist.avatarUrl || journalist.avatar;
   const followerCount = journalist.followerCount || 0;
   const displayHandle = journalist.handle || journalist.outlet || '';
@@ -57,6 +68,21 @@ export function JournalistCard({
     if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
     if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
     return count.toString();
+  };
+
+  // Get reports text
+  const getReportsText = (count: number): string => {
+    return `${count} ${t('journalist.reports', 'reports')}`;
+  };
+
+  // Get recent reports text
+  const getRecentReportsText = (count: number): string => {
+    return `${count} ${t('journalist.recentReports', 'recent reports')}`;
+  };
+
+  // Get followers text
+  const getFollowersText = (count: number): string => {
+    return `${formatFollowers(count)} ${t('journalist.followers', 'followers')}`;
   };
 
   if (compact) {
@@ -92,8 +118,8 @@ export function JournalistCard({
 
         {/* Followers or Reports */}
         <Text style={[styles.compactFollowers, { color: colors.textSecondary }]}>
-          {journalist.recentReports 
-            ? `${journalist.recentReports} reports`
+          {journalist.recentReports
+            ? getReportsText(journalist.recentReports)
             : formatFollowers(followerCount)
           }
         </Text>
@@ -143,9 +169,9 @@ export function JournalistCard({
             </Text>
           </View>
           <Text style={[styles.followers, { color: colors.textSecondary }]}>
-            {journalist.recentReports 
-              ? `${journalist.recentReports} recent reports`
-              : `${formatFollowers(followerCount)} followers`
+            {journalist.recentReports
+              ? getRecentReportsText(journalist.recentReports)
+              : getFollowersText(followerCount)
             }
           </Text>
         </View>
@@ -169,7 +195,7 @@ export function JournalistCard({
               { color: journalist.isFollowing ? colors.text : '#FFFFFF' },
             ]}
           >
-            {journalist.isFollowing ? 'Following' : 'Follow'}
+            {journalist.isFollowing ? t('journalist.following', 'Following') : t('journalist.follow', 'Follow')}
           </Text>
         </Pressable>
       )}
@@ -298,3 +324,5 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fonts.bold,
   },
 });
+
+export default JournalistCard;

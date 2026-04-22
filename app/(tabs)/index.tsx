@@ -2,6 +2,7 @@
 import React, { useState, useCallback, useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
+import { useTranslation } from "react-i18next";
 import { Typography, Spacing } from "@/config/theme";
 import {
   NewsList,
@@ -25,6 +26,7 @@ import type { TimeFilter } from "@/services/news";
 export default function NewsScreen() {
   const router = useRouter();
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const { preferences } = usePreferences();
 
   // Location state
@@ -57,18 +59,17 @@ export default function NewsScreen() {
     return preferences.newsRadius || 25;
   }, [preferences.newsRadius]);
 
-  // Fetch news from Supabase with all filters
+  // Fetch ALL news first (without category filter) to get available categories
   const {
-    news,
+    news: allNews,
     breakingNews,
     isLoading,
     isRefreshing,
     error,
     refresh,
     lastUpdated,
-    totalCount,
+    totalCount: allNewsCount,
   } = useNews({
-    category: activeCategory === "all" ? undefined : activeCategory,
     scope: newsScope,
     latitude: currentCity?.latitude,
     longitude: currentCity?.longitude,
@@ -78,6 +79,12 @@ export default function NewsScreen() {
     realtime: true,
     autoRefresh: true,
   });
+
+  // Filter news by selected category client-side
+  const news = useMemo(() => {
+    if (activeCategory === "all") return allNews;
+    return allNews.filter((article) => article.category === activeCategory);
+  }, [allNews, activeCategory]);
 
   // Handle article press - Navigate to detail screen
   const handleArticlePress = useCallback(
@@ -97,17 +104,50 @@ export default function NewsScreen() {
   const handleRequestPermission = useCallback(async () => {
     const granted = await requestPermission();
     if (granted) {
-      // Location detected automatically after permission granted
       console.log("[NewsScreen] Location permission granted");
     }
   }, [requestPermission]);
+
+  // Get translated category name
+  const getCategoryName = useCallback(
+    (category: string) => {
+      const key = `news.categories.${category}`;
+      const translated = t(key);
+      return translated !== key ? translated : category;
+    },
+    [t]
+  );
+
+  // Get translated time filter name
+  const getTimeFilterName = useCallback(
+    (filter: TimeFilter) => {
+      switch (filter) {
+        case "today":
+          return t("news.today");
+        case "week":
+          return t("news.week");
+        case "month":
+          return t("news.month");
+        case "all":
+          return t("news.all");
+        default:
+          return filter;
+      }
+    },
+    [t]
+  );
 
   // Header component with all filters
   const ListHeader = useMemo(
     () => (
       <View>
         {/* Location Header */}
-        <View style={[styles.locationHeaderWrapper, { backgroundColor: colors.surface }]}>
+        <View
+          style={[
+            styles.locationHeaderWrapper,
+            { backgroundColor: colors.surface },
+          ]}
+        >
           <LocationHeader
             city={currentCity}
             onChangeCity={() => setCityPickerVisible(true)}
@@ -142,24 +182,30 @@ export default function NewsScreen() {
           lastUpdated={lastUpdated}
         />
 
-        {/* News Stats - Collapsible */}
-        <NewsStats articles={news} />
+        {/* News Stats - Collapsible (uses all news for accurate counts) */}
+        <NewsStats articles={allNews} />
 
-        {/* Category Filter */}
+        {/* Category Filter - Dynamic based on available categories */}
         <CategoryFilter
           activeCategory={activeCategory}
           onSelect={setActiveCategory}
+          articles={allNews}
         />
 
         {/* Results count */}
         <View style={styles.resultsBar}>
           <Text style={[styles.resultsText, { color: colors.textSecondary }]}>
-            {totalCount !== null ? totalCount : news.length}{" "}
-            {(totalCount ?? news.length) === 1 ? "article" : "articles"}
-            {activeCategory !== "all" && ` in ${activeCategory}`}
-            {scope === "local" && currentCity && ` within ${radiusKm}km of ${currentCity.name}`}
-            {scope === "national" && " in South Africa"}
-            {timeFilter !== "all" && timeFilter !== "today" && ` • ${timeFilter}`}
+            {news.length}{" "}
+            {news.length === 1 ? t("news.article") : t("news.articles")}
+            {activeCategory !== "all" &&
+              ` ${t("common.in")} ${getCategoryName(activeCategory)}`}
+            {scope === "local" &&
+              currentCity &&
+              ` ${t("news.within")} ${radiusKm}km ${t("news.of")} ${currentCity.name}`}
+            {scope === "national" && ` ${t("news.inSouthAfrica")}`}
+            {timeFilter !== "all" &&
+              timeFilter !== "today" &&
+              ` • ${getTimeFilterName(timeFilter)}`}
           </Text>
         </View>
       </View>
@@ -167,20 +213,22 @@ export default function NewsScreen() {
     [
       activeCategory,
       news.length,
-      totalCount,
+      allNews,
       currentCity,
       isDetecting,
       scope,
       setScope,
       breakingNews,
       handleArticlePress,
-      news,
       colors,
       timeFilter,
       lastUpdated,
       radiusKm,
       permissionStatus,
       handleEnableLocation,
+      t,
+      getCategoryName,
+      getTimeFilterName,
     ]
   );
 
@@ -200,7 +248,7 @@ export default function NewsScreen() {
       {/* City Picker Modal */}
       <CityPickerModal
         visible={cityPickerVisible}
-        currentCityId={currentCity.id}
+        currentCityId={currentCity?.id || ""}
         onSelectCity={(city) => {
           setCity(city);
           setCityPickerVisible(false);

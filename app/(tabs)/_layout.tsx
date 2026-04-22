@@ -2,6 +2,7 @@
 import React from "react";
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
 import { Typography } from "@/config/theme";
 import { useTheme } from "@/contexts";
 
@@ -9,7 +10,7 @@ type TabIcon = React.ComponentProps<typeof Ionicons>["name"];
 
 interface TabConfig {
   name: string;
-  title: string;
+  titleKey: string;
   icon: TabIcon;
   iconFocused: TabIcon;
 }
@@ -17,31 +18,31 @@ interface TabConfig {
 const TABS: TabConfig[] = [
   {
     name: "index",
-    title: "News",
+    titleKey: "tabs.news",
     icon: "newspaper-outline",
     iconFocused: "newspaper",
   },
   {
     name: "map",
-    title: "Map",
+    titleKey: "tabs.map",
     icon: "map-outline",
     iconFocused: "map",
   },
   {
     name: "tip",
-    title: "Report",
+    titleKey: "tabs.tip",
     icon: "shield-outline",
     iconFocused: "shield",
   },
   {
     name: "alerts",
-    title: "Alerts",
+    titleKey: "tabs.alerts",
     icon: "notifications-outline",
     iconFocused: "notifications",
   },
   {
     name: "settings",
-    title: "Settings",
+    titleKey: "tabs.settings",
     icon: "settings-outline",
     iconFocused: "settings",
   },
@@ -49,6 +50,7 @@ const TABS: TabConfig[] = [
 
 export default function TabLayout() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
 
   return (
     <Tabs
@@ -75,7 +77,7 @@ export default function TabLayout() {
           key={tab.name}
           name={tab.name}
           options={{
-            title: tab.title,
+            title: t(tab.titleKey),
             tabBarIcon: ({ focused, color, size }) => (
               <Ionicons
                 name={focused ? tab.iconFocused : tab.icon}

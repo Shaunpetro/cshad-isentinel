@@ -8,6 +8,7 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Typography, Spacing, BorderRadius, Shadows } from '@/config/theme';
 
@@ -53,18 +54,18 @@ interface FeedCardProps {
   onViewMap?: () => void;
 }
 
-const TYPE_CONFIG: Record<FeedItemType, {
-  label: string;
+// Icon config without labels (labels come from translations)
+const TYPE_ICONS: Record<FeedItemType, {
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
 }> = {
-  news: { label: 'NEWS', icon: 'newspaper', color: '#00D4AA' },
-  tip: { label: 'COMMUNITY TIP', icon: 'chatbubble-ellipses', color: '#FF9800' },
-  report: { label: 'JOURNALIST REPORT', icon: 'document-text', color: '#9C27B0' },
-  official: { label: 'OFFICIAL', icon: 'shield-checkmark', color: '#2196F3' },
-  breaking: { label: 'BREAKING', icon: 'flash', color: '#FF1744' },
-  weather: { label: 'WEATHER ALERT', icon: 'cloudy', color: '#03A9F4' },
-  infrastructure: { label: 'INFRASTRUCTURE', icon: 'construct', color: '#795548' },
+  news: { icon: 'newspaper', color: '#00D4AA' },
+  tip: { icon: 'chatbubble-ellipses', color: '#FF9800' },
+  report: { icon: 'document-text', color: '#9C27B0' },
+  official: { icon: 'shield-checkmark', color: '#2196F3' },
+  breaking: { icon: 'flash', color: '#FF1744' },
+  weather: { icon: 'cloudy', color: '#03A9F4' },
+  infrastructure: { icon: 'construct', color: '#795548' },
 };
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -82,19 +83,34 @@ export function FeedCard({
   onViewMap,
 }: FeedCardProps) {
   const { colors } = useTheme();
-  
+  const { t } = useTranslation();
+
+  // Get translated type label
+  const getTypeLabel = (type: FeedItemType, isBreaking?: boolean): string => {
+    if (isBreaking) return t('news.breaking');
+    switch (type) {
+      case 'news': return t('tabs.news').toUpperCase();
+      case 'tip': return t('alerts.communityTips').toUpperCase();
+      case 'report': return t('feed.journalistReport', 'JOURNALIST REPORT');
+      case 'official': return t('feed.official', 'OFFICIAL');
+      case 'breaking': return t('news.breaking');
+      case 'weather': return t('alerts.weather.alert');
+      case 'infrastructure': return t('alerts.infrastructure').toUpperCase();
+    }
+  };
+
   // Determine the display type
   const displayType = item.isBreaking ? 'breaking' : item.type;
-  const typeConfig = TYPE_CONFIG[displayType] || TYPE_CONFIG.news;
+  const typeConfig = TYPE_ICONS[displayType] || TYPE_ICONS.news;
   const severityColor = item.severity ? SEVERITY_COLORS[item.severity] : undefined;
 
   // Normalize source to object format
-  const sourceObj = typeof item.source === 'string' 
+  const sourceObj = typeof item.source === 'string'
     ? { name: item.source, isVerified: item.isVerified }
     : item.source;
 
   // Get location display string
-  const locationDisplay = item.locationName || 
+  const locationDisplay = item.locationName ||
     (typeof item.location === 'string' ? item.location : undefined);
 
   // Get description (support both summary and description)
@@ -114,11 +130,18 @@ export function FeedCard({
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
+    if (diffMins < 1) return t('time.justNow');
+    if (diffMins < 60) return t('time.minutesAgo', { count: diffMins });
+    if (diffHours < 24) return t('time.hoursAgo', { count: diffHours });
+    if (diffDays < 7) return t('time.daysAgo', { count: diffDays });
     return date.toLocaleDateString();
+  };
+
+  // Get translated category name
+  const getCategoryLabel = (category: string): string => {
+    const key = `news.categories.${category.toLowerCase()}`;
+    const translated = t(key);
+    return translated !== key ? translated : category;
   };
 
   return (
@@ -165,7 +188,7 @@ export function FeedCard({
         <View style={[styles.typeBadge, { backgroundColor: typeConfig.color + '20' }]}>
           <Ionicons name={typeConfig.icon} size={12} color={typeConfig.color} />
           <Text style={[styles.typeLabel, { color: typeConfig.color }]}>
-            {typeConfig.label}
+            {getTypeLabel(item.type, item.isBreaking)}
           </Text>
         </View>
       </View>
@@ -176,7 +199,7 @@ export function FeedCard({
         {item.isBreaking && (
           <View style={[styles.breakingBadge, { backgroundColor: colors.danger }]}>
             <Ionicons name="flash" size={12} color="#FFFFFF" />
-            <Text style={styles.breakingText}>BREAKING</Text>
+            <Text style={styles.breakingText}>{t('news.breaking')}</Text>
           </View>
         )}
 
@@ -219,7 +242,7 @@ export function FeedCard({
           <View style={[styles.unverifiedBadge, { backgroundColor: colors.warning + '20' }]}>
             <Ionicons name="alert-circle" size={12} color={colors.warning} />
             <Text style={[styles.unverifiedText, { color: colors.warning }]}>
-              Unverified community report
+              {t('news.unverified')} {t('alerts.communityTips').toLowerCase()}
             </Text>
           </View>
         )}
@@ -229,7 +252,7 @@ export function FeedCard({
           <View style={[styles.unverifiedBadge, { backgroundColor: '#03A9F4' + '20' }]}>
             <Ionicons name="cloudy" size={12} color="#03A9F4" />
             <Text style={[styles.unverifiedText, { color: '#03A9F4' }]}>
-              Weather Service Alert
+              {t('alerts.weather.title')}
             </Text>
           </View>
         )}
@@ -239,7 +262,7 @@ export function FeedCard({
           <View style={[styles.unverifiedBadge, { backgroundColor: '#795548' + '20' }]}>
             <Ionicons name="construct" size={12} color="#795548" />
             <Text style={[styles.unverifiedText, { color: '#795548' }]}>
-              Infrastructure Update
+              {t('alerts.infrastructure')}
             </Text>
           </View>
         )}
@@ -268,7 +291,7 @@ export function FeedCard({
           {/* Show category if no stats */}
           {!item.stats?.views && !item.stats?.comments && item.category && (
             <Text style={[styles.statText, { color: colors.textSecondary }]}>
-              {item.category}
+              {getCategoryLabel(item.category)}
             </Text>
           )}
         </View>
@@ -460,3 +483,5 @@ const styles = StyleSheet.create({
     padding: Spacing.xs,
   },
 });
+
+export default FeedCard;

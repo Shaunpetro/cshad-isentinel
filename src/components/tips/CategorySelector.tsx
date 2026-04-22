@@ -1,6 +1,7 @@
-// v1.263_001/src/components/tips/CategorySelector.tsx
+// src/components/tips/CategorySelector.tsx
 /**
  * Incident category picker with modal selection
+ * Supports light/dark theme
  */
 
 import React, { useState } from "react";
@@ -12,7 +13,9 @@ import {
   ScrollView,
   StyleSheet,
 } from "react-native";
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from "@/config/theme";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Typography, Spacing, BorderRadius } from "@/config/theme";
 import { TIP_CATEGORIES, getCategoryById } from "@/config/tipCategories";
 import type { TipCategory } from "@/types";
 
@@ -22,9 +25,15 @@ interface CategorySelectorProps {
   error?: string;
 }
 
-export function CategorySelector({ value, onChange, error }: CategorySelectorProps) {
+export function CategorySelector({
+  value,
+  onChange,
+  error,
+}: CategorySelectorProps) {
+  const { t } = useTranslation();
+  const { colors } = useTheme();
   const [modalVisible, setModalVisible] = useState(false);
-  
+
   const selectedCategory = value ? getCategoryById(value) : null;
 
   const handleSelect = (categoryId: TipCategory) => {
@@ -32,34 +41,56 @@ export function CategorySelector({ value, onChange, error }: CategorySelectorPro
     setModalVisible(false);
   };
 
+  // Get translated category label
+  const getCategoryLabel = (categoryId: string): string => {
+    const key = `tip.categories.${categoryId}`;
+    const translated = t(key);
+    return translated !== key ? translated : categoryId;
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Incident Type *</Text>
+      <Text style={[styles.label, { color: colors.text }]}>
+        {t("tip.incidentType")} *
+      </Text>
 
       {/* Selector Button */}
       <Pressable
         onPress={() => setModalVisible(true)}
         style={({ pressed }) => [
           styles.selector,
-          error && styles.selectorError,
-          pressed && styles.selectorPressed,
+          {
+            backgroundColor: colors.surface,
+            borderColor: error ? colors.danger : colors.border,
+          },
+          pressed && { opacity: 0.8 },
         ]}
       >
         {selectedCategory ? (
           <View style={styles.selectedWrap}>
             <Text style={styles.selectedIcon}>{selectedCategory.icon}</Text>
             <View style={styles.selectedText}>
-              <Text style={styles.selectedLabel}>{selectedCategory.label}</Text>
-              <Text style={styles.selectedGroup}>{selectedCategory.group}</Text>
+              <Text style={[styles.selectedLabel, { color: colors.text }]}>
+                {getCategoryLabel(selectedCategory.id)}
+              </Text>
+              <Text
+                style={[styles.selectedGroup, { color: colors.textSecondary }]}
+              >
+                {selectedCategory.group}
+              </Text>
             </View>
           </View>
         ) : (
-          <Text style={styles.placeholder}>Select incident type...</Text>
+          <Text style={[styles.placeholder, { color: colors.textSecondary }]}>
+            {t("tip.selectIncidentType")}
+          </Text>
         )}
-        <Text style={styles.chevron}>▼</Text>
+        <Text style={[styles.chevron, { color: colors.textSecondary }]}>▼</Text>
       </Pressable>
 
-      {error && <Text style={styles.error}>{error}</Text>}
+      {error && (
+        <Text style={[styles.error, { color: colors.danger }]}>{error}</Text>
+      )}
 
       {/* Selection Modal */}
       <Modal
@@ -69,15 +100,25 @@ export function CategorySelector({ value, onChange, error }: CategorySelectorPro
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View
+            style={[styles.modalContent, { backgroundColor: colors.surface }]}
+          >
             {/* Header */}
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Incident Type</Text>
+            <View
+              style={[styles.modalHeader, { borderBottomColor: colors.border }]}
+            >
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                {t("tip.selectIncidentType")}
+              </Text>
               <Pressable
                 onPress={() => setModalVisible(false)}
                 style={styles.closeButton}
               >
-                <Text style={styles.closeText}>✕</Text>
+                <Text
+                  style={[styles.closeText, { color: colors.textSecondary }]}
+                >
+                  ✕
+                </Text>
               </Pressable>
             </View>
 
@@ -89,17 +130,35 @@ export function CategorySelector({ value, onChange, error }: CategorySelectorPro
                   onPress={() => handleSelect(category.id)}
                   style={({ pressed }) => [
                     styles.categoryItem,
-                    value === category.id && styles.categoryItemSelected,
-                    pressed && styles.categoryItemPressed,
+                    { backgroundColor: colors.background },
+                    value === category.id && {
+                      backgroundColor: colors.primary + "30",
+                      borderWidth: 1,
+                      borderColor: colors.primary,
+                    },
+                    pressed && { opacity: 0.8 },
                   ]}
                 >
                   <Text style={styles.categoryIcon}>{category.icon}</Text>
                   <View style={styles.categoryText}>
-                    <Text style={styles.categoryLabel}>{category.label}</Text>
-                    <Text style={styles.categoryDesc}>{category.description}</Text>
+                    <Text
+                      style={[styles.categoryLabel, { color: colors.text }]}
+                    >
+                      {getCategoryLabel(category.id)}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.categoryDesc,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      {category.description}
+                    </Text>
                   </View>
                   {value === category.id && (
-                    <Text style={styles.checkmark}>✓</Text>
+                    <Text style={[styles.checkmark, { color: colors.primary }]}>
+                      ✓
+                    </Text>
                   )}
                 </Pressable>
               ))}
@@ -118,26 +177,17 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   label: {
-    color: Colors.carbon.white,
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.bold,
     marginBottom: Spacing.sm,
   },
   selector: {
-    backgroundColor: Colors.carbon.charcoal,
     borderWidth: 1,
-    borderColor: Colors.carbon.steel,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-  },
-  selectorError: {
-    borderColor: Colors.semantic.danger,
-  },
-  selectorPressed: {
-    backgroundColor: Colors.carbon.steel,
   },
   selectedWrap: {
     flexDirection: "row",
@@ -152,43 +202,35 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   selectedLabel: {
-    color: Colors.carbon.white,
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.medium,
   },
   selectedGroup: {
-    color: Colors.carbon.silver,
     fontSize: Typography.sizes.caption,
     fontFamily: Typography.fonts.regular,
   },
   placeholder: {
-    color: Colors.carbon.silver,
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.regular,
   },
   chevron: {
-    color: Colors.carbon.silver,
     fontSize: Typography.sizes.caption,
     marginLeft: Spacing.sm,
   },
   error: {
-    color: Colors.semantic.danger,
     fontSize: Typography.sizes.caption,
     fontFamily: Typography.fonts.regular,
     marginTop: Spacing.sm,
   },
-  // Modal styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: Colors.overlay.heavy,
+    backgroundColor: "rgba(0,0,0,0.6)",
     justifyContent: "flex-end",
   },
   modalContent: {
-    backgroundColor: Colors.carbon.charcoal,
     borderTopLeftRadius: BorderRadius.xl,
     borderTopRightRadius: BorderRadius.xl,
     maxHeight: "80%",
-    ...Shadows.lg,
   },
   modalHeader: {
     flexDirection: "row",
@@ -196,10 +238,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: Spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.carbon.steel,
   },
   modalTitle: {
-    color: Colors.carbon.white,
     fontSize: Typography.sizes.heading,
     fontFamily: Typography.fonts.bold,
   },
@@ -207,7 +247,6 @@ const styles = StyleSheet.create({
     padding: Spacing.sm,
   },
   closeText: {
-    color: Colors.carbon.silver,
     fontSize: Typography.sizes.heading,
   },
   modalScroll: {
@@ -216,18 +255,9 @@ const styles = StyleSheet.create({
   categoryItem: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.carbon.steel,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
     marginBottom: Spacing.sm,
-  },
-  categoryItemSelected: {
-    backgroundColor: Colors.semantic.primary + "30",
-    borderWidth: 1,
-    borderColor: Colors.semantic.primary,
-  },
-  categoryItemPressed: {
-    opacity: 0.8,
   },
   categoryIcon: {
     fontSize: 28,
@@ -239,18 +269,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   categoryLabel: {
-    color: Colors.carbon.white,
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.medium,
   },
   categoryDesc: {
-    color: Colors.carbon.silver,
     fontSize: Typography.sizes.caption,
     fontFamily: Typography.fonts.regular,
     marginTop: 2,
   },
   checkmark: {
-    color: Colors.semantic.primary,
     fontSize: Typography.sizes.heading,
     fontFamily: Typography.fonts.bold,
     marginLeft: Spacing.sm,

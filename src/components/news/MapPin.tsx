@@ -1,9 +1,10 @@
-// v1.263_001/src/components/news/MapPin.tsx
+// src/components/news/MapPin.tsx
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { Colors, BorderRadius } from "@/config/theme";
-import { getSeverityColor, getCategoryIcon } from "@utils/mapHelpers";
-import type { NewsSeverity, NewsCategory, TipCategory } from "@typeDefs/index";
+import { useTheme } from "@/contexts/ThemeContext";
+import { BorderRadius } from "@/config/theme";
+import { getSeverityColor, getCategoryIcon } from "@/utils/mapHelpers";
+import type { NewsSeverity, NewsCategory, TipCategory } from "@/types";
 
 interface Props {
   severity: NewsSeverity;
@@ -12,12 +13,18 @@ interface Props {
 }
 
 export function MapPinMarker({ severity, category, isSelected }: Props) {
+  const { colors } = useTheme();
   const color = getSeverityColor(severity);
   const icon = getCategoryIcon(category);
 
   return (
     <View style={[styles.container, isSelected && styles.selected]}>
-      <View style={[styles.pin, { backgroundColor: color }]}>
+      <View
+        style={[
+          styles.pin,
+          { backgroundColor: color, borderColor: colors.background },
+        ]}
+      >
         <Text style={styles.icon}>{icon}</Text>
       </View>
       <View style={[styles.arrow, { borderTopColor: color }]} />
@@ -39,7 +46,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: Colors.carbon.white,
   },
   icon: {
     fontSize: 16,

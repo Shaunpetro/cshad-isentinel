@@ -1,11 +1,12 @@
 // src/components/news/LocationBanner.tsx
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '@/contexts';
-import { Colors, Typography, Spacing } from '@/config/theme';
+import React from "react";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Typography, Spacing } from "@/config/theme";
 
-export type LocationStatus = 'granted' | 'denied' | 'undetermined' | 'offline';
+export type LocationStatus = "granted" | "denied" | "undetermined" | "offline";
 
 interface LocationBannerProps {
   status: LocationStatus;
@@ -18,40 +19,40 @@ export function LocationBanner({
   status,
   onEnablePress,
   onDismiss,
-  cityName,
 }: LocationBannerProps) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
 
   // Don't show banner if permission is granted
-  if (status === 'granted') {
+  if (status === "granted") {
     return null;
   }
 
   const getBannerConfig = () => {
     switch (status) {
-      case 'denied':
+      case "denied":
         return {
-          icon: 'location-outline' as const,
-          message: 'Location access denied. Enable for local news.',
-          actionText: 'Enable',
-          backgroundColor: Colors.semantic.warning + '20',
-          iconColor: Colors.semantic.warning,
+          icon: "location-outline" as const,
+          messageKey: "location.permissionDenied",
+          actionKey: "common.retry",
+          backgroundColor: colors.warning + "20",
+          iconColor: colors.warning,
         };
-      case 'offline':
+      case "offline":
         return {
-          icon: 'cloud-offline-outline' as const,
-          message: `Showing national news. You're offline.`,
-          actionText: 'Retry',
-          backgroundColor: colors.textSecondary + '20',
+          icon: "cloud-offline-outline" as const,
+          messageKey: "location.unavailable",
+          actionKey: "common.retry",
+          backgroundColor: colors.textSecondary + "20",
           iconColor: colors.textSecondary,
         };
-      case 'undetermined':
+      case "undetermined":
       default:
         return {
-          icon: 'navigate-outline' as const,
-          message: 'Enable location for live local news.',
-          actionText: 'Enable',
-          backgroundColor: colors.primary + '15',
+          icon: "navigate-outline" as const,
+          messageKey: "location.detecting",
+          actionKey: "common.ok",
+          backgroundColor: colors.primary + "15",
           iconColor: colors.primary,
         };
     }
@@ -62,9 +63,9 @@ export function LocationBanner({
   return (
     <View style={[styles.container, { backgroundColor: config.backgroundColor }]}>
       <Ionicons name={config.icon} size={18} color={config.iconColor} />
-      
+
       <Text style={[styles.message, { color: colors.text }]} numberOfLines={1}>
-        {config.message}
+        {t(config.messageKey)}
       </Text>
 
       <TouchableOpacity
@@ -72,7 +73,7 @@ export function LocationBanner({
         onPress={onEnablePress}
         activeOpacity={0.7}
       >
-        <Text style={styles.actionText}>{config.actionText}</Text>
+        <Text style={styles.actionText}>{t(config.actionKey)}</Text>
       </TouchableOpacity>
 
       {onDismiss && (
@@ -90,8 +91,8 @@ export function LocationBanner({
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     marginHorizontal: Spacing.md,
@@ -110,7 +111,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   actionText: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: Typography.sizes.label,
     fontFamily: Typography.fonts.bold,
   },

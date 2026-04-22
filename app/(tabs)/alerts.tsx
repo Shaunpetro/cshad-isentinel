@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useLocation } from '@/hooks/useLocation';
 import { useHub } from '@/hooks/useHub';
@@ -30,6 +31,7 @@ import {
   type Journalist,
   type NationalAlert,
 } from '@/components/hub';
+import type { SavedArea } from '@/services/infrastructure';
 
 // Notification settings state
 interface NotificationSetting {
@@ -40,27 +42,21 @@ interface NotificationSetting {
   color?: string;
 }
 
-const DEFAULT_NOTIFICATION_SETTINGS: NotificationSetting[] = [
-  { id: 'breaking', label: 'Breaking Alerts', icon: 'flash', enabled: true, color: '#FF1744' },
-  { id: 'local', label: 'Local Tips', icon: 'location', enabled: true, color: '#2196F3' },
-  { id: 'weather', label: 'Weather Alerts', icon: 'cloudy', enabled: true, color: '#FF9800' },
-  { id: 'loadshedding', label: 'Load Shedding', icon: 'flash-outline', enabled: true, color: '#9C27B0' },
-];
-
-// Suburb type for picker
-interface SavedSuburb {
-  id: string;
-  name: string;
-  municipality: string;
-  province: string;
-}
-
 export default function AlertsScreen() {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const router = useRouter();
 
   // Get user location
   const { currentCity, radiusKm } = useLocation();
+
+  // Dynamic notification settings with translations
+  const getNotificationSettings = (): NotificationSetting[] => [
+    { id: 'breaking', label: t('news.breaking'), icon: 'flash', enabled: true, color: '#FF1744' },
+    { id: 'local', label: t('alerts.communityTips'), icon: 'location', enabled: true, color: '#2196F3' },
+    { id: 'weather', label: t('alerts.weatherAlerts'), icon: 'cloudy', enabled: true, color: '#FF9800' },
+    { id: 'loadshedding', label: t('alerts.loadshedding.title'), icon: 'flash-outline', enabled: true, color: '#9C27B0' },
+  ];
 
   // Get hub data
   const {
@@ -88,7 +84,7 @@ export default function AlertsScreen() {
 
   // Notification settings state
   const [notificationSettings, setNotificationSettings] = useState<NotificationSetting[]>(
-    DEFAULT_NOTIFICATION_SETTINGS
+    getNotificationSettings()
   );
 
   // Suburb picker modal state
@@ -114,6 +110,19 @@ export default function AlertsScreen() {
     timestamp: item.timestamp instanceof Date ? item.timestamp : new Date(item.timestamp as string),
     source: typeof item.source === 'string' ? item.source : (item.source as { name: string }).name,
   }));
+
+  // Get translated filter name
+  const getFilterName = (filter: HubFilter): string => {
+    switch (filter) {
+      case 'tips': return t('alerts.communityTips');
+      case 'live': return t('alerts.activeIncidents');
+      case 'weather': return t('alerts.weatherAlerts');
+      case 'infrastructure': return t('alerts.infrastructure');
+      case 'national': return t('news.national');
+      case 'all': return t('map.showAll');
+      default: return filter;
+    }
+  };
 
   // Handlers
   const handleFilterChange = useCallback(
@@ -195,10 +204,9 @@ export default function AlertsScreen() {
     setSuburbPickerVisible(false);
   }, []);
 
-  const handleSuburbSelected = useCallback(
-    (suburb: SavedSuburb | null) => {
-      console.log('Suburb selected:', suburb?.name || 'None');
-      // Refresh to get new local schedule
+  const handleAreaSelected = useCallback(
+    (area: SavedArea | null) => {
+      console.log('Area selected:', area?.name || 'None');
       refresh();
     },
     [refresh]
@@ -222,7 +230,7 @@ export default function AlertsScreen() {
   const renderHeader = useCallback(
     () => (
       <View>
-        {/* National Breaking Banner (Top 2, dismissible) */}
+        {/* National Breaking Banner */}
         {nationalAlertItems.length > 0 && (
           <NationalBreakingBanner
             alerts={nationalAlertItems}
@@ -243,7 +251,7 @@ export default function AlertsScreen() {
         )}
 
         {/* Load Shedding Card */}
-        {loadshedding && loadshedding.stage > 0 && (
+        {loadshedding && (
           <InfrastructureCard
             loadshedding={loadshedding}
             onPress={() => setFilter('infrastructure')}
@@ -269,21 +277,11 @@ export default function AlertsScreen() {
         {/* Section label */}
         <View style={styles.sectionHeader}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            {activeFilter === 'tips'
-              ? 'Community Tips'
-              : activeFilter === 'live'
-              ? 'Live Incidents'
-              : activeFilter === 'weather'
-              ? 'Weather Alerts'
-              : activeFilter === 'infrastructure'
-              ? 'Infrastructure'
-              : activeFilter === 'national'
-              ? 'National Alerts'
-              : 'All Updates'}
+            {getFilterName(activeFilter)}
           </Text>
           {feedItems.length > 0 && (
             <Text style={[styles.sectionCount, { color: colors.textSecondary }]}>
-              {feedItems.length} items
+              {feedItems.length} {feedItems.length === 1 ? t('common.item') : t('common.items')}
             </Text>
           )}
         </View>
@@ -307,6 +305,7 @@ export default function AlertsScreen() {
       handleOpenSuburbPicker,
       setFilter,
       feedItems.length,
+      t,
     ]
   );
 
@@ -351,7 +350,7 @@ export default function AlertsScreen() {
         <View style={styles.emptyContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            Loading safety updates...
+            {t('common.loading')}
           </Text>
         </View>
       );
@@ -361,7 +360,7 @@ export default function AlertsScreen() {
       return (
         <View style={styles.emptyContainer}>
           <Ionicons name="alert-circle-outline" size={48} color={colors.danger} />
-          <Text style={[styles.emptyText, { color: colors.text }]}>Failed to load updates</Text>
+          <Text style={[styles.emptyText, { color: colors.text }]}>{t('common.error')}</Text>
           <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>{error}</Text>
         </View>
       );
@@ -370,13 +369,13 @@ export default function AlertsScreen() {
     return (
       <View style={styles.emptyContainer}>
         <Ionicons name="checkmark-circle-outline" size={48} color={colors.success} />
-        <Text style={[styles.emptyText, { color: colors.text }]}>All clear!</Text>
+        <Text style={[styles.emptyText, { color: colors.text }]}>{t('alerts.allClear')}</Text>
         <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-          No {activeFilter === 'all' ? 'updates' : activeFilter} at the moment
+          {t('alerts.noAlerts')}
         </Text>
       </View>
     );
-  }, [isLoading, error, activeFilter, colors]);
+  }, [isLoading, error, activeFilter, colors, t]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -384,7 +383,7 @@ export default function AlertsScreen() {
       <SafeAreaView edges={['top']} style={[styles.header, { backgroundColor: colors.background }]}>
         <View style={styles.headerContent}>
           <View style={styles.headerLeft}>
-            <Text style={[styles.title, { color: colors.text }]}>Safety Hub</Text>
+            <Text style={[styles.title, { color: colors.text }]}>{t('alerts.title')}</Text>
             <View style={styles.locationRow}>
               <Ionicons name="location" size={14} color={colors.primary} />
               <Text style={[styles.locationText, { color: colors.primary }]}>
@@ -424,11 +423,11 @@ export default function AlertsScreen() {
         contentContainerStyle={feedItems.length === 0 ? styles.emptyList : undefined}
       />
 
-      {/* Suburb Picker Modal */}
+      {/* Area Picker Modal */}
       <SuburbPickerModal
         visible={suburbPickerVisible}
         onClose={handleCloseSuburbPicker}
-        onSuburbSelected={handleSuburbSelected}
+        onSuburbSelected={handleAreaSelected}
       />
     </View>
   );

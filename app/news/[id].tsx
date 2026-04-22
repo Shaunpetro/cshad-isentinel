@@ -14,11 +14,8 @@ import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import MapView, { Marker } from "react-native-maps";
-import {
-  Typography,
-  Spacing,
-  BorderRadius,
-} from "@/config/theme";
+import { useTranslation } from "react-i18next";
+import { Typography, Spacing, BorderRadius } from "@/config/theme";
 import { SeverityBadge, SourceBadge, VerifiedBadge } from "@/components/news";
 import { timeAgo, formatDate } from "@/utils/formatters";
 import { useNewsArticle } from "@/hooks/useNews";
@@ -28,9 +25,17 @@ export default function NewsDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
+  const { t } = useTranslation();
 
   // Fetch article from Supabase
   const { article, isLoading, error } = useNewsArticle(id);
+
+  // Get translated category
+  const getCategoryLabel = (category: string): string => {
+    const key = `news.categories.${category}`;
+    const translated = t(key);
+    return translated !== key ? translated.toUpperCase() : category.toUpperCase();
+  };
 
   // Handle share
   const handleShare = async () => {
@@ -39,7 +44,7 @@ export default function NewsDetailScreen() {
     try {
       await Share.share({
         title: article.title,
-        message: `${article.title}\n\n${article.summary}\n\nShared via PSHAD iSentinel`,
+        message: `${article.title}\n\n${article.summary}\n\n${t("news.shareArticle")} - CSHAD iSentinel`,
       });
     } catch (err) {
       console.error("[NewsDetail] Share error:", err);
@@ -69,7 +74,7 @@ export default function NewsDetailScreen() {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-            Loading article...
+            {t("common.loading")}
           </Text>
         </View>
       </View>
@@ -82,7 +87,7 @@ export default function NewsDetailScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Stack.Screen
           options={{
-            title: "Article Not Found",
+            title: t("common.error"),
             headerStyle: { backgroundColor: colors.surface },
             headerTintColor: colors.text,
           }}
@@ -94,17 +99,17 @@ export default function NewsDetailScreen() {
             color={colors.textDisabled}
           />
           <Text style={[styles.errorTitle, { color: colors.text }]}>
-            {error ? "Error Loading Article" : "Article Not Found"}
+            {error ? t("common.error") : t("common.noResults")}
           </Text>
           <Text style={[styles.errorText, { color: colors.textSecondary }]}>
-            {error || "This article may have been removed or is no longer available."}
+            {error || t("common.noResults")}
           </Text>
-          <Pressable 
-            style={[styles.backButton, { backgroundColor: colors.primary }]} 
+          <Pressable
+            style={[styles.backButton, { backgroundColor: colors.primary }]}
             onPress={() => router.back()}
           >
-            <Text style={[styles.backButtonText, { color: colors.textInverse }]}>
-              Go Back
+            <Text style={[styles.backButtonText, { color: "#FFFFFF" }]}>
+              {t("common.back")}
             </Text>
           </Pressable>
         </View>
@@ -121,11 +126,7 @@ export default function NewsDetailScreen() {
           headerTintColor: colors.text,
           headerRight: () => (
             <Pressable onPress={handleShare} style={styles.headerButton}>
-              <Ionicons
-                name="share-outline"
-                size={24}
-                color={colors.text}
-              />
+              <Ionicons name="share-outline" size={24} color={colors.text} />
             </Pressable>
           ),
         }}
@@ -144,7 +145,9 @@ export default function NewsDetailScreen() {
             transition={300}
           />
         ) : (
-          <View style={[styles.heroPlaceholder, { backgroundColor: colors.surface }]}>
+          <View
+            style={[styles.heroPlaceholder, { backgroundColor: colors.surface }]}
+          >
             <Ionicons
               name="newspaper-outline"
               size={64}
@@ -157,7 +160,7 @@ export default function NewsDetailScreen() {
           {/* Category + Severity Row */}
           <View style={styles.metaRow}>
             <Text style={[styles.category, { color: colors.primary }]}>
-              {article.category.toUpperCase()}
+              {getCategoryLabel(article.category)}
             </Text>
             <SeverityBadge severity={article.severity} />
           </View>
@@ -200,8 +203,8 @@ export default function NewsDetailScreen() {
                   size={16}
                   color={colors.textSecondary}
                 />
-                <Text 
-                  style={[styles.infoText, { color: colors.textSecondary }]} 
+                <Text
+                  style={[styles.infoText, { color: colors.textSecondary }]}
                   numberOfLines={1}
                 >
                   {article.locationName}
@@ -211,7 +214,7 @@ export default function NewsDetailScreen() {
           </View>
 
           {/* Divider */}
-          <View style={[styles.divider, { backgroundColor: colors.divider }]} />
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
           {/* Summary */}
           <Text style={[styles.summary, { color: colors.text }]}>
@@ -224,27 +227,24 @@ export default function NewsDetailScreen() {
               {article.body}
             </Text>
           ) : (
-            <View style={[styles.noBodyContainer, { backgroundColor: colors.surface }]}>
+            <View
+              style={[styles.noBodyContainer, { backgroundColor: colors.surface }]}
+            >
               <Text style={[styles.noBodyText, { color: colors.textDisabled }]}>
-                Full article content will be available when connected to live
-                news feeds.
+                {t("news.readMore")}
               </Text>
             </View>
           )}
 
           {/* Source Link */}
           {article.sourceUrl && (
-            <Pressable 
-              style={[styles.sourceLink, { backgroundColor: colors.surface }]} 
+            <Pressable
+              style={[styles.sourceLink, { backgroundColor: colors.surface }]}
               onPress={handleSourcePress}
             >
-              <Ionicons
-                name="open-outline"
-                size={18}
-                color={colors.primary}
-              />
+              <Ionicons name="open-outline" size={18} color={colors.primary} />
               <Text style={[styles.sourceLinkText, { color: colors.primary }]}>
-                View Original Source
+                {t("news.source")}
               </Text>
             </Pressable>
           )}
@@ -253,7 +253,7 @@ export default function NewsDetailScreen() {
           {article.location && (
             <View style={styles.mapSection}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                📍 Incident Location
+                📍 {t("map.incidentDetails")}
               </Text>
               <View style={styles.mapContainer}>
                 <MapView
@@ -280,17 +280,23 @@ export default function NewsDetailScreen() {
                 </MapView>
               </View>
               <Text style={[styles.mapCaption, { color: colors.textDisabled }]}>
-                {article.locationName || "Location approximate"}
+                {article.locationName || t("map.confidence.approximate")}
               </Text>
             </View>
           )}
 
           {/* Published Date */}
-          <View style={[styles.publishedRow, { borderTopColor: colors.divider }]}>
-            <Text style={[styles.publishedLabel, { color: colors.textDisabled }]}>
-              Published:
+          <View
+            style={[styles.publishedRow, { borderTopColor: colors.border }]}
+          >
+            <Text
+              style={[styles.publishedLabel, { color: colors.textDisabled }]}
+            >
+              {t("news.lastUpdated")}:
             </Text>
-            <Text style={[styles.publishedDate, { color: colors.textSecondary }]}>
+            <Text
+              style={[styles.publishedDate, { color: colors.textSecondary }]}
+            >
               {formatDate(article.publishedAt)}
             </Text>
           </View>
@@ -347,7 +353,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: Typography.sizes.title,
     fontFamily: Typography.fonts.bold,
-    lineHeight: Typography.sizes.title * Typography.lineHeight.tight,
+    lineHeight: Typography.sizes.title * 1.2,
     marginBottom: Spacing.md,
   },
   sourceRow: {
@@ -378,13 +384,13 @@ const styles = StyleSheet.create({
   summary: {
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.medium,
-    lineHeight: Typography.sizes.body * Typography.lineHeight.relaxed,
+    lineHeight: Typography.sizes.body * 1.6,
     marginBottom: Spacing.lg,
   },
   body: {
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.regular,
-    lineHeight: Typography.sizes.body * Typography.lineHeight.relaxed,
+    lineHeight: Typography.sizes.body * 1.6,
     marginBottom: Spacing.lg,
   },
   noBodyContainer: {

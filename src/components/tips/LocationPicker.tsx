@@ -1,13 +1,22 @@
-// v1.263_001/src/components/tips/LocationPicker.tsx
+// src/components/tips/LocationPicker.tsx
 /**
  * Location picker with GPS auto-detect
  * Shows fuzzed location for privacy (Rule 1)
+ * Supports light/dark theme
  */
 
 import React, { useState } from "react";
-import { View, Text, Pressable, StyleSheet, ActivityIndicator } from "react-native";
+import {
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  ActivityIndicator,
+} from "react-native";
 import * as Location from "expo-location";
-import { Colors, Typography, Spacing, BorderRadius } from "@/config/theme";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Typography, Spacing, BorderRadius } from "@/config/theme";
 import { fuzzLocation, isValidSALocation } from "@/services/tips";
 import type { GeoPoint } from "@/types";
 
@@ -18,7 +27,14 @@ interface LocationPickerProps {
   error?: string;
 }
 
-export function LocationPicker({ value, locationName, onChange, error }: LocationPickerProps) {
+export function LocationPicker({
+  value,
+  locationName,
+  onChange,
+  error,
+}: LocationPickerProps) {
+  const { t } = useTranslation();
+  const { colors } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 
@@ -29,9 +45,12 @@ export function LocationPicker({ value, locationName, onChange, error }: Locatio
     try {
       // Request permission
       const { status } = await Location.requestForegroundPermissionsAsync();
-      
+
       if (status !== "granted") {
-        setLocationError("Location permission denied. You can still submit without location.");
+        setLocationError(
+          t("location.permissionDenied") +
+            ". You can still submit without location."
+        );
         setIsLoading(false);
         return;
       }
@@ -61,7 +80,11 @@ export function LocationPicker({ value, locationName, onChange, error }: Locatio
       try {
         const [address] = await Location.reverseGeocodeAsync(rawLocation);
         if (address) {
-          const parts = [address.district, address.city, address.region].filter(Boolean);
+          const parts = [
+            address.district,
+            address.city,
+            address.region,
+          ].filter(Boolean);
           areaName = parts.join(", ");
         }
       } catch {
@@ -85,27 +108,41 @@ export function LocationPicker({ value, locationName, onChange, error }: Locatio
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Location (Optional)</Text>
-      <Text style={styles.hint}>
+      <Text style={[styles.label, { color: colors.text }]}>
+        {t("tip.location")} ({t("common.item")})
+      </Text>
+      <Text style={[styles.hint, { color: colors.textSecondary }]}>
         📍 Location is rounded to ~100m for your privacy
       </Text>
 
       {value ? (
         // Location selected
-        <View style={styles.selectedBox}>
+        <View
+          style={[
+            styles.selectedBox,
+            {
+              backgroundColor: colors.success + "20",
+              borderColor: colors.success,
+            },
+          ]}
+        >
           <View style={styles.selectedInfo}>
             <Text style={styles.selectedIcon}>📍</Text>
             <View style={styles.selectedText}>
-              <Text style={styles.selectedName}>
+              <Text style={[styles.selectedName, { color: colors.text }]}>
                 {locationName || "Location set"}
               </Text>
-              <Text style={styles.selectedCoords}>
+              <Text
+                style={[styles.selectedCoords, { color: colors.textSecondary }]}
+              >
                 ~{value.latitude.toFixed(3)}, {value.longitude.toFixed(3)}
               </Text>
             </View>
           </View>
           <Pressable onPress={handleClear} style={styles.clearButton}>
-            <Text style={styles.clearText}>✕</Text>
+            <Text style={[styles.clearText, { color: colors.textSecondary }]}>
+              ✕
+            </Text>
           </Pressable>
         </View>
       ) : (
@@ -115,24 +152,32 @@ export function LocationPicker({ value, locationName, onChange, error }: Locatio
           disabled={isLoading}
           style={({ pressed }) => [
             styles.locationButton,
-            pressed && styles.buttonPressed,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.primary,
+            },
+            pressed && { backgroundColor: colors.primary + "20" },
             isLoading && styles.buttonDisabled,
           ]}
         >
           {isLoading ? (
-            <ActivityIndicator size="small" color={Colors.semantic.primary} />
+            <ActivityIndicator size="small" color={colors.primary} />
           ) : (
             <Text style={styles.buttonIcon}>📍</Text>
           )}
-          <Text style={styles.buttonText}>
-            {isLoading ? "Getting location..." : "Use Current Location"}
+          <Text style={[styles.buttonText, { color: colors.primary }]}>
+            {isLoading
+              ? t("location.detecting")
+              : t("tip.useCurrentLocation")}
           </Text>
         </Pressable>
       )}
 
       {/* Errors */}
       {(locationError || error) && (
-        <Text style={styles.error}>{locationError || error}</Text>
+        <Text style={[styles.error, { color: colors.danger }]}>
+          {locationError || error}
+        </Text>
       )}
     </View>
   );
@@ -143,13 +188,11 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   label: {
-    color: Colors.carbon.white,
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.bold,
     marginBottom: Spacing.xs,
   },
   hint: {
-    color: Colors.carbon.silver,
     fontSize: Typography.sizes.caption,
     fontFamily: Typography.fonts.regular,
     marginBottom: Spacing.sm,
@@ -158,15 +201,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: Colors.carbon.charcoal,
     borderWidth: 1,
-    borderColor: Colors.semantic.primary,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
     gap: Spacing.sm,
-  },
-  buttonPressed: {
-    backgroundColor: Colors.semantic.primary + "20",
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -175,7 +213,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   buttonText: {
-    color: Colors.semantic.primary,
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.medium,
   },
@@ -183,9 +220,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: Colors.semantic.success + "20",
     borderWidth: 1,
-    borderColor: Colors.semantic.success,
     borderRadius: BorderRadius.md,
     padding: Spacing.md,
   },
@@ -202,12 +237,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   selectedName: {
-    color: Colors.carbon.white,
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.medium,
   },
   selectedCoords: {
-    color: Colors.carbon.silver,
     fontSize: Typography.sizes.caption,
     fontFamily: Typography.fonts.mono,
     marginTop: 2,
@@ -216,11 +249,9 @@ const styles = StyleSheet.create({
     padding: Spacing.sm,
   },
   clearText: {
-    color: Colors.carbon.silver,
     fontSize: Typography.sizes.heading,
   },
   error: {
-    color: Colors.semantic.danger,
     fontSize: Typography.sizes.caption,
     fontFamily: Typography.fonts.regular,
     marginTop: Spacing.sm,

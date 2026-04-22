@@ -1,7 +1,7 @@
 // src/components/tips/SuccessModal.tsx
 /**
  * Modern success modal for tip submission
- * Matches the app's dark theme with semantic colors
+ * Supports light/dark theme
  */
 
 import React, { useEffect, useRef } from "react";
@@ -15,7 +15,9 @@ import {
   Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Colors, Typography, Spacing } from "@/config/theme";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Typography, Spacing } from "@/config/theme";
 
 interface SuccessModalProps {
   visible: boolean;
@@ -25,14 +27,17 @@ interface SuccessModalProps {
 
 const { width } = Dimensions.get("window");
 
-// Use semantic primary color (#00D4AA)
-const ACCENT_COLOR = Colors.semantic.primary;
-const ACCENT_DARK = "#00B894";
-
 export function SuccessModal({ visible, onClose, tipId }: SuccessModalProps) {
+  const { t } = useTranslation();
+  const { colors } = useTheme();
+  
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const checkmarkAnim = useRef(new Animated.Value(0)).current;
+
+  // Use theme primary color for accent
+  const accentColor = colors.primary;
+  const accentDark = colors.primary + "CC";
 
   useEffect(() => {
     if (visible) {
@@ -91,6 +96,8 @@ export function SuccessModal({ visible, onClose, tipId }: SuccessModalProps) {
           style={[
             styles.modalContainer,
             {
+              backgroundColor: colors.surface,
+              borderColor: accentDark,
               transform: [
                 { scale: scaleAnim },
                 {
@@ -105,11 +112,15 @@ export function SuccessModal({ visible, onClose, tipId }: SuccessModalProps) {
         >
           {/* Success Icon with Glow */}
           <View style={styles.iconContainer}>
-            <View style={styles.iconGlow} />
+            <View
+              style={[styles.iconGlow, { backgroundColor: accentColor }]}
+            />
             <Animated.View
               style={[
                 styles.iconCircle,
                 {
+                  backgroundColor: accentColor,
+                  shadowColor: accentColor,
                   transform: [
                     {
                       scale: checkmarkAnim.interpolate({
@@ -121,46 +132,61 @@ export function SuccessModal({ visible, onClose, tipId }: SuccessModalProps) {
                 },
               ]}
             >
-              <Ionicons name="shield-checkmark" size={48} color={Colors.carbon.white} />
+              <Ionicons name="shield-checkmark" size={48} color="#FFFFFF" />
             </Animated.View>
           </View>
 
           {/* Title */}
-          <Text style={styles.title}>Tip Submitted!</Text>
+          <Text style={[styles.title, { color: colors.text }]}>
+            {t("tip.success")}
+          </Text>
 
           {/* Message */}
-          <Text style={styles.message}>
-            Thank you for helping keep your community safe.
+          <Text style={[styles.message, { color: colors.textSecondary }]}>
+            {t("tip.successMessage")}
           </Text>
 
           {/* Anonymous Badge */}
-          <View style={styles.anonymousBadge}>
-            <Ionicons name="eye-off" size={16} color={ACCENT_COLOR} />
-            <Text style={styles.anonymousText}>
-              Your identity remains completely anonymous
+          <View
+            style={[
+              styles.anonymousBadge,
+              { backgroundColor: accentColor + "15" },
+            ]}
+          >
+            <Ionicons name="eye-off" size={16} color={accentColor} />
+            <Text style={[styles.anonymousText, { color: accentColor }]}>
+              {t("tip.anonymous")}
             </Text>
           </View>
 
           {/* Tip Reference (optional display) */}
           {tipId && (
             <View style={styles.referenceContainer}>
-              <Text style={styles.referenceLabel}>Reference</Text>
-              <Text style={styles.referenceId}>{tipId.substring(0, 8)}...</Text>
+              <Text
+                style={[styles.referenceLabel, { color: colors.textSecondary }]}
+              >
+                Reference
+              </Text>
+              <Text style={[styles.referenceId, { color: colors.textDisabled }]}>
+                {tipId.substring(0, 8)}...
+              </Text>
             </View>
           )}
 
           {/* Close Button */}
           <TouchableOpacity
-            style={styles.closeButton}
+            style={[styles.closeButton, { backgroundColor: accentColor }]}
             onPress={handleClose}
             activeOpacity={0.8}
           >
-            <Text style={styles.closeButtonText}>Done</Text>
+            <Text style={styles.closeButtonText}>{t("common.done")}</Text>
           </TouchableOpacity>
 
           {/* Decorative Elements */}
-          <View style={styles.decorTop} />
-          <View style={styles.decorBottom} />
+          <View style={[styles.decorTop, { backgroundColor: accentColor }]} />
+          <View
+            style={[styles.decorBottom, { backgroundColor: accentColor }]}
+          />
         </Animated.View>
       </Animated.View>
     </Modal>
@@ -178,12 +204,10 @@ const styles = StyleSheet.create({
   modalContainer: {
     width: width - Spacing.xl * 2,
     maxWidth: 340,
-    backgroundColor: Colors.carbon.charcoal,
     borderRadius: 24,
     padding: Spacing.xl,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: ACCENT_DARK,
     overflow: "hidden",
   },
   iconContainer: {
@@ -196,17 +220,14 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: ACCENT_COLOR,
     opacity: 0.15,
   },
   iconCircle: {
     width: 88,
     height: 88,
     borderRadius: 44,
-    backgroundColor: ACCENT_COLOR,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: ACCENT_COLOR,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.5,
     shadowRadius: 20,
@@ -215,14 +236,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: Typography.sizes.heading,
     fontFamily: Typography.fonts.bold,
-    color: Colors.carbon.white,
     marginBottom: Spacing.sm,
     textAlign: "center",
   },
   message: {
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.regular,
-    color: Colors.carbon.silver,
     textAlign: "center",
     lineHeight: Typography.sizes.body * 1.5,
     marginBottom: Spacing.lg,
@@ -230,7 +249,6 @@ const styles = StyleSheet.create({
   anonymousBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(0, 212, 170, 0.1)",
     paddingVertical: Spacing.sm,
     paddingHorizontal: Spacing.md,
     borderRadius: 20,
@@ -240,7 +258,6 @@ const styles = StyleSheet.create({
   anonymousText: {
     fontSize: Typography.sizes.caption,
     fontFamily: Typography.fonts.medium,
-    color: ACCENT_COLOR,
   },
   referenceContainer: {
     flexDirection: "row",
@@ -251,20 +268,17 @@ const styles = StyleSheet.create({
   referenceLabel: {
     fontSize: Typography.sizes.caption,
     fontFamily: Typography.fonts.regular,
-    color: Colors.carbon.silver,
   },
   referenceId: {
     fontSize: Typography.sizes.caption,
     fontFamily: Typography.fonts.mono,
-    color: Colors.carbon.steel,
   },
   closeButton: {
     width: "100%",
-    backgroundColor: ACCENT_COLOR,
     paddingVertical: Spacing.md,
     borderRadius: 12,
     alignItems: "center",
-    shadowColor: ACCENT_COLOR,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -273,7 +287,7 @@ const styles = StyleSheet.create({
   closeButtonText: {
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.bold,
-    color: Colors.carbon.white,
+    color: "#FFFFFF",
   },
   decorTop: {
     position: "absolute",
@@ -281,7 +295,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 3,
-    backgroundColor: ACCENT_COLOR,
   },
   decorBottom: {
     position: "absolute",
@@ -290,7 +303,6 @@ const styles = StyleSheet.create({
     width: 150,
     height: 150,
     borderRadius: 75,
-    backgroundColor: ACCENT_COLOR,
     opacity: 0.03,
   },
 });

@@ -1,24 +1,38 @@
-﻿// v1.263_001/src/components/news/MapLegend.tsx
+﻿// src/components/news/MapLegend.tsx
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { Colors, Typography, Spacing, BorderRadius, Shadows } from "@/config/theme";
-
-const SEVERITY_ITEMS = [
-  { label: "Critical", color: Colors.severity.critical },
-  { label: "High", color: Colors.severity.high },
-  { label: "Medium", color: Colors.severity.medium },
-  { label: "Low", color: Colors.severity.low },
-];
+import { useTranslation } from "react-i18next";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Typography, Spacing, BorderRadius } from "@/config/theme";
 
 export function MapLegend() {
+  const { t } = useTranslation();
+  const { colors } = useTheme();
+
+  const SEVERITY_ITEMS = [
+    { labelKey: "news.severity.critical", color: colors.danger },
+    { labelKey: "news.severity.high", color: colors.warning },
+    { labelKey: "news.severity.medium", color: colors.info },
+    { labelKey: "news.severity.low", color: colors.success },
+  ];
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Severity</Text>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: colors.surface + "E6" },
+      ]}
+    >
+      <Text style={[styles.title, { color: colors.text }]}>
+        {t("map.filters")}
+      </Text>
       <View style={styles.items}>
         {SEVERITY_ITEMS.map((item) => (
-          <View key={item.label} style={styles.item}>
+          <View key={item.labelKey} style={styles.item}>
             <View style={[styles.dot, { backgroundColor: item.color }]} />
-            <Text style={styles.label}>{item.label}</Text>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              {t(item.labelKey)}
+            </Text>
           </View>
         ))}
       </View>
@@ -31,13 +45,15 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 100,
     left: 12,
-    backgroundColor: Colors.carbon.charcoal + "E6",
     borderRadius: BorderRadius.md,
     padding: Spacing.sm,
-    ...Shadows.sm,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   title: {
-    color: Colors.carbon.white,
     fontSize: Typography.sizes.tiny,
     fontFamily: Typography.fonts.bold,
     marginBottom: Spacing.xs,
@@ -58,7 +74,6 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   label: {
-    color: Colors.carbon.silver,
     fontSize: Typography.sizes.tiny,
     fontFamily: Typography.fonts.regular,
   },

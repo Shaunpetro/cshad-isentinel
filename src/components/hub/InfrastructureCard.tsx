@@ -8,6 +8,7 @@ import {
   Pressable,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Typography, Spacing, BorderRadius } from '@/config/theme';
 import type {
@@ -26,43 +27,25 @@ interface InfrastructureCardProps {
   compact?: boolean;
 }
 
-/**
- * Get infrastructure alert icon
- */
 function getInfrastructureIcon(type: InfrastructureType): keyof typeof Ionicons.glyphMap {
   switch (type) {
-    case 'electricity':
-      return 'flash';
-    case 'water':
-      return 'water';
-    case 'roads':
-      return 'car';
-    case 'telecom':
-      return 'cellular';
-    default:
-      return 'construct';
+    case 'electricity': return 'flash';
+    case 'water': return 'water';
+    case 'roads': return 'car';
+    case 'telecom': return 'cellular';
+    default: return 'construct';
   }
 }
 
-/**
- * Get infrastructure alert color
- */
 function getInfrastructureColor(severity: string): string {
   switch (severity) {
-    case 'critical':
-      return '#D32F2F';
-    case 'major':
-      return '#F57C00';
-    case 'minor':
-      return '#FBC02D';
-    default:
-      return '#1976D2';
+    case 'critical': return '#D32F2F';
+    case 'major': return '#F57C00';
+    case 'minor': return '#FBC02D';
+    default: return '#1976D2';
   }
 }
 
-/**
- * Format time slot for display
- */
 function formatTimeSlot(slot: LoadsheddingSlot): string {
   const formatTime = (date: Date) =>
     date.toLocaleTimeString('en-ZA', {
@@ -70,43 +53,19 @@ function formatTimeSlot(slot: LoadsheddingSlot): string {
       minute: '2-digit',
       hour12: false,
     });
-
   return `${formatTime(slot.start)} - ${formatTime(slot.end)}`;
 }
 
-/**
- * Check if a slot is currently active
- */
 function isSlotActive(slot: LoadsheddingSlot): boolean {
   const now = new Date();
   return slot.start <= now && slot.end >= now;
 }
 
-/**
- * Get relative time label for slot
- */
-function getSlotLabel(slot: LoadsheddingSlot): string {
-  const now = new Date();
-
-  if (isSlotActive(slot)) {
-    const minsLeft = Math.ceil((slot.end.getTime() - now.getTime()) / 60000);
-    if (minsLeft <= 60) return `Ends in ${minsLeft}m`;
-    return `Ends in ${Math.floor(minsLeft / 60)}h ${minsLeft % 60}m`;
-  }
-
-  const minsUntil = Math.ceil((slot.start.getTime() - now.getTime()) / 60000);
-  if (minsUntil <= 60) return `In ${minsUntil}m`;
-  if (minsUntil <= 180) return `In ${Math.floor(minsUntil / 60)}h ${minsUntil % 60}m`;
-
-  // Check if it's today or tomorrow
-  const slotDate = slot.start.toDateString();
-  const todayDate = now.toDateString();
-  const tomorrow = new Date(now);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  if (slotDate === todayDate) return 'Today';
-  if (slotDate === tomorrow.toDateString()) return 'Tomorrow';
-  return slot.start.toLocaleDateString('en-ZA', { weekday: 'short' });
+function getStageColor(stage: number): string {
+  if (stage === 0) return '#4CAF50';
+  if (stage >= 6) return '#D32F2F';
+  if (stage >= 4) return '#F57C00';
+  return '#FBC02D';
 }
 
 export function InfrastructureCard({
@@ -118,15 +77,42 @@ export function InfrastructureCard({
   compact = false,
 }: InfrastructureCardProps) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
 
-  // Load shedding specific card
-  if (loadshedding && loadshedding.stage > 0) {
-    const stageColor =
-      loadshedding.stage >= 6
-        ? '#D32F2F'
-        : loadshedding.stage >= 4
-        ? '#F57C00'
-        : '#FBC02D';
+  const getSlotLabel = (slot: LoadsheddingSlot): string => {
+    const now = new Date();
+
+    if (isSlotActive(slot)) {
+      const minsLeft = Math.ceil((slot.end.getTime() - now.getTime()) / 60000);
+      if (minsLeft <= 60) return `${t('time.endsIn')} ${minsLeft}m`;
+      return `${t('time.endsIn')} ${Math.floor(minsLeft / 60)}h ${minsLeft % 60}m`;
+    }
+
+    const minsUntil = Math.ceil((slot.start.getTime() - now.getTime()) / 60000);
+    if (minsUntil <= 60) return `${t('time.in')} ${minsUntil}m`;
+    if (minsUntil <= 180) return `${t('time.in')} ${Math.floor(minsUntil / 60)}h ${minsUntil % 60}m`;
+
+    const slotDate = slot.start.toDateString();
+    const todayDate = now.toDateString();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    if (slotDate === todayDate) return t('time.today');
+    if (slotDate === tomorrow.toDateString()) return t('time.tomorrow');
+    return slot.start.toLocaleDateString('en-ZA', { weekday: 'short' });
+  };
+
+  const getStageDescription = (stage: number): string => {
+    if (stage >= 6) return t('alerts.loadshedding.severe');
+    if (stage >= 4) return t('alerts.loadshedding.significant');
+    if (stage >= 2) return t('alerts.loadshedding.moderate');
+    return t('alerts.loadshedding.light');
+  };
+
+  if (loadshedding) {
+    const stage = loadshedding.stage;
+    const stageColor = getStageColor(stage);
+    const isActive = stage > 0;
 
     const hasLocalSchedule =
       loadshedding.localSchedule && loadshedding.localSchedule.length > 0;
@@ -157,16 +143,18 @@ export function InfrastructureCard({
 
         <View style={styles.content}>
           <View style={styles.header}>
-            <Text style={[styles.typeLabel, { color: stageColor }]}>LOAD SHEDDING</Text>
+            <Text style={[styles.typeLabel, { color: stageColor }]}>
+              {t('alerts.loadshedding.title').toUpperCase()}
+            </Text>
             <View style={[styles.stageBadge, { backgroundColor: stageColor }]}>
-              <Text style={styles.stageText}>Stage {loadshedding.stage}</Text>
+              <Text style={styles.stageText}>
+                {stage === 0 ? t('alerts.loadshedding.noLoadshedding') : `${t('alerts.loadshedding.stage')} ${stage}`}
+              </Text>
             </View>
           </View>
 
-          {/* Local Schedule Display */}
-          {hasLocalSchedule && !compact && (
+          {isActive && hasLocalSchedule && !compact && (
             <View style={styles.scheduleContainer}>
-              {/* Next/Current Outage */}
               <View
                 style={[
                   styles.nextOutage,
@@ -203,7 +191,6 @@ export function InfrastructureCard({
                 </Text>
               </View>
 
-              {/* Additional Slots */}
               {loadshedding.localSchedule!.length > 1 && (
                 <View style={styles.additionalSlots}>
                   {loadshedding.localSchedule!.slice(1, 3).map((slot, index) => (
@@ -216,7 +203,7 @@ export function InfrastructureCard({
                   ))}
                   {loadshedding.localSchedule!.length > 3 && (
                     <Text style={[styles.moreSlots, { color: colors.textDisabled }]}>
-                      +{loadshedding.localSchedule!.length - 3} more
+                      +{loadshedding.localSchedule!.length - 3} {t('common.more')}
                     </Text>
                   )}
                 </View>
@@ -224,15 +211,34 @@ export function InfrastructureCard({
             </View>
           )}
 
-          {/* No Local Schedule - Prompt to Select Area */}
-          {!hasLocalSchedule && !compact && (
+          {isActive && !hasLocalSchedule && !compact && (
             <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={2}>
-              {getStageDescription(loadshedding.stage)}
+              {getStageDescription(stage)}
             </Text>
           )}
 
+          {!isActive && !compact && (
+            <View style={styles.noLoadsheddingContainer}>
+              <View style={styles.noLoadsheddingRow}>
+                <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
+                <Text style={[styles.noLoadsheddingText, { color: colors.text }]}>
+                  {t('alerts.loadshedding.noLoadshedding')}
+                </Text>
+              </View>
+              {!loadshedding.suburbName && (
+                <Text style={[styles.setAreaHint, { color: colors.textSecondary }]}>
+                  {t('alerts.loadshedding.areaNotSet')}
+                </Text>
+              )}
+              {loadshedding.suburbName && (
+                <Text style={[styles.setAreaHint, { color: colors.textSecondary }]}>
+                  {t('alerts.loadshedding.willNotify')}
+                </Text>
+              )}
+            </View>
+          )}
+
           <View style={styles.footer}>
-            {/* Source / Location */}
             <View style={styles.sourceRow}>
               {loadshedding.suburbName ? (
                 <View style={styles.locationBadge}>
@@ -251,7 +257,6 @@ export function InfrastructureCard({
               )}
             </View>
 
-            {/* Change Area Button */}
             {onChangeArea && (
               <Pressable
                 style={[styles.changeAreaButton, { backgroundColor: colors.primary + '15' }]}
@@ -264,7 +269,7 @@ export function InfrastructureCard({
                   color={colors.primary}
                 />
                 <Text style={[styles.changeAreaText, { color: colors.primary }]}>
-                  {loadshedding.suburbName ? 'Change' : 'Set Area'}
+                  {loadshedding.suburbName ? t('alerts.loadshedding.changeArea') : t('alerts.loadshedding.setArea')}
                 </Text>
               </Pressable>
             )}
@@ -274,7 +279,6 @@ export function InfrastructureCard({
     );
   }
 
-  // Generic infrastructure alert card
   if (alert) {
     const alertColor = getInfrastructureColor(alert.severity);
     const alertIcon = getInfrastructureIcon(alert.type);
@@ -351,13 +355,6 @@ export function InfrastructureCard({
   return null;
 }
 
-function getStageDescription(stage: number): string {
-  if (stage >= 6) return 'Severe power cuts expected. Prepare for extended outages.';
-  if (stage >= 4) return 'Significant power cuts. Check your schedule.';
-  if (stage >= 2) return 'Moderate power cuts in effect.';
-  return 'Light power cuts. Limited impact expected.';
-}
-
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
@@ -425,6 +422,24 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fonts.regular,
     lineHeight: Typography.sizes.caption * 1.4,
     marginBottom: Spacing.xs,
+  },
+  noLoadsheddingContainer: {
+    marginBottom: Spacing.sm,
+  },
+  noLoadsheddingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginBottom: 4,
+  },
+  noLoadsheddingText: {
+    fontSize: Typography.sizes.body,
+    fontFamily: Typography.fonts.medium,
+  },
+  setAreaHint: {
+    fontSize: Typography.sizes.caption,
+    fontFamily: Typography.fonts.regular,
+    lineHeight: Typography.sizes.caption * 1.4,
   },
   scheduleContainer: {
     marginBottom: Spacing.sm,

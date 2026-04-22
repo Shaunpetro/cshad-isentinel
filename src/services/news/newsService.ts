@@ -8,12 +8,12 @@ import type {
   TimeFilter,
 } from './types';
 import { ARTICLE_LIMITS } from './types';
-import { 
-  findCityByName, 
-  getCitiesInProvince, 
+import {
+  findCityByName,
+  getCitiesInProvince,
   extractProvinceFromLocation,
   PROVINCE_CODES,
-  type SACity 
+  type SACity
 } from '../location/saCities';
 
 /**
@@ -52,59 +52,104 @@ function getLimit(scope: string, requestedLimit?: number): number {
 }
 
 /**
- * Build location search terms for a city
- * Returns array of terms to search in location_name
+ * Build CITY-ONLY search terms (no province to avoid cross-city matches)
+ * This is for Layer 2 - strict city matching
  */
-function buildLocationSearchTerms(city: SACity): string[] {
+function buildCitySearchTerms(city: SACity): string[] {
   const terms: string[] = [];
-  
+
   // Add city name
   terms.push(city.name);
-  
-  // Add aliases if available
+
+  // Add aliases if available (e.g., "Joburg", "JHB" for Johannesburg)
   if (city.aliases) {
     terms.push(...city.aliases);
   }
-  
-  // Add province
-  terms.push(city.province);
-  
-  // Add province code
-  terms.push(city.provinceCode);
-  
+
+  // DO NOT add province or provinceCode here!
+  // That was causing JHB to match PTA (both in Gauteng)
+
   return terms;
 }
 
 /**
- * Build location search terms for province-level fallback
+ * Build location search terms for province-level fallback (Layer 3 only)
  */
 function buildProvinceSearchTerms(province: string): string[] {
   const terms: string[] = [province];
-  
+
   // Add province code
   const code = PROVINCE_CODES[province];
   if (code) {
     terms.push(code);
   }
+
+  return [...new Set(terms)];
+}
+
+/**
+ * Check if a location_name matches the target city
+ * More strict matching to avoid false positives
+ */
+function locationMatchesCity(locationName: string | null, city: SACity): boolean {
+  if (!locationName) return false;
   
-  // Get all cities in this province for broader matching
-  const citiesInProvince = getCitiesInProvince(province);
-  for (const city of citiesInProvince) {
-    terms.push(city.name);
-    if (city.aliases) {
-      terms.push(...city.aliases);
+  const locationLower = locationName.toLowerCase();
+  const cityLower = city.name.toLowerCase();
+  
+  // Direct city name match
+  if (locationLower.includes(cityLower)) return true;
+  
+  // Alias match
+  if (city.aliases) {
+    for (const alias of city.aliases) {
+      if (locationLower.includes(alias.toLowerCase())) return true;
     }
   }
   
-  return [...new Set(terms)]; // Remove duplicates
+  return false;
+}
+
+/**
+ * Check if a location_name is in the same province but DIFFERENT city
+ * Used to filter out cross-city matches
+ */
+function isWrongCityInSameProvince(locationName: string | null, targetCity: SACity): boolean {
+  if (!locationName) return false;
+  
+  const locationLower = locationName.toLowerCase();
+  
+  // Get all cities in the same province
+  const citiesInProvince = getCitiesInProvince(targetCity.province);
+  
+  for (const otherCity of citiesInProvince) {
+    // Skip the target city itself
+    if (otherCity.id === targetCity.id) continue;
+    
+    // Check if location matches this OTHER city
+    if (locationLower.includes(otherCity.name.toLowerCase())) {
+      return true; // It's a different city in the same province
+    }
+    
+    // Check aliases of other city
+    if (otherCity.aliases) {
+      for (const alias of otherCity.aliases) {
+        if (locationLower.includes(alias.toLowerCase())) {
+          return true;
+        }
+      }
+    }
+  }
+  
+  return false;
 }
 
 /**
  * Fetch news articles with multi-layer location filtering
- * 
+ *
  * Layer 1: Coordinate-based (for articles with lat/lng)
- * Layer 2: Text-based city matching (for articles with location_name)
- * Layer 3: Province fallback (if city not found, match province)
+ * Layer 2: Text-based CITY matching (strict - city name/aliases only)
+ * Layer 3: Province fallback (only if < 5 results from Layers 1+2)
  */
 export async function fetchNews(params: NewsQueryParams = {}): Promise<NewsQueryResult> {
   try {
@@ -250,13 +295,12 @@ async function fetchLocalNews(params: {
     console.log(`[NewsService] Layer 1 (coords): ${coordResults.length} articles within ${radiusKm}km`);
   }
 
-  // LAYER 2: Text-based city matching
+  // LAYER 2: Text-based CITY matching (STRICT - no province matching!)
   let textResults: NewsRecord[] = [];
   if (userCity) {
-    const searchTerms = buildLocationSearchTerms(userCity);
-    
-    // Build OR query for location_name matching
-    // Using ilike for case-insensitive partial matching
+    // Only use city name and aliases, NOT province
+    const searchTerms = buildCitySearchTerms(userCity);
+
     let textQuery = supabase
       .from('news')
       .select('*')
@@ -273,26 +317,42 @@ async function fetchLocalNews(params: {
       textQuery = textQuery.gte('published_at', timeThreshold.toISOString());
     }
 
-    // Match any of the search terms in location_name
-    // Supabase doesn't support OR in .filter(), so we use .or()
+    // Match city name and aliases only (not province!)
     const orConditions = searchTerms
-      .slice(0, 5) // Limit to avoid query size issues
+      .slice(0, 5)
       .map(term => `location_name.ilike.%${term}%`)
       .join(',');
-    
+
     textQuery = textQuery.or(orConditions);
 
     const { data: textData } = await textQuery;
-    textResults = textData || [];
-    console.log(`[NewsService] Layer 2 (text): ${textResults.length} articles matching "${userCity.name}"`);
+    
+    // IMPORTANT: Post-filter to remove articles from OTHER cities in the same province
+    // e.g., if user selected JHB, filter out articles with "Pretoria" in location_name
+    const filteredTextData = (textData || []).filter(article => {
+      // If it matches our city, keep it
+      if (locationMatchesCity(article.location_name, userCity!)) {
+        return true;
+      }
+      // If it matches a DIFFERENT city in the same province, reject it
+      if (isWrongCityInSameProvince(article.location_name, userCity!)) {
+        console.log(`[NewsService] Filtered out: "${article.title?.substring(0, 40)}..." (location: ${article.location_name})`);
+        return false;
+      }
+      // Ambiguous - keep it (might be generic province news)
+      return true;
+    });
+    
+    textResults = filteredTextData;
+    console.log(`[NewsService] Layer 2 (text): ${textResults.length} articles matching "${userCity.name}" (filtered from ${textData?.length || 0})`);
   }
 
-  // LAYER 3: Province fallback (if still low results)
+  // LAYER 3: Province fallback (ONLY if combined results are very low)
   let provinceResults: NewsRecord[] = [];
-  const combinedCount = coordResults.length + textResults.length;
-  
+  const combinedCount = new Set([...coordResults.map(r => r.id), ...textResults.map(r => r.id)]).size;
+
   if (combinedCount < 5 && userProvince) {
-    const provinceTerms = buildProvinceSearchTerms(userProvince);
+    console.log(`[NewsService] Layer 3: Only ${combinedCount} results, falling back to province "${userProvince}"`);
     
     let provinceQuery = supabase
       .from('news')
@@ -321,9 +381,9 @@ async function fetchLocalNews(params: {
   // Merge and deduplicate results
   const allResults = [...coordResults, ...textResults, ...provinceResults];
   const uniqueResults = deduplicateNews(allResults);
-  
+
   // Sort by published_at descending
-  uniqueResults.sort((a, b) => 
+  uniqueResults.sort((a, b) =>
     new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
   );
 
@@ -412,7 +472,7 @@ export function subscribeToNews(
 ): () => void {
   // Create unique channel name based on options
   const channelId = `news-realtime-${options?.cityName || 'all'}-${Date.now()}`;
-  
+
   // Clean up any existing subscription with similar base name
   const baseChannelName = `news-realtime-${options?.cityName || 'all'}`;
   for (const [key, existingChannel] of activeSubscriptions.entries()) {
@@ -440,26 +500,26 @@ export function subscribeToNews(
       // Optional location filter for realtime
       if (options?.cityName || options?.province) {
         const locationName = record.location_name?.toLowerCase() || '';
-        
+
         let matches = false;
-        
+
         if (options.cityName) {
           const city = findCityByName(options.cityName);
           if (city) {
             // Check city name and aliases
             matches = locationName.includes(city.name.toLowerCase());
             if (!matches && city.aliases) {
-              matches = city.aliases.some(alias => 
+              matches = city.aliases.some(alias =>
                 locationName.includes(alias.toLowerCase())
               );
             }
           }
         }
-        
+
         if (!matches && options.province) {
           matches = locationName.includes(options.province.toLowerCase());
         }
-        
+
         if (!matches) {
           console.log('[NewsService] Skipping article (wrong location):', record.title?.substring(0, 50));
           return;

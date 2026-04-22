@@ -1,6 +1,43 @@
 // src/utils/formatters.ts
 
 /**
+ * Strip HTML tags from text
+ * Handles common RSS feed HTML like <span>, <p>, <br>, etc.
+ */
+export function stripHtml(html: string): string {
+  if (!html) return '';
+  
+  return html
+    // Replace <br> and <br/> with newlines
+    .replace(/<br\s*\/?>/gi, '\n')
+    // Replace </p> with double newline
+    .replace(/<\/p>/gi, '\n\n')
+    // Remove all remaining HTML tags
+    .replace(/<[^>]*>/g, '')
+    // Decode common HTML entities
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&apos;/gi, "'")
+    .replace(/&#x27;/gi, "'")
+    .replace(/&#x2F;/gi, '/')
+    .replace(/&hellip;/gi, '...')
+    .replace(/&mdash;/gi, '-')
+    .replace(/&ndash;/gi, '-')
+    .replace(/&lsquo;/gi, "'")
+    .replace(/&rsquo;/gi, "'")
+    .replace(/&ldquo;/gi, '"')
+    .replace(/&rdquo;/gi, '"')
+    // Clean up extra whitespace
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
+}
+
+/**
  * Format a date string to relative time ("2 hours ago", "Yesterday")
  */
 export function timeAgo(dateString: string): string {
@@ -42,8 +79,16 @@ export function formatDate(dateString: string): string {
  * Truncate text with ellipsis
  */
 export function truncate(text: string, maxLength: number): string {
+  if (!text) return '';
   if (text.length <= maxLength) return text;
   return text.slice(0, maxLength - 3).trimEnd() + "...";
+}
+
+/**
+ * Clean and truncate text (strip HTML then truncate)
+ */
+export function cleanAndTruncate(text: string, maxLength: number): string {
+  return truncate(stripHtml(text), maxLength);
 }
 
 /**

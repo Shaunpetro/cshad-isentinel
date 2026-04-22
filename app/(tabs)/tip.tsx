@@ -15,7 +15,9 @@ import {
   Platform,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Colors, Typography, Spacing } from "@/config/theme";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "@/contexts";
+import { Typography, Spacing } from "@/config/theme";
 import {
   AnonymousBadge,
   CategorySelector,
@@ -29,11 +31,14 @@ import { submitTip, validateTip, EMPTY_TIP_DRAFT, type TipDraft } from "@/servic
 import type { TipCategory, NewsSeverity, GeoPoint } from "@/types";
 
 export default function TipScreen() {
+  const { colors } = useTheme();
+  const { t } = useTranslation();
+
   // Form state
   const [draft, setDraft] = useState<TipDraft>(EMPTY_TIP_DRAFT);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  
+
   // Success modal state
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [submittedTipId, setSubmittedTipId] = useState<string | undefined>();
@@ -79,12 +84,12 @@ export default function TipScreen() {
       // Map errors to fields
       const newErrors: Record<string, string> = {};
       validation.errors.forEach((err) => {
-        if (err.toLowerCase().includes("incident type")) {
-          newErrors.category = err;
+        if (err.toLowerCase().includes("incident type") || err.toLowerCase().includes("category")) {
+          newErrors.category = t('tip.selectCategoryError');
         } else if (err.toLowerCase().includes("severity")) {
           newErrors.severity = err;
         } else if (err.toLowerCase().includes("description")) {
-          newErrors.description = err;
+          newErrors.description = t('tip.minLength');
         }
       });
       setErrors(newErrors);
@@ -95,11 +100,11 @@ export default function TipScreen() {
     if (validation.warnings.length > 0) {
       const shouldContinue = await new Promise<boolean>((resolve) => {
         Alert.alert(
-          "Privacy Notice",
-          `${validation.warnings.join("\n")}\n\nDo you want to continue anyway?`,
+          t('privacy.title'),
+          `${validation.warnings.join("\n")}\n\n${t('tip.continueAnyway')}`,
           [
-            { text: "Edit", onPress: () => resolve(false), style: "cancel" },
-            { text: "Submit Anyway", onPress: () => resolve(true) },
+            { text: t('common.cancel'), onPress: () => resolve(false), style: "cancel" },
+            { text: t('common.yes'), onPress: () => resolve(true) },
           ]
         );
       });
@@ -119,21 +124,21 @@ export default function TipScreen() {
         setSubmittedTipId(result.tipId);
         setShowSuccessModal(true);
       } else {
-        Alert.alert("Submission Failed", result.error || "Please try again.");
+        Alert.alert(t('common.error'), result.error || t('common.retry'));
       }
     } catch (error) {
       console.error("Submit error:", error);
-      Alert.alert("Error", "Something went wrong. Please try again.");
+      Alert.alert(t('common.error'), t('common.retry'));
     } finally {
       setIsSubmitting(false);
     }
-  }, [draft]);
+  }, [draft, t]);
 
   // Check if form has minimum required data
   const canSubmit = draft.category && draft.severity && draft.description.length >= 20;
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
@@ -146,9 +151,9 @@ export default function TipScreen() {
         >
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Report Incident</Text>
-            <Text style={styles.subtitle}>
-              Help keep your community safe
+            <Text style={[styles.title, { color: colors.text }]}>{t('tip.title')}</Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+              {t('tip.subtitle')}
             </Text>
           </View>
 
@@ -191,10 +196,9 @@ export default function TipScreen() {
               isLoading={isSubmitting}
               isDisabled={!canSubmit}
             />
-            
-            <Text style={styles.disclaimer}>
-              By submitting, you confirm this report is truthful to the best of your knowledge.
-              False reports may be removed.
+
+            <Text style={[styles.disclaimer, { color: colors.textSecondary }]}>
+              {t('tip.privacyNote')}
             </Text>
           </View>
 
@@ -216,7 +220,6 @@ export default function TipScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.carbon.black,
   },
   keyboardView: {
     flex: 1,
@@ -231,12 +234,10 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   title: {
-    color: Colors.carbon.white,
     fontSize: Typography.sizes.title,
     fontFamily: Typography.fonts.bold,
   },
   subtitle: {
-    color: Colors.carbon.silver,
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.regular,
     marginTop: Spacing.xs,
@@ -246,7 +247,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   disclaimer: {
-    color: Colors.carbon.silver,
     fontSize: Typography.sizes.caption,
     fontFamily: Typography.fonts.regular,
     textAlign: "center",

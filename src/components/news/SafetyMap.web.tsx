@@ -1,7 +1,9 @@
-﻿// v1.263_001/src/components/news/SafetyMap.web.tsx
+﻿// src/components/news/SafetyMap.web.tsx
 import React, { useEffect } from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { Colors, Typography, Spacing } from "@/config/theme";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "@/contexts/ThemeContext";
+import { Typography, Spacing } from "@/config/theme";
 import type { NewsItem } from "@/types";
 
 interface Props {
@@ -15,20 +17,25 @@ interface Props {
 }
 
 export function SafetyMapWeb({ articles, onMapReady }: Props) {
+  const { t } = useTranslation();
+  const { colors } = useTheme();
+
   useEffect(() => {
     // Trigger map ready after mount
     onMapReady();
   }, [onMapReady]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.surface }]}>
       <Text style={styles.icon}>🗺️</Text>
-      <Text style={styles.title}>Map View</Text>
-      <Text style={styles.message}>
-        Interactive map is available on mobile devices.
+      <Text style={[styles.title, { color: colors.text }]}>
+        {t("map.title")}
       </Text>
-      <Text style={styles.count}>
-        {articles.length} incidents tracked
+      <Text style={[styles.message, { color: colors.textSecondary }]}>
+        {t("map.zoomIn")}
+      </Text>
+      <Text style={[styles.count, { color: colors.primary }]}>
+        {articles.length} {t("map.markers")}
       </Text>
     </View>
   );
@@ -37,7 +44,6 @@ export function SafetyMapWeb({ articles, onMapReady }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.carbon.charcoal,
     justifyContent: "center",
     alignItems: "center",
     padding: Spacing.xl,
@@ -47,20 +53,17 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   title: {
-    color: Colors.carbon.white,
     fontSize: Typography.sizes.heading,
     fontFamily: Typography.fonts.bold,
     marginBottom: Spacing.sm,
   },
   message: {
-    color: Colors.carbon.silver,
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.regular,
     textAlign: "center",
     marginBottom: Spacing.md,
   },
   count: {
-    color: Colors.semantic.primary,
     fontSize: Typography.sizes.caption,
     fontFamily: Typography.fonts.mono,
   },
