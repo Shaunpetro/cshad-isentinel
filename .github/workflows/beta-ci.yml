@@ -34,7 +34,7 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          npx eas build --platform android --profile preview --non-interactive
+          npx @expo/eas-cli@latest build --platform android --profile preview --non-interactive
       - name: Download APK
         uses: actions/download-artifact@v4
         with:
