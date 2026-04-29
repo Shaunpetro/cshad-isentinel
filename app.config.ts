@@ -6,7 +6,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: "cshad-isentinel-news",
   version: "1.263.4",
   orientation: "portrait",
-  icon: "./assets/icons/notification-icon.png",
+  icon: "./assets/brand/ihub-main-logo.png",
   scheme: "cshad-isentinel",
   userInterfaceStyle: "automatic",
 
@@ -20,7 +20,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   ios: {
     supportsTablet: true,
-    bundleIdentifier: "com.atg.cshad.isentinel",
+    bundleIdentifier: "cshad.isentinel.news",
     config: {
       googleMapsApiKey: "AIzaSyBhOSPYnYnoraCNu44xqtTw6C-_8KZF4ew",
     },
@@ -31,10 +31,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   android: {
     adaptiveIcon: {
-      foregroundImage: "./assets/icons/adaptive-icon.png",
+      foregroundImage: "./assets/brand/ihub-main-logo.png",
       backgroundColor: "#1C1C1C",
     },
-    package: "com.atg.pshad.sentinel",
+    package: "cshad.isentinel.news",
     config: {
       googleMaps: {
         apiKey: "AIzaSyBhOSPYnYnoraCNu44xqtTw6C-_8KZF4ew",
@@ -45,7 +45,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   web: {
     bundler: "metro",
     output: "static",
-    favicon: "./assets/icons/app-icon.png",
+    favicon: "./assets/brand/ihub-main-logo.png",
   },
 
   plugins: [
@@ -58,7 +58,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       "expo-notifications",
       {
-        icon: "./assets/icons/notification-icon.png",
+        icon: "./assets/brand/ihub-main-logo.png",
         color: "#00D4AA",
         defaultChannel: "default",
         sounds: [],
@@ -76,7 +76,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     buildDate: new Date().toISOString(),
     developer: "ATG Development",
     eas: {
-      projectId: "",
+      projectId: "41d9d284-b014-48ab-9238-fe2c0724fd98",
     },
   },
 });
