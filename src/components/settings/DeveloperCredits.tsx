@@ -8,14 +8,15 @@ import {
   StyleSheet,
   Linking,
   Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Spacing } from '@/config/theme';
 import { useTheme } from '@/contexts';
 
-// Social links
+// Fixed social links – using app‑specific deep links where possible
 const SOCIAL_LINKS = {
-  whatsapp: 'https://wa.me/27813877744',
+  whatsapp: 'whatsapp://send?phone=27813877744',
   linkedin: 'https://linkedin.com/in/petromalamule',
   email: 'mailto:petrographics.adm@gmail.com',
 };
@@ -29,7 +30,26 @@ export function DeveloperCredits() {
       if (supported) {
         await Linking.openURL(url);
       } else {
-        Alert.alert('Error', `Cannot open ${name}`);
+        // If the app isn't installed, fall back to the web version
+        if (name === 'WhatsApp') {
+          const webUrl = 'https://wa.me/27813877744';
+          const webSupported = await Linking.canOpenURL(webUrl);
+          if (webSupported) {
+            await Linking.openURL(webUrl);
+          } else {
+            Alert.alert('Error', 'No WhatsApp or browser found');
+          }
+        } else if (name === 'LinkedIn') {
+          // Open in browser
+          const webSupported = await Linking.canOpenURL(url);
+          if (webSupported) {
+            await Linking.openURL(url);
+          } else {
+            Alert.alert('Error', 'Cannot open LinkedIn');
+          }
+        } else {
+          Alert.alert('Error', `Cannot open ${name}`);
+        }
       }
     } catch (error) {
       Alert.alert('Error', `Failed to open ${name}`);
@@ -40,9 +60,9 @@ export function DeveloperCredits() {
     <View style={styles.container}>
       {/* App Branding */}
       <View style={styles.section}>
-        <Text style={[styles.appTitle, { color: colors.primary }]}>PSHAD iSentinel</Text>
+        <Text style={[styles.appTitle, { color: colors.primary }]}>CSHAD iSentinel News</Text>
         <Image
-          source={require('../../../assets/brand/main-logo.png')}
+          source={require('../../../assets/brand/ihub-main-logo.png')}
           style={styles.mainLogo}
           resizeMode="contain"
         />
@@ -56,7 +76,7 @@ export function DeveloperCredits() {
         <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>Developed by</Text>
         <Text style={[styles.developerName, { color: colors.text }]}>Petro@ATG</Text>
         <Image
-          source={require('../../../assets/brand/dev-logo.png')}
+          source={require('../../../assets/brand/main-dev-logo.png')}
           style={styles.devLogo}
           resizeMode="contain"
         />
@@ -89,7 +109,7 @@ export function DeveloperCredits() {
         <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>Sponsored & Powered By</Text>
         <Text style={[styles.sponsorName, { color: colors.text }]}>Shadrack Chabalala</Text>
         <Image
-          source={require('../../../assets/brand/chabi.png')}
+          source={require('../../../assets/brand/chabi2.png')}
           style={styles.sponsorLogo}
           resizeMode="contain"
         />

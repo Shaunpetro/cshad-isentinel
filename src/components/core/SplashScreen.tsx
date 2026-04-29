@@ -70,7 +70,7 @@ export function CustomSplashScreen({ onComplete }: Props) {
         ]}
       >
         <Image
-          source={require("@assets/brand/main-logo-light.png")}
+          source={require("@assets/brand/ihub-main-logo.png")}
           style={styles.mainLogo}
           resizeMode="contain"
         />
@@ -86,7 +86,7 @@ export function CustomSplashScreen({ onComplete }: Props) {
         style={[styles.devLogoWrapper, { opacity: devLogoOpacity }]}
       >
         <Image
-          source={require("@assets/brand/dev-logo.png")}
+          source={require("@assets/brand/main-dev-logo.png")}
           style={styles.devLogo}
           resizeMode="contain"
         />
