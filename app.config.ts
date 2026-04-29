@@ -2,12 +2,12 @@
 import { ExpoConfig, ConfigContext } from "expo/config";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
-  name: "PSHAD Sentinel iHub",
-  slug: "pshad-sentinel-ihub",
+  name: "CSHAD iSentinel News",
+  slug: "cshad-isentinel-news",
   version: "1.263.4",
   orientation: "portrait",
-  icon: "./assets/icons/app-icon.png",
-  scheme: "pshad-sentinel",
+  icon: "./assets/icons/notification-icon.png",
+  scheme: "cshad-isentinel",
   userInterfaceStyle: "automatic",
 
   splash: {
@@ -20,7 +20,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   ios: {
     supportsTablet: true,
-    bundleIdentifier: "com.atg.pshad.sentinel",
+    bundleIdentifier: "com.atg.cshad.isentinel",
     config: {
       googleMapsApiKey: "AIzaSyBhOSPYnYnoraCNu44xqtTw6C-_8KZF4ew",
     },
