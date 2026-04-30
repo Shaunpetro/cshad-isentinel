@@ -2,11 +2,29 @@
 appId: cshad.isentinel.news
 ---
 - launchApp
+# ── Tab 1: News (default screen) ──
 - extendedWaitUntil:
     visible:
-      text: "Settings"
-    timeout: 15000
+      text: "Safety News"
+    timeout: 20000
+- assertVisible: "Safety News"
+
+# ── Tab 2: Map ──
+- tapOn: "Map"
+- extendedWaitUntil:
+    visible:
+      text: "Safety Map"
+    timeout: 10000
+- assertVisible: "Safety Map"
+
+# ── Tab 3: Settings ──
 - tapOn: "Settings"
+- extendedWaitUntil:
+    visible:
+      text: "CSHAD iSentinel News"
+    timeout: 10000
 - assertVisible: "CSHAD iSentinel News"
+
+# ── Finish ──
 - pressKey: back
 - stopApp
