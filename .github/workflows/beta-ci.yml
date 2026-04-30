@@ -19,13 +19,10 @@ jobs:
       - run: npm ci
       - run: npm run test:ci -- --passWithNoTests
 
-  # ── 2. UI smoke tests with Maestro ──
+  # ── 2. UI smoke tests with Maestro (emulator on Ubuntu) ──
   maestro-tests:
     needs: jest-tests
     runs-on: ubuntu-latest
-    container:
-      image: reactivecircus/android-emulator-34:latest
-      options: --privileged
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,13 +32,43 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android licenses
+        run: yes | sdkmanager --licenses
+
+      - name: Install system image
+        run: sdkmanager "system-images;android-30;google_apis;x86_64"
+
+      - name: Create AVD
+        run: |
+          echo "no" | avdmanager create avd \
+            -n test_avd \
+            -k "system-images;android-30;google_apis;x86_64" \
+            -f
+
+      - name: Start emulator
+        run: |
+          $ANDROID_HOME/emulator/emulator -avd test_avd -no-window -no-audio -gpu swiftshader_indirect -no-boot-anim &
+        timeout-minutes: 10
+
+      - name: Wait for emulator to boot
+        run: |
+          adb wait-for-device
+          adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done'
+          sleep 5
+
       - name: Setup Expo & EAS
         uses: expo/expo-github-action@v8
         with:
           expo-version: latest
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
+
       - run: npm ci
+
       - name: Build debug APK locally
         env:
           EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
@@ -51,10 +78,10 @@ jobs:
             --profile debug \
             --non-interactive \
             --output=./app-debug.apk
-      - name: Wait for emulator and install
-        run: |
-          adb wait-for-device
-          adb install -r app-debug.apk
+
+      - name: Install APK on emulator
+        run: adb install -r app-debug.apk
+
       - name: Run Maestro tests
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash
