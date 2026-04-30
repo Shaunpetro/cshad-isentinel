@@ -25,13 +25,13 @@ export async function requestPermissions(): Promise<PermissionResult> {
   }
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  
+
   if (existingStatus === 'granted') {
     return { granted: true, canAskAgain: false };
   }
 
   const { status, canAskAgain } = await Notifications.requestPermissionsAsync();
-  
+
   return {
     granted: status === 'granted',
     canAskAgain: canAskAgain ?? false,
@@ -43,7 +43,6 @@ export async function requestPermissions(): Promise<PermissionResult> {
  */
 export async function getPushToken(): Promise<PushTokenResult> {
   try {
-    // Check if physical device
     if (!canReceivePushNotifications()) {
       return {
         success: false,
@@ -51,10 +50,8 @@ export async function getPushToken(): Promise<PushTokenResult> {
       };
     }
 
-    // Setup Android channel first
     await setupNotificationChannel();
 
-    // Check permissions
     const { granted } = await requestPermissions();
     if (!granted) {
       return {
@@ -63,7 +60,6 @@ export async function getPushToken(): Promise<PushTokenResult> {
       };
     }
 
-    // Get the token
     const projectId = getProjectId();
     const tokenData = await Notifications.getExpoPushTokenAsync({
       projectId: projectId,
@@ -117,16 +113,61 @@ export async function registerTokenWithBackend(token: string): Promise<boolean> 
 }
 
 /**
- * Initialize push notifications - call this on app start
+ * Initialize push notifications – call on app start
  */
 export async function initializePushNotifications(): Promise<PushTokenResult> {
   const result = await getPushToken();
-  
+
   if (result.success && result.token) {
     await registerTokenWithBackend(result.token);
   }
-  
+
   return result;
+}
+
+/**
+ * Send a real push notification via Expo's free push service
+ */
+export async function sendRealPushNotification(): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!canReceivePushNotifications()) {
+      return { success: false, error: 'Push notifications only work on a physical device.' };
+    }
+
+    const tokenResult = await getPushToken();
+    if (!tokenResult.success || !tokenResult.token) {
+      return { success: false, error: tokenResult.error || 'No push token available.' };
+    }
+
+    const response = await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to: tokenResult.token,
+        title: '🛡️ CSHAD iSentinel News',
+        body: 'Push notifications are working! 🎉',
+        sound: 'default',
+        priority: 'high',
+        badge: 1,
+      }),
+    });
+
+    const data = await response.json();
+
+    if (response.ok && data.data?.status === 'ok') {
+      console.log('[PushService] Real push sent successfully');
+      return { success: true };
+    }
+
+    console.error('[PushService] Expo push API error:', data);
+    return { success: false, error: data.errors?.[0]?.message || 'Failed to send push notification.' };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[PushService] sendRealPush error:', message);
+    return { success: false, error: message };
+  }
 }
 
 /**
@@ -148,12 +189,12 @@ export function addNotificationResponseListener(
 }
 
 /**
- * Schedule a local notification (for testing)
+ * Schedule a local notification (legacy test, kept for quick testing)
  */
 export async function scheduleTestNotification(): Promise<string> {
   const id = await Notifications.scheduleNotificationAsync({
     content: {
-      title: '🛡️ PSHAD Sentinel',
+      title: '🛡️ CSHAD iSentinel News',
       body: 'Push notifications are working!',
       data: { test: true },
     },
@@ -162,6 +203,6 @@ export async function scheduleTestNotification(): Promise<string> {
       type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
     },
   });
-  
+
   return id;
 }

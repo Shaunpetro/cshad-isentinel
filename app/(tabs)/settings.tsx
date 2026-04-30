@@ -26,7 +26,7 @@ import {
 import { PrivacyModal } from "@/components/privacy";
 import { CityPickerModal } from "@/components/news";
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from "@/content/legal";
-import { scheduleTestNotification } from "@/services/notifications";
+import { sendRealPushNotification } from "@/services/notifications";
 import { usePreferences } from "@/hooks/usePreferences";
 import { useLanguage, LanguageCode } from "@/hooks/useLanguage";
 import { useTheme } from "@/contexts";
@@ -102,7 +102,7 @@ export default function SettingsScreen() {
   // Handle email support
   const handleEmailSupport = async () => {
     const email = "petrographics.adm@gmail.com";
-    const subject = encodeURIComponent("PSHAD iSentinel Support");
+    const subject = encodeURIComponent("CSHAD iSentinel Support");
     const body = encodeURIComponent(`\n\n---\nApp Version: ${APP.version}\nPlatform: ${Platform.OS}`);
     const url = `mailto:${email}?subject=${subject}&body=${body}`;
 
@@ -131,26 +131,40 @@ export default function SettingsScreen() {
   const handleShareApp = async () => {
     try {
       await Share.share({
-        title: "PSHAD iSentinel",
+        title: "CSHAD iSentinel News",
         message:
-          "Check out PSHAD iSentinel - A privacy-first community safety app for South Africa. Download it now!",
+          "Check out CSHAD iSentinel News - A privacy-first community safety app for South Africa. Download it now!",
       });
     } catch (error) {
       // User cancelled or error
     }
   };
 
-  // Handle test notification
+  // Handle test notification – now uses real Expo push
+  const [sendingTest, setSendingTest] = useState(false);
+
   const handleTestNotification = async () => {
+    if (sendingTest) return;
+    setSendingTest(true);
     try {
-      await scheduleTestNotification();
-      Alert.alert(
-        t('settings.testNotification'),
-        "A notification will appear in 2 seconds!",
-        [{ text: t('common.ok') }]
-      );
+      const result = await sendRealPushNotification();
+      if (result.success) {
+        Alert.alert(
+          t('settings.testNotification'),
+          "Real push notification sent! Check your notification tray.",
+          [{ text: t('common.ok') }]
+        );
+      } else {
+        Alert.alert(
+          t('common.error'),
+          result.error || "Could not send push notification. Are you on a physical device?",
+          [{ text: t('common.ok') }]
+        );
+      }
     } catch (error) {
-      Alert.alert(t('common.error'), "Could not schedule notification");
+      Alert.alert(t('common.error'), "An unexpected error occurred.");
+    } finally {
+      setSendingTest(false);
     }
   };
 
@@ -322,7 +336,7 @@ export default function SettingsScreen() {
           icon="paper-plane-outline"
           iconColor={colors.warning}
           title={t('settings.testNotification')}
-          subtitle={t('settings.testNotificationSubtitle')}
+          subtitle={sendingTest ? "Sending..." : t('settings.testNotificationSubtitle')}
           onPress={handleTestNotification}
         />
       </View>
@@ -401,7 +415,7 @@ export default function SettingsScreen() {
       {/* Copyright Footer */}
       <View style={styles.footer}>
         <Text style={[styles.copyright, { color: colors.textSecondary }]}>
-          ATG © 2026 PSHAD iSentinel
+          ATG © 2026 CSHAD iSentinel
         </Text>
         <Text style={[styles.rights, { color: colors.textDisabled }]}>
           All Rights Reserved
