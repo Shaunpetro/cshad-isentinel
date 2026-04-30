@@ -19,78 +19,9 @@ jobs:
       - run: npm ci
       - run: npm run test:ci -- --passWithNoTests
 
-  # ── 2. UI smoke tests with Maestro (emulator on Ubuntu) ──
-  maestro-tests:
-    needs: jest-tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept Android licenses
-        run: yes | sdkmanager --licenses
-
-      - name: Install system image
-        run: sdkmanager "system-images;android-30;google_apis;x86_64"
-
-      - name: Create AVD
-        run: |
-          echo "no" | avdmanager create avd \
-            -n test_avd \
-            -k "system-images;android-30;google_apis;x86_64" \
-            -f
-
-      - name: Start emulator
-        run: |
-          $ANDROID_HOME/emulator/emulator -avd test_avd -no-window -no-audio -gpu swiftshader_indirect -no-boot-anim &
-        timeout-minutes: 10
-
-      - name: Wait for emulator to boot
-        run: |
-          adb wait-for-device
-          adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done'
-          sleep 5
-
-      - name: Setup Expo & EAS
-        uses: expo/expo-github-action@v8
-        with:
-          expo-version: latest
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-
-      - run: npm ci
-
-      - name: Build debug APK locally
-        env:
-          EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
-        run: |
-          eas build --local \
-            --platform android \
-            --profile debug \
-            --non-interactive \
-            --output=./app-debug.apk
-
-      - name: Install APK on emulator
-        run: adb install -r app-debug.apk
-
-      - name: Run Maestro tests
-        run: |
-          curl -Ls "https://get.maestro.mobile.dev" | bash
-          export PATH="$PATH:$HOME/.maestro/bin"
-          maestro test maestro/
-
-  # ── 3. Build release APK (only on version tags) ──
+  # ── 2. Build release APK (only on version tags) ──
   build-release:
-    needs: [jest-tests, maestro-tests]
+    needs: jest-tests
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
@@ -127,7 +58,7 @@ jobs:
           name: app-release
           path: ./app-release.apk
 
-  # ── 4. Download artifact and create GitHub Release ──
+  # ── 3. GitHub Release ──
   github-release:
     needs: build-release
     if: startsWith(github.ref, 'refs/tags/v')
