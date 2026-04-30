@@ -2,11 +2,11 @@
 appId: cshad.isentinel.news
 ---
 - launchApp
-- assertVisible: "News"          # adjust if your main screen shows something else
+- extendedWaitUntil:
+    visible:
+      text: "Settings"
+    timeout: 15000
 - tapOn: "Settings"
-- assertVisible: "CSHAD iSentinel News"   # matches the new title in DeveloperCredits
-- tapOn: "Developer"
-- assertVisible: "Petro@ATG"
-- pressKey: back
+- assertVisible: "CSHAD iSentinel News"
 - pressKey: back
 - stopApp

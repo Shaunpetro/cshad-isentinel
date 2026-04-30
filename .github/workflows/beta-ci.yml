@@ -19,9 +19,51 @@ jobs:
       - run: npm ci
       - run: npm run test:ci -- --passWithNoTests
 
-  # ── 2. Build release APK locally, then upload artifact ──
-  build-release:
+  # ── 2. UI smoke tests with Maestro ──
+  maestro-tests:
     needs: jest-tests
+    runs-on: ubuntu-latest
+    container:
+      image: reactivecircus/android-emulator-34:latest
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - name: Setup Expo & EAS
+        uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+      - name: Build debug APK locally
+        env:
+          EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
+        run: |
+          eas build --local \
+            --platform android \
+            --profile debug \
+            --non-interactive \
+            --output=./app-debug.apk
+      - name: Wait for emulator and install
+        run: |
+          adb wait-for-device
+          adb install -r app-debug.apk
+      - name: Run Maestro tests
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          export PATH="$PATH:$HOME/.maestro/bin"
+          maestro test maestro/
+
+  # ── 3. Build release APK (only on version tags) ──
+  build-release:
+    needs: [jest-tests, maestro-tests]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
@@ -58,7 +100,7 @@ jobs:
           name: app-release
           path: ./app-release.apk
 
-  # ── 3. Download artifact and create GitHub Release ──
+  # ── 4. Download artifact and create GitHub Release ──
   github-release:
     needs: build-release
     if: startsWith(github.ref, 'refs/tags/v')
