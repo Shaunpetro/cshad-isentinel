@@ -22,7 +22,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     supportsTablet: true,
     bundleIdentifier: "cshad.isentinel.news",
     config: {
-      googleMapsApiKey: "AIzaSyBhOSPYnYnoraCNu44xqtTw6C-_8KZF4ew",
+      googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
     },
     infoPlist: {
       UIBackgroundModes: ["remote-notification"],
@@ -37,7 +37,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     package: "cshad.isentinel.news",
     config: {
       googleMaps: {
-        apiKey: "AIzaSyBhOSPYnYnoraCNu44xqtTw6C-_8KZF4ew",
+        apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
       },
     },
   },
