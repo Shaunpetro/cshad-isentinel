@@ -1,4 +1,4 @@
-// v1.263_001/app.config.ts
+// app.config.ts
 import { ExpoConfig, ConfigContext } from "expo/config";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
@@ -6,7 +6,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: "cshad-isentinel-news",
   version: "1.263.4",
   orientation: "portrait",
-  icon: "./assets/brand/ihub-main-logo.png",
+  icon: "./assets/brand/app-icon-cshad.png",
   scheme: "cshad-isentinel",
   userInterfaceStyle: "automatic",
 
@@ -31,10 +31,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   android: {
     adaptiveIcon: {
-      foregroundImage: "./assets/brand/ihub-main-logo.png",
+      foregroundImage: "./assets/brand/app-icon-cshad.png",
       backgroundColor: "#1C1C1C",
     },
     package: "cshad.isentinel.news",
+    googleServicesFile: "./google-services.json",
     config: {
       googleMaps: {
         apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
@@ -45,7 +46,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   web: {
     bundler: "metro",
     output: "static",
-    favicon: "./assets/brand/ihub-main-logo.png",
+    favicon: "./assets/brand/app-icon-cshad.png",
   },
 
   plugins: [
@@ -58,7 +59,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       "expo-notifications",
       {
-        icon: "./assets/brand/ihub-main-logo.png",
+        icon: "./assets/brand/app-icon-cshad.png",
         color: "#00D4AA",
         defaultChannel: "default",
         sounds: [],
