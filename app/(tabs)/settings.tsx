@@ -22,6 +22,7 @@ import {
   PreferenceSelector,
   OptionPickerModal,
   PickerOption,
+  FeedbackModal,   // <-- new feedback modal
 } from "@/components/settings";
 import { PrivacyModal } from "@/components/privacy";
 import { CityPickerModal } from "@/components/news";
@@ -63,6 +64,7 @@ export default function SettingsScreen() {
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
   const [termsModalVisible, setTermsModalVisible] = useState(false);
   const [privacyDashboardVisible, setPrivacyDashboardVisible] = useState(false);
+  const [feedbackModalVisible, setFeedbackModalVisible] = useState(false); // <-- feedback
 
   // Picker modal states
   const [appearancePickerVisible, setAppearancePickerVisible] = useState(false);
@@ -99,7 +101,7 @@ export default function SettingsScreen() {
     { value: 100, label: '100 km', subtitle: t('news.national') },
   ];
 
-  // Handle email support
+  // Handle email support (direct fallback)
   const handleEmailSupport = async () => {
     const email = "petrographics.adm@gmail.com";
     const subject = encodeURIComponent("CSHAD iSentinel Support");
@@ -343,6 +345,14 @@ export default function SettingsScreen() {
       <View style={[styles.section, { backgroundColor: colors.surface }]}>
         <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>{t('settings.helpSupport')}</Text>
         <SettingsItem
+          icon="chatbubble-ellipses-outline"
+          iconColor={colors.primary}
+          title="Send Feedback"
+          subtitle="Report a bug or suggest a feature"
+          onPress={() => setFeedbackModalVisible(true)}   // <-- opens new feedback modal
+        />
+        <View style={[styles.itemDivider, { backgroundColor: colors.divider }]} />
+        <SettingsItem
           icon="mail-outline"
           iconColor={colors.primary}
           title={t('settings.contactSupport')}
@@ -431,6 +441,12 @@ export default function SettingsScreen() {
       <PrivacyModal
         visible={privacyDashboardVisible}
         onClose={() => setPrivacyDashboardVisible(false)}
+      />
+
+      {/* Feedback Modal (new) */}
+      <FeedbackModal
+        visible={feedbackModalVisible}
+        onClose={() => setFeedbackModalVisible(false)}
       />
 
       {/* Appearance Picker */}
