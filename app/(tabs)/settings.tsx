@@ -26,7 +26,7 @@ import {
 import { PrivacyModal } from "@/components/privacy";
 import { CityPickerModal } from "@/components/news";
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from "@/content/legal";
-import { sendRealPushNotification } from "@/services/notifications";
+import { scheduleTestNotification } from "@/services/notifications";
 import { usePreferences } from "@/hooks/usePreferences";
 import { useLanguage, LanguageCode } from "@/hooks/useLanguage";
 import { useTheme } from "@/contexts";
@@ -140,31 +140,17 @@ export default function SettingsScreen() {
     }
   };
 
-  // Handle test notification – now uses real Expo push
-  const [sendingTest, setSendingTest] = useState(false);
-
+  // Handle test notification – uses local notification (no Firebase required)
   const handleTestNotification = async () => {
-    if (sendingTest) return;
-    setSendingTest(true);
     try {
-      const result = await sendRealPushNotification();
-      if (result.success) {
-        Alert.alert(
-          t('settings.testNotification'),
-          "Real push notification sent! Check your notification tray.",
-          [{ text: t('common.ok') }]
-        );
-      } else {
-        Alert.alert(
-          t('common.error'),
-          result.error || "Could not send push notification. Are you on a physical device?",
-          [{ text: t('common.ok') }]
-        );
-      }
+      await scheduleTestNotification();
+      Alert.alert(
+        t('settings.testNotification'),
+        "A test notification will appear in 2 seconds!",
+        [{ text: t('common.ok') }]
+      );
     } catch (error) {
-      Alert.alert(t('common.error'), "An unexpected error occurred.");
-    } finally {
-      setSendingTest(false);
+      Alert.alert(t('common.error'), "Could not schedule notification");
     }
   };
 
@@ -336,7 +322,7 @@ export default function SettingsScreen() {
           icon="paper-plane-outline"
           iconColor={colors.warning}
           title={t('settings.testNotification')}
-          subtitle={sendingTest ? "Sending..." : t('settings.testNotificationSubtitle')}
+          subtitle={t('settings.testNotificationSubtitle')}
           onPress={handleTestNotification}
         />
       </View>
