@@ -35,7 +35,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: "#1C1C1C",
     },
     package: "cshad.isentinel.news",
-    googleServicesFile: "./google-services.json",
     config: {
       googleMaps: {
         apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
