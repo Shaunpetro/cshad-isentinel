@@ -8,15 +8,14 @@ import {
   StyleSheet,
   Linking,
   Alert,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Typography, Spacing } from '@/config/theme';
 import { useTheme } from '@/contexts';
 
-// Fixed social links – using app‑specific deep links where possible
+// Universal links – work whether the app is installed or not
 const SOCIAL_LINKS = {
-  whatsapp: 'whatsapp://send?phone=27813877744',
+  whatsapp: 'https://wa.me/27813877744',
   linkedin: 'https://linkedin.com/in/petromalamule',
   email: 'mailto:petrographics.adm@gmail.com',
 };
@@ -26,33 +25,26 @@ export function DeveloperCredits() {
 
   const handleLinkPress = async (url: string, name: string) => {
     try {
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
-      } else {
-        // If the app isn't installed, fall back to the web version
-        if (name === 'WhatsApp') {
-          const webUrl = 'https://wa.me/27813877744';
-          const webSupported = await Linking.canOpenURL(webUrl);
-          if (webSupported) {
-            await Linking.openURL(webUrl);
-          } else {
-            Alert.alert('Error', 'No WhatsApp or browser found');
-          }
-        } else if (name === 'LinkedIn') {
-          // Open in browser
-          const webSupported = await Linking.canOpenURL(url);
-          if (webSupported) {
-            await Linking.openURL(url);
-          } else {
-            Alert.alert('Error', 'Cannot open LinkedIn');
-          }
-        } else {
-          Alert.alert('Error', `Cannot open ${name}`);
+      await Linking.openURL(url);
+    } catch {
+      // If the primary URL fails, try a fallback
+      if (name === 'WhatsApp') {
+        try {
+          await Linking.openURL('https://wa.me/27813877744');
+        } catch {
+          Alert.alert('Error', 'Could not open WhatsApp');
         }
+      } else if (name === 'LinkedIn') {
+        try {
+          await Linking.openURL('https://www.linkedin.com/in/petromalamule');
+        } catch {
+          Alert.alert('Error', 'Could not open LinkedIn');
+        }
+      } else if (name === 'Email') {
+        Alert.alert('Error', 'No email app found');
+      } else {
+        Alert.alert('Error', `Could not open ${name}`);
       }
-    } catch (error) {
-      Alert.alert('Error', `Failed to open ${name}`);
     }
   };
 
@@ -60,7 +52,6 @@ export function DeveloperCredits() {
     <View style={styles.container}>
       {/* App Branding */}
       <View style={styles.section}>
-        <Text style={[styles.appTitle, { color: colors.primary }]}>CSHAD iSentinel News</Text>
         <Image
           source={require('../../../assets/brand/ihub-main-logo.png')}
           style={styles.mainLogo}
@@ -106,7 +97,7 @@ export function DeveloperCredits() {
 
       {/* Sponsor */}
       <View style={styles.section}>
-        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>Sponsored & Powered By</Text>
+        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>Built & Powered By</Text>
         <Text style={[styles.sponsorName, { color: colors.text }]}>Shadrack Chabalala</Text>
         <Image
           source={require('../../../assets/brand/chabi2.png')}

@@ -75,7 +75,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     buildPhase: "001",
     phaseMonth: "March 2026",
     buildDate: new Date().toISOString(),
-    developer: "ATG Development",
+    developer: "Petro@ATG",
     eas: {
       projectId: "41d9d284-b014-48ab-9238-fe2c0724fd98",
     },
