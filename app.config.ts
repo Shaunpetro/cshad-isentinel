@@ -11,7 +11,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   userInterfaceStyle: "automatic",
 
   splash: {
-    image: "./assets/splash/splash.png",
+    image: "./assets/brand/ihub-main-logo.png",
     resizeMode: "contain",
     backgroundColor: "#1C1C1C",
   },
