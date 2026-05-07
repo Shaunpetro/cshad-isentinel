@@ -1,3 +1,4 @@
+// src/components/core/SplashScreen.tsx
 import React, { useEffect, useRef } from "react";
 import {
   View,
@@ -22,9 +23,7 @@ export function CustomSplashScreen({ onComplete }: Props) {
   const devLogoOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Staggered fade-in sequence
     Animated.sequence([
-      // 1. Main logo fades in and scales up
       Animated.parallel([
         Animated.timing(logoOpacity, {
           toValue: 1,
@@ -37,29 +36,23 @@ export function CustomSplashScreen({ onComplete }: Props) {
           useNativeDriver: true,
         }),
       ]),
-
-      // 2. Subtitle fades in
       Animated.timing(subtitleOpacity, {
         toValue: 0.7,
         duration: 400,
         useNativeDriver: true,
       }),
-
-      // 3. Developer logo fades in
       Animated.timing(devLogoOpacity, {
         toValue: 1,
         duration: 400,
         useNativeDriver: true,
       }),
     ]).start(() => {
-      // Hold for 1 second then signal completion
       setTimeout(onComplete, 1000);
     });
   }, []);
 
   return (
     <View style={styles.container}>
-      {/* Main Logo — centered, slightly above middle */}
       <Animated.View
         style={[
           styles.logoWrapper,
@@ -70,18 +63,16 @@ export function CustomSplashScreen({ onComplete }: Props) {
         ]}
       >
         <Image
-          source={require("@assets/brand/ihub-main-logo.png")}
+          source={require("@assets/brand/cshad-isentinel-logo-main.png")}
           style={styles.mainLogo}
           resizeMode="contain"
         />
       </Animated.View>
 
-      {/* Subtitle */}
       <Animated.Text style={[styles.subtitle, { opacity: subtitleOpacity }]}>
         Powered by AI
       </Animated.Text>
 
-      {/* ATG Developer Logo — bottom */}
       <Animated.View
         style={[styles.devLogoWrapper, { opacity: devLogoOpacity }]}
       >
@@ -105,7 +96,7 @@ const styles = StyleSheet.create({
   },
   logoWrapper: {
     alignItems: "center",
-    marginTop: -50, // Push slightly above true center
+    marginTop: -50,
   },
   mainLogo: {
     width: Math.min(width * 0.6, 300),

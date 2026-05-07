@@ -6,12 +6,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: "cshad-isentinel-news",
   version: "1.263.4",
   orientation: "portrait",
-  icon: "./assets/brand/app-icon-cshad.png",
+  icon: "./assets/brand/cshad-isentinel-logo-icon.png",
   scheme: "cshad-isentinel",
   userInterfaceStyle: "automatic",
 
   splash: {
-    image: "./assets/brand/ihub-main-logo.png",
+    image: "./assets/brand/cshad-isentinel-logo-main.png",
     resizeMode: "contain",
     backgroundColor: "#1C1C1C",
   },
@@ -31,7 +31,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   android: {
     adaptiveIcon: {
-      foregroundImage: "./assets/brand/app-icon-cshad.png",
+      foregroundImage: "./assets/brand/cshad-isentinel-logo-icon.png",
       backgroundColor: "#1C1C1C",
     },
     package: "cshad.isentinel.news",
@@ -45,7 +45,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   web: {
     bundler: "metro",
     output: "static",
-    favicon: "./assets/brand/app-icon-cshad.png",
+    favicon: "./assets/brand/cshad-isentinel-logo-icon.png",
   },
 
   plugins: [
@@ -58,7 +58,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       "expo-notifications",
       {
-        icon: "./assets/brand/app-icon-cshad.png",
+        icon: "./assets/brand/cshad-isentinel-logo-icon.png",
         color: "#00D4AA",
         defaultChannel: "default",
         sounds: [],
@@ -72,7 +72,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   extra: {
     buildPhase: "002",
-    phaseMonth: "May 2026",
+    phaseMonth: "March 2026",
     buildDate: new Date().toISOString(),
     developer: "Petro@ATG",
     eas: {
