@@ -71,8 +71,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
 
   extra: {
-    buildPhase: "001",
-    phaseMonth: "March 2026",
+    buildPhase: "002",
+    phaseMonth: "May 2026",
     buildDate: new Date().toISOString(),
     developer: "Petro@ATG",
     eas: {

@@ -33,17 +33,17 @@ export interface UserPreferences {
   // Display
   appearance: AppearanceMode;
   textSize: TextSize;
-  
+
   // Location & News
   homeLocation: HomeLocation | null;
   newsRadius: NewsRadius;
   defaultScope: NewsScope;
   defaultCategory: string | null; // null = "All"
-  
+
   // Feedback
   soundEnabled: boolean;
   vibrationEnabled: boolean;
-  
+
   // Behavior
   startupScreen: StartupScreen;
   autoRefreshMinutes: number | null; // null = disabled
@@ -52,7 +52,7 @@ export interface UserPreferences {
 
 // Default values
 export const DEFAULT_PREFERENCES: UserPreferences = {
-  appearance: 'dark',
+  appearance: 'system',
   textSize: 'medium',
   homeLocation: null,
   newsRadius: 25,
