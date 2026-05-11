@@ -7,7 +7,7 @@ import { APP } from '@/config/constants';
 
 export interface MapMarker {
   id: string;
-  type: 'news' | 'tip';
+  type: 'news' | 'tip' | 'hazard';
   title: string;
   description?: string;
   category: string;
@@ -168,7 +168,6 @@ export async function fetchMapData(options?: {
             tipsCount++;
           } else {
             // NO location found - use fallback so tip still appears on map
-            // This ensures tips are NEVER lost, just shown at approximate location
             const fallback = getFallbackLocation(fallbackLat, fallbackLng);
 
             console.log(`[MapService] Tip ${tip.id} has no location, using fallback`);
@@ -316,4 +315,20 @@ export function subscribeToMapUpdates(
   return () => {
     supabase.removeChannel(channel);
   };
+}
+
+/**
+ * Fetch hazards from the public.hazards table
+ */
+export async function fetchHazards(): Promise<any[]> {
+  const { data, error } = await supabase
+    .from('hazards')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(50);
+  if (error) {
+    console.error('[MapService] fetchHazards error:', error);
+    return [];
+  }
+  return data || [];
 }
