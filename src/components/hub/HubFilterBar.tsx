@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Typography, Spacing, BorderRadius } from '@/config/theme';
 
-export type HubFilter = 'tips' | 'live' | 'weather' | 'infrastructure' | 'national' | 'all';
+export type HubFilter = 'tips' | 'live' | 'weather' | 'infrastructure' | 'national' | 'hazards' | 'all';
 
 interface FilterConfig {
   id: HubFilter;
@@ -27,6 +27,7 @@ const FILTERS: FilterConfig[] = [
   { id: 'live', labelKey: 'time.live', icon: 'radio', activeColor: '#D32F2F' },
   { id: 'weather', labelKey: 'alerts.weather.title', icon: 'cloudy', activeColor: '#2196F3' },
   { id: 'infrastructure', labelKey: 'alerts.infrastructure', icon: 'flash', activeColor: '#9C27B0' },
+  { id: 'hazards', labelKey: 'alerts.hazards', icon: 'warning', activeColor: '#FF6D00' },
   { id: 'national', labelKey: 'news.national', icon: 'globe', activeColor: '#4CAF50' },
   { id: 'all', labelKey: 'map.showAll', icon: 'list', activeColor: '#757575' },
 ];
@@ -45,11 +46,10 @@ export function HubFilterBar({
   const { colors, isDark } = useTheme();
   const { t } = useTranslation();
 
-  // Get short label for filter
   const getShortLabel = (filter: FilterConfig): string => {
     const fullLabel = t(filter.labelKey);
-    // Shorten some labels for the filter bar
     if (filter.id === 'infrastructure') return t('alerts.infrastructure').substring(0, 5);
+    if (filter.id === 'hazards') return t('alerts.hazards').substring(0, 7);
     if (filter.id === 'tips') return t('map.showTips');
     return fullLabel;
   };
@@ -90,9 +90,7 @@ export function HubFilterBar({
               <Text
                 style={[
                   styles.filterLabel,
-                  {
-                    color: isActive ? '#FFFFFF' : colors.text,
-                  },
+                  { color: isActive ? '#FFFFFF' : colors.text },
                 ]}
               >
                 {getShortLabel(filter)}
@@ -111,9 +109,7 @@ export function HubFilterBar({
                   <Text
                     style={[
                       styles.countText,
-                      {
-                        color: isActive ? '#FFFFFF' : activeColor,
-                      },
+                      { color: isActive ? '#FFFFFF' : activeColor },
                     ]}
                   >
                     {count > 99 ? '99+' : count}
