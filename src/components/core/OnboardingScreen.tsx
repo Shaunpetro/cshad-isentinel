@@ -16,7 +16,9 @@ interface OnboardingScreenProps {
   onComplete: () => void;
 }
 
-const SLIDES = [
+type IconName = keyof typeof Ionicons.glyphMap;
+
+const SLIDES: { icon: IconName; title: string; subtitle: string; action?: string }[] = [
   {
     icon: 'shield-checkmark-outline',
     title: 'Welcome to CSHAD iSentinel News',
@@ -80,7 +82,6 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
             <Text style={[styles.title, { color: colors.text }]}>{slide.title}</Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{slide.subtitle}</Text>
 
-            {/* Permission buttons (show only on relevant slides) */}
             {slide.action === 'enableLocation' && !locationGranted && (
               <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.primary }]} onPress={requestLocation}>
                 <Ionicons name="locate" size={20} color="#fff" />
@@ -110,7 +111,6 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
         ))}
       </ScrollView>
 
-      {/* Footer */}
       <View style={styles.footer}>
         <View style={styles.dots}>
           {SLIDES.map((_, index) => (
