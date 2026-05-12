@@ -1,6 +1,7 @@
 {
   "common": {
     "loading": "Loading...",
+    "hazards": "Hazards",
     "error": "Error",
     "retry": "Retry",
     "cancel": "Cancel",

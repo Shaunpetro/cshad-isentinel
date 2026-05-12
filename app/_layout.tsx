@@ -1,37 +1,19 @@
 // app/_layout.tsx
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View, StyleSheet } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { useAppReady } from "@/hooks/useAppReady";
 import { CustomSplashScreen } from "@/components/core/SplashScreen";
-import { OnboardingScreen } from "@/components/core/OnboardingScreen";
 import { useNotifications } from "@/hooks/useNotifications";
 import { ThemeProvider, useTheme } from "@/contexts";
-
-const ONBOARDING_COMPLETED_KEY = "pshad_onboarding_completed";
 
 function RootLayoutInner() {
   const { isReady, showCustomSplash, onLayoutReady, onSplashComplete } = useAppReady();
   const { colors } = useTheme();
   const { isInitialized: notificationsReady, error: notificationError } = useNotifications();
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [onboardingChecked, setOnboardingChecked] = useState(false);
-
-  useEffect(() => {
-    if (isReady && !showCustomSplash) {
-      // Check if onboarding has been completed
-      AsyncStorage.getItem(ONBOARDING_COMPLETED_KEY).then((value) => {
-        if (value !== "true") {
-          setShowOnboarding(true);
-        }
-        setOnboardingChecked(true);
-      });
-    }
-  }, [isReady, showCustomSplash]);
 
   React.useEffect(() => {
     if (notificationsReady) {
@@ -43,14 +25,9 @@ function RootLayoutInner() {
     }
   }, [notificationsReady, notificationError]);
 
-  if (!isReady || !onboardingChecked) {
+  if (!isReady) {
     return null;
   }
-
-  const handleOnboardingComplete = async () => {
-    await AsyncStorage.setItem(ONBOARDING_COMPLETED_KEY, "true");
-    setShowOnboarding(false);
-  };
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]} onLayout={onLayoutReady}>
@@ -60,7 +37,6 @@ function RootLayoutInner() {
       </Stack>
 
       {showCustomSplash && <CustomSplashScreen onComplete={onSplashComplete} />}
-      {showOnboarding && <OnboardingScreen onComplete={handleOnboardingComplete} />}
 
       <StatusBar style={colors.statusBar} />
     </View>

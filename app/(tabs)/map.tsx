@@ -6,6 +6,7 @@ import {
   Pressable,
   StyleSheet,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import MapView, { Marker, Callout, Circle } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -19,7 +20,11 @@ import { APP } from "@/config/constants";
 import { useMapData } from "@/hooks/useMapData";
 import { METRO_QUICK_ACCESS } from "@/services/location/saCities";
 import { HazardReportModal } from "@/components/hub/HazardReportModal";
-import { fetchHazards } from "@/services/map/mapService";
+import {
+  fetchHazards,
+  voteHazardCleared,
+  voteHazardStillThere,
+} from "@/services/map/mapService";
 import type { MapMarker } from "@/services/map";
 
 const ZOOM_LEVELS = {
@@ -59,13 +64,21 @@ const getCategoryIcon = (category: string): keyof typeof Ionicons.glyphMap => {
     traffic: 'car-sport',
     politics: 'megaphone',
     health: 'medkit',
-    hazard: 'warning',
-    pothole: 'alert-circle',
-    burstpipe: 'water',
-    powerline: 'flash',
-    roadclosure: 'close-circle',
   };
   return icons[category] || 'alert-circle';
+};
+
+// Hazard‑specific icons
+const getHazardIcon = (category: string): keyof typeof Ionicons.glyphMap => {
+  const icons: Record<string, keyof typeof Ionicons.glyphMap> = {
+    pothole: 'alert-circle',
+    burst_pipe: 'water',
+    power_line: 'flash',
+    road_closure: 'close-circle',
+    accident: 'car-sport',
+    other: 'warning',
+  };
+  return icons[category] || 'warning';
 };
 
 const findMatchingMajorCity = (
@@ -124,7 +137,6 @@ export default function MapScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      console.log('[MapScreen] Screen focused, refreshing location and hazards...');
       refreshLocation();
       fetchHazards().then((hazards) => {
         if (hazards) {
@@ -136,10 +148,10 @@ export default function MapScreen() {
             latitude: h.latitude,
             longitude: h.longitude,
             category: h.category,
-            severity: h.severity || 'medium',
+            severity: (h.severity as MapMarker['severity']) || 'medium',
             timestamp: h.created_at,
             matchedLocation: h.location_name || 'Unknown',
-            confidence: 'exact',
+            confidence: 'exact' as const,
           })));
         }
       });
@@ -154,7 +166,7 @@ export default function MapScreen() {
   const activeCity = useMemo(() => findMatchingMajorCity(cityName, userLat, userLng), [cityName, userLat, userLng]);
 
   const {
-    markers,
+    markers: newsTipMarkers,
     newsCount,
     tipsCount,
     isLoading: dataLoading,
@@ -162,9 +174,7 @@ export default function MapScreen() {
     refresh,
   } = useMapData({ includeNews: showNews, includeTips: showTips, realtime: true });
 
-  const allMarkers = useMemo(() => {
-    return [...markers, ...hazardMarkers];
-  }, [markers, hazardMarkers]);
+  const allMarkers = useMemo(() => [...newsTipMarkers, ...hazardMarkers], [newsTipMarkers, hazardMarkers]);
 
   const initialRegion = useMemo(() => {
     if (userLat && userLng) {
@@ -176,7 +186,6 @@ export default function MapScreen() {
   useEffect(() => {
     if (mapReady && mapRef.current && userLat && userLng && viewMode === 'myArea') {
       if (hasAnimatedToCity.current !== cityId) {
-        console.log(`[MapScreen] City changed to ${cityName}, animating map...`);
         hasAnimatedToCity.current = cityId || null;
         const timer = setTimeout(() => {
           mapRef.current?.animateToRegion({ latitude: userLat, longitude: userLng, ...ZOOM_LEVELS.city }, 800);
@@ -189,8 +198,10 @@ export default function MapScreen() {
   const visibleMarkers = useMemo(() => {
     if (viewMode === 'national' || !userLat || !userLng) return allMarkers;
     const radiusInDegrees = (radiusKm || 25) / 111;
-    return allMarkers.filter((marker) => {
-      const distance = Math.sqrt(Math.pow(marker.latitude - userLat, 2) + Math.pow(marker.longitude - userLng, 2));
+    return allMarkers.filter(marker => {
+      const distance = Math.sqrt(
+        Math.pow(marker.latitude - userLat, 2) + Math.pow(marker.longitude - userLng, 2)
+      );
       return distance <= radiusInDegrees;
     });
   }, [allMarkers, viewMode, userLat, userLng, radiusKm]);
@@ -209,7 +220,10 @@ export default function MapScreen() {
   const handleNationalPress = useCallback(() => {
     setViewMode('national');
     if (mapRef.current) {
-      mapRef.current.animateToRegion({ latitude: APP.defaultRegion.latitude, longitude: APP.defaultRegion.longitude, ...ZOOM_LEVELS.country }, 800);
+      mapRef.current.animateToRegion(
+        { latitude: APP.defaultRegion.latitude, longitude: APP.defaultRegion.longitude, ...ZOOM_LEVELS.country },
+        800
+      );
       setSelectedId(null);
     }
   }, []);
@@ -223,8 +237,8 @@ export default function MapScreen() {
   const handleTipsToggle = useCallback(() => {
     if (!showTips) {
       setShowTips(true);
-      if (markers.some(m => m.type === 'tip') && mapRef.current) {
-        const tipMarkers = markers.filter(m => m.type === 'tip');
+      if (newsTipMarkers.some(m => m.type === 'tip') && mapRef.current) {
+        const tipMarkers = newsTipMarkers.filter(m => m.type === 'tip');
         if (tipMarkers.length > 0) {
           const lats = tipMarkers.map(m => m.latitude);
           const lngs = tipMarkers.map(m => m.longitude);
@@ -244,8 +258,44 @@ export default function MapScreen() {
     } else {
       setShowTips(false);
     }
-  }, [showTips, markers]);
+  }, [showTips, newsTipMarkers]);
   const handleMapReady = useCallback(() => setMapReady(true), []);
+
+  // Hazard voting handlers
+  const handleVoteCleared = useCallback((hazardId: string) => {
+    Alert.alert("Confirm", "Is this hazard actually cleared?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Yes, Cleared", onPress: async () => {
+          await voteHazardCleared(hazardId);
+          fetchHazards().then((hazards) => {
+            if (hazards) setHazardMarkers(hazards.map((h: any) => ({
+              id: h.id, type: 'hazard' as const,
+              title: h.category.replace('_', ' ').toUpperCase(),
+              description: h.description, latitude: h.latitude, longitude: h.longitude,
+              category: h.category, severity: (h.severity as MapMarker['severity']) || 'medium',
+              timestamp: h.created_at, matchedLocation: h.location_name || 'Unknown',
+              confidence: 'exact' as const,
+            })));
+          });
+        },
+      },
+    ]);
+  }, []);
+
+  const handleVoteStillThere = useCallback(async (hazardId: string) => {
+    await voteHazardStillThere(hazardId);
+    fetchHazards().then((hazards) => {
+      if (hazards) setHazardMarkers(hazards.map((h: any) => ({
+        id: h.id, type: 'hazard' as const,
+        title: h.category.replace('_', ' ').toUpperCase(),
+        description: h.description, latitude: h.latitude, longitude: h.longitude,
+        category: h.category, severity: (h.severity as MapMarker['severity']) || 'medium',
+        timestamp: h.created_at, matchedLocation: h.location_name || 'Unknown',
+        confidence: 'exact' as const,
+      })));
+    });
+  }, []);
 
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -256,6 +306,7 @@ export default function MapScreen() {
     if (diffHours < 24) return t('time.hoursAgo', { count: diffHours });
     return date.toLocaleDateString();
   };
+
   const getConfidenceText = (confidence: string) => {
     switch (confidence) {
       case 'exact': return t('map.confidence.exact');
@@ -268,6 +319,7 @@ export default function MapScreen() {
 
   const isLoading = locationLoading || dataLoading;
   const currentRadiusKm = radiusKm || 25;
+
   const locationDisplayText = useMemo(() => {
     if (viewMode === 'national') return '🇿🇦 South Africa';
     if (cityName) {
@@ -317,26 +369,91 @@ export default function MapScreen() {
           >
             <View style={[styles.markerContainer, { backgroundColor: getMarkerColor(marker) }]}>
               <Ionicons
-                name={marker.type === 'hazard' ? 'warning' : getCategoryIcon(marker.category)}
+                name={
+                  marker.type === 'hazard'
+                    ? getHazardIcon(marker.category)
+                    : marker.type === 'tip'
+                    ? 'chatbubble'
+                    : getCategoryIcon(marker.category)
+                }
                 size={16}
                 color="#FFFFFF"
               />
             </View>
-            <Callout tooltip>
-              <View style={[styles.callout, { backgroundColor: colors.surface }]}>
-                <View style={[styles.typeBadge, { backgroundColor: marker.type === 'tip' ? '#9C27B0' : marker.type === 'hazard' ? '#FF6D00' : colors.primary }]}>
-                  <Text style={styles.typeBadgeText}>
-                    {marker.type === 'tip' ? `🟣 ${t('map.showTips')}` : marker.type === 'hazard' ? `⚠️ Hazard` : `📰 ${t('map.showNews')}`}
+
+            {marker.type === 'hazard' ? (
+              <Callout tooltip>
+                <View style={[styles.callout, { backgroundColor: colors.surface }]}>
+                  <View style={[styles.typeBadge, { backgroundColor: '#FF6D00' }]}>
+                    <Text style={styles.typeBadgeText}>⚠️ Hazard</Text>
+                  </View>
+                  <Text style={[styles.calloutTitle, { color: colors.text }]} numberOfLines={2}>
+                    {marker.title}
                   </Text>
+                  {marker.description && (
+                    <Text style={[styles.calloutDescription, { color: colors.textSecondary }]} numberOfLines={2}>
+                      {marker.description}
+                    </Text>
+                  )}
+                  <View style={styles.calloutMeta}>
+                    <Text style={[styles.calloutLocation, { color: colors.primary }]}>
+                      📍 {marker.matchedLocation}
+                    </Text>
+                    <Text style={[styles.calloutTime, { color: colors.textSecondary }]}>
+                      {formatTimestamp(marker.timestamp)}
+                    </Text>
+                  </View>
+                  {/* Voting buttons */}
+                  <View style={styles.voteRow}>
+                    <Pressable
+                      style={styles.voteButton}
+                      onPress={() => handleVoteCleared(marker.id)}
+                    >
+                      <Ionicons name="close-circle" size={18} color="#FF1744" />
+                      <Text style={[styles.voteText, { color: '#FF1744' }]}>Cleared</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.voteButton}
+                      onPress={() => handleVoteStillThere(marker.id)}
+                    >
+                      <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
+                      <Text style={[styles.voteText, { color: '#4CAF50' }]}>Still there</Text>
+                    </Pressable>
+                  </View>
                 </View>
-                <Text style={[styles.calloutTitle, { color: colors.text }]} numberOfLines={2}>{marker.title}</Text>
-                {marker.description && <Text style={[styles.calloutDescription, { color: colors.textSecondary }]} numberOfLines={2}>{marker.description}</Text>}
-                <View style={styles.calloutMeta}>
-                  <Text style={[styles.calloutLocation, { color: colors.primary }]}>📍 {marker.matchedLocation}</Text>
-                  <Text style={[styles.calloutTime, { color: colors.textSecondary }]}>{formatTimestamp(marker.timestamp)}</Text>
+              </Callout>
+            ) : (
+              <Callout tooltip>
+                <View style={[styles.callout, { backgroundColor: colors.surface }]}>
+                  <View style={[styles.typeBadge, { backgroundColor: marker.type === 'tip' ? '#9C27B0' : colors.primary }]}>
+                    <Text style={styles.typeBadgeText}>
+                      {marker.type === 'tip' ? `🟣 ${t('map.showTips')}` : `📰 ${t('map.showNews')}`}
+                    </Text>
+                  </View>
+                  <Text style={[styles.calloutTitle, { color: colors.text }]} numberOfLines={2}>
+                    {marker.title}
+                  </Text>
+                  {marker.description && (
+                    <Text style={[styles.calloutDescription, { color: colors.textSecondary }]} numberOfLines={2}>
+                      {marker.description}
+                    </Text>
+                  )}
+                  <View style={styles.calloutMeta}>
+                    <Text style={[styles.calloutLocation, { color: colors.primary }]}>
+                      📍 {marker.matchedLocation}
+                    </Text>
+                    <Text style={[styles.calloutTime, { color: colors.textSecondary }]}>
+                      {formatTimestamp(marker.timestamp)}
+                    </Text>
+                  </View>
+                  {marker.confidence !== 'exact' && (
+                    <Text style={[styles.confidenceText, { color: colors.textSecondary }]}>
+                      📌 {getConfidenceText(marker.confidence)}
+                    </Text>
+                  )}
                 </View>
-              </View>
-            </Callout>
+              </Callout>
+            )}
           </Marker>
         ))}
       </MapView>
@@ -482,22 +599,15 @@ export default function MapScreen() {
         visible={hazardModalVisible}
         onClose={() => setHazardModalVisible(false)}
         onReported={() => {
-          fetchHazards().then(hazards => {
-            if (hazards) {
-              setHazardMarkers(hazards.map((h: any) => ({
-                id: h.id,
-                type: 'hazard' as const,
-                title: h.category.replace('_', ' ').toUpperCase(),
-                description: h.description,
-                latitude: h.latitude,
-                longitude: h.longitude,
-                category: h.category,
-                severity: h.severity || 'medium',
-                timestamp: h.created_at,
-                matchedLocation: h.location_name || 'Unknown',
-                confidence: 'exact',
-              })));
-            }
+          fetchHazards().then((hazards) => {
+            if (hazards) setHazardMarkers(hazards.map((h: any) => ({
+              id: h.id, type: 'hazard' as const,
+              title: h.category.replace('_', ' ').toUpperCase(),
+              description: h.description, latitude: h.latitude, longitude: h.longitude,
+              category: h.category, severity: (h.severity as MapMarker['severity']) || 'medium',
+              timestamp: h.created_at, matchedLocation: h.location_name || 'Unknown',
+              confidence: 'exact' as const,
+            })));
           });
         }}
         currentLocation={userLat && userLng ? { latitude: userLat, longitude: userLng } : undefined}
@@ -552,4 +662,7 @@ const styles = StyleSheet.create({
   calloutLocation: { fontSize: Typography.sizes.tiny, fontFamily: Typography.fonts.medium },
   calloutTime: { fontSize: Typography.sizes.tiny, fontFamily: Typography.fonts.mono },
   confidenceText: { fontSize: 10, fontFamily: Typography.fonts.mono, marginTop: 4, fontStyle: 'italic' },
+  voteRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: Spacing.sm, borderTopWidth: 1, borderTopColor: '#E0E0E0', paddingTop: Spacing.sm },
+  voteButton: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 4 },
+  voteText: { fontSize: Typography.sizes.tiny, fontFamily: Typography.fonts.bold },
 });

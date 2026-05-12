@@ -2,6 +2,7 @@
   "common": {
     "loading": "Iyalayisha...",
     "error": "Iphutha",
+    "hazards": "Ingozi",
     "retry": "Zama futhi",
     "cancel": "Khansela",
     "save": "Gcina",

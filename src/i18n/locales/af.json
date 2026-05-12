@@ -1,6 +1,7 @@
 {
   "common": {
     "loading": "Laai...",
+    "hazards": "Gevaarlik",
     "error": "Fout",
     "retry": "Probeer weer",
     "cancel": "Kanselleer",
