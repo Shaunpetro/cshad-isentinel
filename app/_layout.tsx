@@ -1,70 +1,72 @@
 // app/_layout.tsx
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View, StyleSheet } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { useAppReady } from "@/hooks/useAppReady";
 import { CustomSplashScreen } from "@/components/core/SplashScreen";
+import { OnboardingScreen } from "@/components/core/OnboardingScreen";
 import { useNotifications } from "@/hooks/useNotifications";
 import { ThemeProvider, useTheme } from "@/contexts";
 
-// Inner component that uses theme
+const ONBOARDING_COMPLETED_KEY = "pshad_onboarding_completed";
+
 function RootLayoutInner() {
-  const { isReady, showCustomSplash, onLayoutReady, onSplashComplete } =
-    useAppReady();
-
-  // Get theme
+  const { isReady, showCustomSplash, onLayoutReady, onSplashComplete } = useAppReady();
   const { colors } = useTheme();
+  const { isInitialized: notificationsReady, error: notificationError } = useNotifications();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
 
-  // Initialize push notifications
-  const { isInitialized: notificationsReady, error: notificationError } =
-    useNotifications();
+  useEffect(() => {
+    if (isReady && !showCustomSplash) {
+      // Check if onboarding has been completed
+      AsyncStorage.getItem(ONBOARDING_COMPLETED_KEY).then((value) => {
+        if (value !== "true") {
+          setShowOnboarding(true);
+        }
+        setOnboardingChecked(true);
+      });
+    }
+  }, [isReady, showCustomSplash]);
 
-  // Log notification status in development
   React.useEffect(() => {
     if (notificationsReady) {
       if (notificationError) {
-        console.log('[RootLayout] Notifications note:', notificationError);
+        console.log("[RootLayout] Notifications note:", notificationError);
       } else {
-        console.log('[RootLayout] Notifications initialized');
+        console.log("[RootLayout] Notifications initialized");
       }
     }
   }, [notificationsReady, notificationError]);
 
-  // Still loading fonts/resources — native splash stays visible
-  if (!isReady) {
+  if (!isReady || !onboardingChecked) {
     return null;
   }
 
+  const handleOnboardingComplete = async () => {
+    await AsyncStorage.setItem(ONBOARDING_COMPLETED_KEY, "true");
+    setShowOnboarding(false);
+  };
+
   return (
-    <View
-      style={[styles.root, { backgroundColor: colors.background }]}
-      onLayout={onLayoutReady}
-    >
-      {/* Main app navigation */}
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: colors.background },
-        }}
-      >
+    <View style={[styles.root, { backgroundColor: colors.background }]} onLayout={onLayoutReady}>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />
       </Stack>
 
-      {/* Custom animated splash on top */}
-      {showCustomSplash && (
-        <CustomSplashScreen onComplete={onSplashComplete} />
-      )}
+      {showCustomSplash && <CustomSplashScreen onComplete={onSplashComplete} />}
+      {showOnboarding && <OnboardingScreen onComplete={handleOnboardingComplete} />}
 
       <StatusBar style={colors.statusBar} />
     </View>
   );
 }
 
-// Root component with providers
 export default function RootLayout() {
   return (
     <I18nextProvider i18n={i18n}>
@@ -76,7 +78,5 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
+  root: { flex: 1 },
 });
