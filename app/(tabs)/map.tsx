@@ -1,12 +1,7 @@
 ﻿// app/(tabs)/map.tsx
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
-  View,
-  Text,
-  Pressable,
-  StyleSheet,
-  ActivityIndicator,
-  Alert,
+  View, Text, Pressable, StyleSheet, ActivityIndicator, TouchableOpacity,
 } from "react-native";
 import MapView, { Marker, Callout, Circle } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -26,6 +21,24 @@ import {
   voteHazardStillThere,
 } from "@/services/map/mapService";
 import type { MapMarker } from "@/services/map";
+
+// Hazard SVG icons
+import PotholeIcon from '@assets/hazard-icons/pothole.svg';
+import BurstPipeIcon from '@assets/hazard-icons/burst-pipe.svg';
+import PowerLineIcon from '@assets/hazard-icons/power-line.svg';
+import RoadClosureIcon from '@assets/hazard-icons/road-closure.svg';
+import AccidentIcon from '@assets/hazard-icons/accident.svg';
+import OtherIcon from '@assets/hazard-icons/other.svg';
+
+// Map category to SVG component
+const HAZARD_ICONS: Record<string, React.FC<{ width: number; height: number }>> = {
+  pothole: PotholeIcon,
+  burst_pipe: BurstPipeIcon,
+  power_line: PowerLineIcon,
+  road_closure: RoadClosureIcon,
+  accident: AccidentIcon,
+  other: OtherIcon,
+};
 
 const ZOOM_LEVELS = {
   city: { latitudeDelta: 0.15, longitudeDelta: 0.15 },
@@ -68,19 +81,6 @@ const getCategoryIcon = (category: string): keyof typeof Ionicons.glyphMap => {
   return icons[category] || 'alert-circle';
 };
 
-// Hazard‑specific icons
-const getHazardIcon = (category: string): keyof typeof Ionicons.glyphMap => {
-  const icons: Record<string, keyof typeof Ionicons.glyphMap> = {
-    pothole: 'alert-circle',
-    burst_pipe: 'water',
-    power_line: 'flash',
-    road_closure: 'close-circle',
-    accident: 'car-sport',
-    other: 'warning',
-  };
-  return icons[category] || 'warning';
-};
-
 const findMatchingMajorCity = (
   cityName: string | undefined,
   latitude: number | undefined,
@@ -113,6 +113,20 @@ const findMatchingMajorCity = (
   return null;
 };
 
+function ToastMessage({ message, onHide }: { message: string; onHide: () => void }) {
+  const { colors } = useTheme();
+  useEffect(() => {
+    const timer = setTimeout(onHide, 2000);
+    return () => clearTimeout(timer);
+  }, [onHide]);
+
+  return (
+    <View style={[styles.toast, { backgroundColor: '#4CAF50' }]}>
+      <Text style={styles.toastText}>{message}</Text>
+    </View>
+  );
+}
+
 export default function MapScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
@@ -125,6 +139,7 @@ export default function MapScreen() {
   const [viewMode, setViewMode] = useState<'myArea' | 'national'>('myArea');
   const [hazardModalVisible, setHazardModalVisible] = useState(false);
   const [hazardMarkers, setHazardMarkers] = useState<MapMarker[]>([]);
+  const [toast, setToast] = useState<string | null>(null);
   const hasAnimatedToCity = useRef<string | null>(null);
 
   const {
@@ -138,25 +153,29 @@ export default function MapScreen() {
   useFocusEffect(
     useCallback(() => {
       refreshLocation();
-      fetchHazards().then((hazards) => {
-        if (hazards) {
-          setHazardMarkers(hazards.map((h: any) => ({
-            id: h.id,
-            type: 'hazard' as const,
-            title: h.category.replace('_', ' ').toUpperCase(),
-            description: h.description,
-            latitude: h.latitude,
-            longitude: h.longitude,
-            category: h.category,
-            severity: (h.severity as MapMarker['severity']) || 'medium',
-            timestamp: h.created_at,
-            matchedLocation: h.location_name || 'Unknown',
-            confidence: 'exact' as const,
-          })));
-        }
-      });
+      loadHazards();
     }, [refreshLocation])
   );
+
+  const loadHazards = () => {
+    fetchHazards().then((hazards) => {
+      if (hazards) {
+        setHazardMarkers(hazards.map((h: any) => ({
+          id: h.id,
+          type: 'hazard' as const,
+          title: h.category.replace('_', ' ').toUpperCase(),
+          description: h.description,
+          latitude: h.latitude,
+          longitude: h.longitude,
+          category: h.category,
+          severity: (h.severity as MapMarker['severity']) || 'medium',
+          timestamp: h.created_at,
+          matchedLocation: h.location_name || 'Unknown',
+          confidence: 'exact' as const,
+        })));
+      }
+    });
+  };
 
   const userLat = currentCity?.latitude;
   const userLng = currentCity?.longitude;
@@ -261,40 +280,16 @@ export default function MapScreen() {
   }, [showTips, newsTipMarkers]);
   const handleMapReady = useCallback(() => setMapReady(true), []);
 
-  // Hazard voting handlers
-  const handleVoteCleared = useCallback((hazardId: string) => {
-    Alert.alert("Confirm", "Is this hazard actually cleared?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Yes, Cleared", onPress: async () => {
-          await voteHazardCleared(hazardId);
-          fetchHazards().then((hazards) => {
-            if (hazards) setHazardMarkers(hazards.map((h: any) => ({
-              id: h.id, type: 'hazard' as const,
-              title: h.category.replace('_', ' ').toUpperCase(),
-              description: h.description, latitude: h.latitude, longitude: h.longitude,
-              category: h.category, severity: (h.severity as MapMarker['severity']) || 'medium',
-              timestamp: h.created_at, matchedLocation: h.location_name || 'Unknown',
-              confidence: 'exact' as const,
-            })));
-          });
-        },
-      },
-    ]);
+  const handleVoteCleared = useCallback(async (hazardId: string) => {
+    await voteHazardCleared(hazardId);
+    setToast("✅ Cleared vote recorded");
+    loadHazards();
   }, []);
 
   const handleVoteStillThere = useCallback(async (hazardId: string) => {
     await voteHazardStillThere(hazardId);
-    fetchHazards().then((hazards) => {
-      if (hazards) setHazardMarkers(hazards.map((h: any) => ({
-        id: h.id, type: 'hazard' as const,
-        title: h.category.replace('_', ' ').toUpperCase(),
-        description: h.description, latitude: h.latitude, longitude: h.longitude,
-        category: h.category, severity: (h.severity as MapMarker['severity']) || 'medium',
-        timestamp: h.created_at, matchedLocation: h.location_name || 'Unknown',
-        confidence: 'exact' as const,
-      })));
-    });
+    setToast("✅ Confirmed still there");
+    loadHazards();
   }, []);
 
   const formatTimestamp = (timestamp: string) => {
@@ -306,7 +301,6 @@ export default function MapScreen() {
     if (diffHours < 24) return t('time.hoursAgo', { count: diffHours });
     return date.toLocaleDateString();
   };
-
   const getConfidenceText = (confidence: string) => {
     switch (confidence) {
       case 'exact': return t('map.confidence.exact');
@@ -319,7 +313,6 @@ export default function MapScreen() {
 
   const isLoading = locationLoading || dataLoading;
   const currentRadiusKm = radiusKm || 25;
-
   const locationDisplayText = useMemo(() => {
     if (viewMode === 'national') return '🇿🇦 South Africa';
     if (cityName) {
@@ -368,21 +361,22 @@ export default function MapScreen() {
             tracksViewChanges={false}
           >
             <View style={[styles.markerContainer, { backgroundColor: getMarkerColor(marker) }]}>
-              <Ionicons
-                name={
-                  marker.type === 'hazard'
-                    ? getHazardIcon(marker.category)
-                    : marker.type === 'tip'
-                    ? 'chatbubble'
-                    : getCategoryIcon(marker.category)
-                }
-                size={16}
-                color="#FFFFFF"
-              />
+              {marker.type === 'hazard' ? (
+                React.createElement(HAZARD_ICONS[marker.category] || HAZARD_ICONS.other, {
+                  width: 20,
+                  height: 20,
+                })
+              ) : (
+                <Ionicons
+                  name={marker.type === 'tip' ? 'chatbubble' : getCategoryIcon(marker.category)}
+                  size={16}
+                  color="#FFFFFF"
+                />
+              )}
             </View>
 
             {marker.type === 'hazard' ? (
-              <Callout tooltip>
+              <Callout tooltip onPress={() => {}}>
                 <View style={[styles.callout, { backgroundColor: colors.surface }]}>
                   <View style={[styles.typeBadge, { backgroundColor: '#FF6D00' }]}>
                     <Text style={styles.typeBadgeText}>⚠️ Hazard</Text>
@@ -405,20 +399,22 @@ export default function MapScreen() {
                   </View>
                   {/* Voting buttons */}
                   <View style={styles.voteRow}>
-                    <Pressable
+                    <TouchableOpacity
                       style={styles.voteButton}
                       onPress={() => handleVoteCleared(marker.id)}
+                      activeOpacity={0.7}
                     >
                       <Ionicons name="close-circle" size={18} color="#FF1744" />
                       <Text style={[styles.voteText, { color: '#FF1744' }]}>Cleared</Text>
-                    </Pressable>
-                    <Pressable
+                    </TouchableOpacity>
+                    <TouchableOpacity
                       style={styles.voteButton}
                       onPress={() => handleVoteStillThere(marker.id)}
+                      activeOpacity={0.7}
                     >
                       <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
                       <Text style={[styles.voteText, { color: '#4CAF50' }]}>Still there</Text>
-                    </Pressable>
+                    </TouchableOpacity>
                   </View>
                 </View>
               </Callout>
@@ -475,6 +471,8 @@ export default function MapScreen() {
           </Pressable>
         </View>
       )}
+
+      {toast && <ToastMessage message={toast} onHide={() => setToast(null)} />}
 
       <SafeAreaView style={[styles.topBar, { backgroundColor: colors.surface + 'F0' }]} edges={['top']}>
         <View style={styles.topBarContent}>
@@ -599,16 +597,8 @@ export default function MapScreen() {
         visible={hazardModalVisible}
         onClose={() => setHazardModalVisible(false)}
         onReported={() => {
-          fetchHazards().then((hazards) => {
-            if (hazards) setHazardMarkers(hazards.map((h: any) => ({
-              id: h.id, type: 'hazard' as const,
-              title: h.category.replace('_', ' ').toUpperCase(),
-              description: h.description, latitude: h.latitude, longitude: h.longitude,
-              category: h.category, severity: (h.severity as MapMarker['severity']) || 'medium',
-              timestamp: h.created_at, matchedLocation: h.location_name || 'Unknown',
-              confidence: 'exact' as const,
-            })));
-          });
+          loadHazards();
+          setToast("✅ Hazard reported — thank you!");
         }}
         currentLocation={userLat && userLng ? { latitude: userLat, longitude: userLng } : undefined}
       />
@@ -624,6 +614,8 @@ const styles = StyleSheet.create({
   errorBanner: { position: 'absolute', top: 100, left: Spacing.md, right: Spacing.md, padding: Spacing.md, borderRadius: BorderRadius.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 15 },
   errorText: { color: '#FFFFFF', fontSize: Typography.sizes.caption, flex: 1 },
   retryText: { color: '#FFFFFF', fontFamily: Typography.fonts.bold, marginLeft: Spacing.md },
+  toast: { position: 'absolute', top: 60, left: Spacing.lg, right: Spacing.lg, padding: Spacing.md, borderRadius: BorderRadius.md, zIndex: 100, alignItems: 'center' },
+  toastText: { color: '#FFFFFF', fontSize: Typography.sizes.body, fontFamily: Typography.fonts.bold },
   topBar: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm, zIndex: 10 },
   topBarContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   topBarLeft: { flex: 1 },
@@ -653,6 +645,7 @@ const styles = StyleSheet.create({
   legendDot: { width: 12, height: 12, borderRadius: 6 },
   legendText: { fontSize: Typography.sizes.tiny, fontFamily: Typography.fonts.regular },
   markerContainer: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#FFFFFF', ...Shadows.md },
+  markerImage: { width: 20, height: 20 },
   callout: { width: 250, padding: Spacing.md, borderRadius: BorderRadius.md, ...Shadows.lg },
   typeBadge: { alignSelf: 'flex-start', paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: BorderRadius.sm, marginBottom: Spacing.xs },
   typeBadgeText: { color: '#FFFFFF', fontSize: Typography.sizes.tiny, fontFamily: Typography.fonts.bold },
