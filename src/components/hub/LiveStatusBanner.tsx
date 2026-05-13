@@ -29,7 +29,6 @@ export function LiveStatusBanner({
   const { t } = useTranslation();
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Pulse animation for live indicator
   useEffect(() => {
     if (activeIncidents > 0 || breakingCount > 0) {
       const pulse = Animated.loop(
@@ -55,7 +54,6 @@ export function LiveStatusBanner({
 
   return (
     <View style={[styles.container, { backgroundColor: colors.surface }]}>
-      {/* Live Indicator */}
       <Animated.View
         style={[
           styles.liveIndicator,
@@ -66,57 +64,45 @@ export function LiveStatusBanner({
         ]}
       />
 
-      {/* Status Content */}
       <View style={styles.content}>
-        {/* Active Incidents */}
         <Pressable
           onPress={onViewIncidents}
-          style={({ pressed }) => [
-            styles.statusItem,
-            pressed && styles.pressed,
-          ]}
+          style={({ pressed }) => [styles.statusItem, pressed && styles.pressed]}
+          accessibilityRole="button"
+          accessibilityLabel="View active incidents"
         >
           <View style={[styles.iconContainer, { backgroundColor: colors.danger + '20' }]}>
             <Ionicons name="warning" size={16} color={colors.danger} />
           </View>
           <View style={styles.statusText}>
-            <Text style={[styles.statusCount, { color: colors.text }]}>
-              {activeIncidents}
-            </Text>
+            <Text style={[styles.statusCount, { color: colors.text }]}>{activeIncidents}</Text>
             <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>
               {t('alerts.activeIncidents')}
             </Text>
           </View>
         </Pressable>
 
-        {/* Divider */}
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-        {/* Breaking Stories */}
         <Pressable
           onPress={onViewBreaking}
-          style={({ pressed }) => [
-            styles.statusItem,
-            pressed && styles.pressed,
-          ]}
+          style={({ pressed }) => [styles.statusItem, pressed && styles.pressed]}
+          accessibilityRole="button"
+          accessibilityLabel="View breaking stories"
         >
           <View style={[styles.iconContainer, { backgroundColor: colors.warning + '20' }]}>
             <Ionicons name="flash" size={16} color={colors.warning} />
           </View>
           <View style={styles.statusText}>
-            <Text style={[styles.statusCount, { color: colors.text }]}>
-              {breakingCount}
-            </Text>
+            <Text style={[styles.statusCount, { color: colors.text }]}>{breakingCount}</Text>
             <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>
               {t('news.breaking')}
             </Text>
           </View>
         </Pressable>
 
-        {/* Divider */}
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-        {/* Live Badge */}
         <View style={styles.liveBadge}>
           <Animated.View
             style={[
@@ -157,6 +143,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
+    minHeight: 48,
   },
   pressed: {
     opacity: 0.7,

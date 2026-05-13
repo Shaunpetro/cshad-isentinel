@@ -12,7 +12,6 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Typography, Spacing, BorderRadius, Shadows } from '@/config/theme';
 
-// Extended type to include weather and infrastructure
 export type FeedItemType = 'news' | 'tip' | 'report' | 'official' | 'breaking' | 'weather' | 'infrastructure';
 
 export interface FeedItem {
@@ -54,7 +53,6 @@ interface FeedCardProps {
   onViewMap?: () => void;
 }
 
-// Icon config without labels (labels come from translations)
 const TYPE_ICONS: Record<FeedItemType, {
   icon: keyof typeof Ionicons.glyphMap;
   color: string;
@@ -85,7 +83,6 @@ export function FeedCard({
   const { colors } = useTheme();
   const { t } = useTranslation();
 
-  // Get translated type label
   const getTypeLabel = (type: FeedItemType, isBreaking?: boolean): string => {
     if (isBreaking) return t('news.breaking');
     switch (type) {
@@ -99,21 +96,17 @@ export function FeedCard({
     }
   };
 
-  // Determine the display type
   const displayType = item.isBreaking ? 'breaking' : item.type;
   const typeConfig = TYPE_ICONS[displayType] || TYPE_ICONS.news;
   const severityColor = item.severity ? SEVERITY_COLORS[item.severity] : undefined;
 
-  // Normalize source to object format
   const sourceObj = typeof item.source === 'string'
     ? { name: item.source, isVerified: item.isVerified }
     : item.source;
 
-  // Get location display string
   const locationDisplay = item.locationName ||
     (typeof item.location === 'string' ? item.location : undefined);
 
-  // Get description (support both summary and description)
   const descriptionText = item.summary || item.description;
 
   const formatNumber = (num?: number): string => {
@@ -137,7 +130,6 @@ export function FeedCard({
     return date.toLocaleDateString();
   };
 
-  // Get translated category name
   const getCategoryLabel = (category: string): string => {
     const key = `news.categories.${category.toLowerCase()}`;
     const translated = t(key);
@@ -152,15 +144,13 @@ export function FeedCard({
         { backgroundColor: colors.surface },
         pressed && styles.pressed,
       ]}
+      accessibilityRole="button"
     >
-      {/* Severity indicator bar */}
       {severityColor && (
         <View style={[styles.severityBar, { backgroundColor: severityColor }]} />
       )}
 
-      {/* Header */}
       <View style={styles.header}>
-        {/* Source info */}
         <View style={styles.sourceContainer}>
           {sourceObj.avatar ? (
             <Image source={{ uri: sourceObj.avatar }} style={styles.avatar} />
@@ -184,7 +174,6 @@ export function FeedCard({
           </View>
         </View>
 
-        {/* Type badge */}
         <View style={[styles.typeBadge, { backgroundColor: typeConfig.color + '20' }]}>
           <Ionicons name={typeConfig.icon} size={12} color={typeConfig.color} />
           <Text style={[styles.typeLabel, { color: typeConfig.color }]}>
@@ -193,9 +182,7 @@ export function FeedCard({
         </View>
       </View>
 
-      {/* Content */}
       <View style={styles.content}>
-        {/* Breaking indicator */}
         {item.isBreaking && (
           <View style={[styles.breakingBadge, { backgroundColor: colors.danger }]}>
             <Ionicons name="flash" size={12} color="#FFFFFF" />
@@ -213,7 +200,6 @@ export function FeedCard({
           </Text>
         )}
 
-        {/* Image */}
         {item.imageUrl && (
           <Image
             source={{ uri: item.imageUrl }}
@@ -222,7 +208,6 @@ export function FeedCard({
           />
         )}
 
-        {/* Location */}
         {locationDisplay && (
           <View style={styles.locationRow}>
             <Ionicons name="location" size={14} color={colors.primary} />
@@ -237,7 +222,6 @@ export function FeedCard({
           </View>
         )}
 
-        {/* Unverified warning for tips */}
         {item.type === 'tip' && !item.isVerified && (
           <View style={[styles.unverifiedBadge, { backgroundColor: colors.warning + '20' }]}>
             <Ionicons name="alert-circle" size={12} color={colors.warning} />
@@ -247,7 +231,6 @@ export function FeedCard({
           </View>
         )}
 
-        {/* Weather alert indicator */}
         {item.type === 'weather' && (
           <View style={[styles.unverifiedBadge, { backgroundColor: '#03A9F4' + '20' }]}>
             <Ionicons name="cloudy" size={12} color="#03A9F4" />
@@ -257,7 +240,6 @@ export function FeedCard({
           </View>
         )}
 
-        {/* Infrastructure alert indicator */}
         {item.type === 'infrastructure' && (
           <View style={[styles.unverifiedBadge, { backgroundColor: '#795548' + '20' }]}>
             <Ionicons name="construct" size={12} color="#795548" />
@@ -268,9 +250,7 @@ export function FeedCard({
         )}
       </View>
 
-      {/* Footer */}
       <View style={[styles.footer, { borderTopColor: colors.divider }]}>
-        {/* Stats */}
         <View style={styles.stats}>
           {item.stats?.views !== undefined && (
             <View style={styles.statItem}>
@@ -288,7 +268,6 @@ export function FeedCard({
               </Text>
             </View>
           )}
-          {/* Show category if no stats */}
           {!item.stats?.views && !item.stats?.comments && item.category && (
             <Text style={[styles.statText, { color: colors.textSecondary }]}>
               {getCategoryLabel(item.category)}
@@ -296,20 +275,31 @@ export function FeedCard({
           )}
         </View>
 
-        {/* Actions */}
         <View style={styles.actions}>
           {onViewMap && (
-            <Pressable onPress={onViewMap} style={styles.actionButton}>
+            <Pressable
+              onPress={onViewMap}
+              style={styles.actionButton}
+              accessibilityLabel="View on map"
+            >
               <Ionicons name="map-outline" size={18} color={colors.textSecondary} />
             </Pressable>
           )}
           {onShare && (
-            <Pressable onPress={onShare} style={styles.actionButton}>
+            <Pressable
+              onPress={onShare}
+              style={styles.actionButton}
+              accessibilityLabel="Share"
+            >
               <Ionicons name="share-outline" size={18} color={colors.textSecondary} />
             </Pressable>
           )}
           {onFollow && (
-            <Pressable onPress={onFollow} style={styles.actionButton}>
+            <Pressable
+              onPress={onFollow}
+              style={styles.actionButton}
+              accessibilityLabel="Follow story"
+            >
               <Ionicons name="notifications-outline" size={18} color={colors.textSecondary} />
             </Pressable>
           )}
@@ -481,6 +471,10 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     padding: Spacing.xs,
+    minWidth: 44,
+    minHeight: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

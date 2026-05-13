@@ -93,8 +93,8 @@ const lightColors: ThemeColors = {
   surface: Colors.carbon.white,
   card: Colors.carbon.white,
   text: Colors.carbon.black,
-  textSecondary: Colors.carbon.steel,
-  textDisabled: Colors.carbon.silver,
+  textSecondary: '#3A3A3A',          // darken slightly for better contrast
+  textDisabled: '#8A8A8A',           // keep silver for disabled
   textInverse: Colors.carbon.white,
   border: '#E0E0E0',
   divider: '#E8E8E8',
@@ -150,10 +150,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   // Listen for system theme changes
   useEffect(() => {
     const subscription = Appearance.addChangeListener(({ colorScheme }) => {
-      // Only matters if user has "system" selected
       const currentMode = getPreferences().appearance;
       if (currentMode === 'system') {
-        // Force re-render by updating state
         setModeState('system');
       }
     });
