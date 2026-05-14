@@ -22,12 +22,12 @@ import {
   PreferenceSelector,
   OptionPickerModal,
   PickerOption,
-  FeedbackModal,   // <-- new feedback modal
+  FeedbackModal,
 } from "@/components/settings";
 import { PrivacyModal } from "@/components/privacy";
 import { CityPickerModal } from "@/components/news";
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from "@/content/legal";
-import { scheduleTestNotification } from "@/services/notifications";
+import { sendRealPushNotification } from "@/services/notifications";
 import { usePreferences } from "@/hooks/usePreferences";
 import { useLanguage, LanguageCode } from "@/hooks/useLanguage";
 import { useTheme } from "@/contexts";
@@ -40,16 +40,9 @@ import {
 import { SACity } from "@/services/location";
 
 export default function SettingsScreen() {
-  // Theme context
   const { colors, mode: themeMode, setMode: setThemeMode } = useTheme();
-
-  // Translation
   const { t } = useTranslation();
-
-  // Language hook
   const { currentLanguage, currentLanguageLabel, changeLanguage, availableLanguages } = useLanguage();
-
-  // Preferences hook
   const {
     preferences,
     isLoading,
@@ -60,20 +53,17 @@ export default function SettingsScreen() {
     updateVibrationEnabled,
   } = usePreferences();
 
-  // Modal states
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
   const [termsModalVisible, setTermsModalVisible] = useState(false);
   const [privacyDashboardVisible, setPrivacyDashboardVisible] = useState(false);
-  const [feedbackModalVisible, setFeedbackModalVisible] = useState(false); // <-- feedback
-
-  // Picker modal states
+  const [feedbackModalVisible, setFeedbackModalVisible] = useState(false);
   const [appearancePickerVisible, setAppearancePickerVisible] = useState(false);
   const [languagePickerVisible, setLanguagePickerVisible] = useState(false);
   const [scopePickerVisible, setScopePickerVisible] = useState(false);
   const [radiusPickerVisible, setRadiusPickerVisible] = useState(false);
   const [cityPickerVisible, setCityPickerVisible] = useState(false);
+  const [sendingTest, setSendingTest] = useState(false);
 
-  // ---- Option Definitions (with translations) ----
   const APPEARANCE_OPTIONS: PickerOption<AppearanceMode>[] = [
     { value: 'dark', label: t('settings.dark'), subtitle: t('settings.appearanceSubtitle'), icon: 'moon' },
     { value: 'light', label: t('settings.light'), subtitle: t('settings.appearanceSubtitle'), icon: 'sunny' },
@@ -101,13 +91,11 @@ export default function SettingsScreen() {
     { value: 100, label: '100 km', subtitle: t('news.national') },
   ];
 
-  // Handle email support (direct fallback)
   const handleEmailSupport = async () => {
     const email = "petrographics.adm@gmail.com";
     const subject = encodeURIComponent("CSHAD iSentinel Support");
     const body = encodeURIComponent(`\n\n---\nApp Version: ${APP.version}\nPlatform: ${Platform.OS}`);
     const url = `mailto:${email}?subject=${subject}&body=${body}`;
-
     try {
       const supported = await Linking.canOpenURL(url);
       if (supported) {
@@ -120,7 +108,6 @@ export default function SettingsScreen() {
     }
   };
 
-  // Handle rate app
   const handleRateApp = () => {
     Alert.alert(
       t('settings.rateApp'),
@@ -129,7 +116,6 @@ export default function SettingsScreen() {
     );
   };
 
-  // Handle share app
   const handleShareApp = async () => {
     try {
       await Share.share({
@@ -137,26 +123,35 @@ export default function SettingsScreen() {
         message:
           "Check out CSHAD iSentinel News - A privacy-first community safety app for South Africa. Download it now!",
       });
-    } catch (error) {
-      // User cancelled or error
-    }
+    } catch (error) {}
   };
 
-  // Handle test notification – uses local notification (no Firebase required)
+  // Real remote push notification (Firebase‑backed)
   const handleTestNotification = async () => {
+    if (sendingTest) return;
+    setSendingTest(true);
     try {
-      await scheduleTestNotification();
-      Alert.alert(
-        t('settings.testNotification'),
-        "A test notification will appear in 2 seconds!",
-        [{ text: t('common.ok') }]
-      );
+      const result = await sendRealPushNotification();
+      if (result.success) {
+        Alert.alert(
+          t('settings.testNotification'),
+          "Real push notification sent! Check your notification tray.",
+          [{ text: t('common.ok') }]
+        );
+      } else {
+        Alert.alert(
+          t('common.error'),
+          result.error || "Could not send push notification. Are you on a physical device?",
+          [{ text: t('common.ok') }]
+        );
+      }
     } catch (error) {
-      Alert.alert(t('common.error'), "Could not schedule notification");
+      Alert.alert(t('common.error'), "An unexpected error occurred.");
+    } finally {
+      setSendingTest(false);
     }
   };
 
-  // Handle city selection
   const handleCitySelect = (city: SACity) => {
     const homeLocation: HomeLocation = {
       id: city.id,
@@ -169,13 +164,11 @@ export default function SettingsScreen() {
     setCityPickerVisible(false);
   };
 
-  // Handle appearance change (uses theme context)
   const handleAppearanceChange = async (newMode: AppearanceMode) => {
     await setThemeMode(newMode);
     setAppearancePickerVisible(false);
   };
 
-  // Handle language change
   const handleLanguageChange = async (newLanguage: LanguageCode) => {
     try {
       await changeLanguage(newLanguage);
@@ -185,7 +178,6 @@ export default function SettingsScreen() {
     }
   };
 
-  // Get display values
   const getAppearanceLabel = () => {
     switch (themeMode) {
       case 'dark': return t('settings.dark');
@@ -204,32 +196,20 @@ export default function SettingsScreen() {
     }
   };
 
-  const getRadiusLabel = () => {
-    return `${preferences.newsRadius} km`;
-  };
+  const getRadiusLabel = () => `${preferences.newsRadius} km`;
+  const getHomeLocationLabel = () => preferences.homeLocation?.name || t('common.unknown');
 
-  const getHomeLocationLabel = () => {
-    return preferences.homeLocation?.name || t('common.unknown');
-  };
-
-  // Loading state
   if (isLoading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-          {t('common.loading')}
-        </Text>
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('common.loading')}</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={styles.content}
-    >
-      {/* Header */}
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
       <View style={[styles.header, { backgroundColor: colors.surface }]}>
         <Text style={[styles.title, { color: colors.text }]}>{t('settings.title')}</Text>
       </View>
@@ -237,336 +217,105 @@ export default function SettingsScreen() {
       {/* Display Preferences */}
       <View style={[styles.section, { backgroundColor: colors.surface }]}>
         <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>{t('settings.display')}</Text>
-        <PreferenceSelector
-          icon="moon-outline"
-          iconColor={colors.info}
-          title={t('settings.appearance')}
-          subtitle={t('settings.appearanceSubtitle')}
-          value={getAppearanceLabel()}
-          onPress={() => setAppearancePickerVisible(true)}
-        />
+        <PreferenceSelector icon="moon-outline" iconColor={colors.info} title={t('settings.appearance')} subtitle={t('settings.appearanceSubtitle')} value={getAppearanceLabel()} onPress={() => setAppearancePickerVisible(true)} />
         <View style={[styles.itemDivider, { backgroundColor: colors.divider }]} />
-        <PreferenceSelector
-          icon="language-outline"
-          iconColor={colors.warning}
-          title={t('settings.language')}
-          subtitle={t('settings.languageSubtitle')}
-          value={currentLanguageLabel}
-          onPress={() => setLanguagePickerVisible(true)}
-        />
+        <PreferenceSelector icon="language-outline" iconColor={colors.warning} title={t('settings.language')} subtitle={t('settings.languageSubtitle')} value={currentLanguageLabel} onPress={() => setLanguagePickerVisible(true)} />
       </View>
 
       {/* Location & News Preferences */}
       <View style={[styles.section, { backgroundColor: colors.surface }]}>
         <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>{t('settings.newsFeed')}</Text>
-        <PreferenceSelector
-          icon="home-outline"
-          iconColor={colors.primary}
-          title={t('settings.homeLocation')}
-          subtitle={t('settings.homeLocationSubtitle')}
-          value={getHomeLocationLabel()}
-          onPress={() => setCityPickerVisible(true)}
-        />
+        <PreferenceSelector icon="home-outline" iconColor={colors.primary} title={t('settings.homeLocation')} subtitle={t('settings.homeLocationSubtitle')} value={getHomeLocationLabel()} onPress={() => setCityPickerVisible(true)} />
         <View style={[styles.itemDivider, { backgroundColor: colors.divider }]} />
-        <PreferenceSelector
-          icon="radio-outline"
-          iconColor={colors.warning}
-          title={t('settings.newsRadius')}
-          subtitle={t('settings.newsRadiusSubtitle')}
-          value={getRadiusLabel()}
-          onPress={() => setRadiusPickerVisible(true)}
-        />
+        <PreferenceSelector icon="radio-outline" iconColor={colors.warning} title={t('settings.newsRadius')} subtitle={t('settings.newsRadiusSubtitle')} value={getRadiusLabel()} onPress={() => setRadiusPickerVisible(true)} />
         <View style={[styles.itemDivider, { backgroundColor: colors.divider }]} />
-        <PreferenceSelector
-          icon="globe-outline"
-          iconColor={colors.success}
-          title={t('settings.defaultScope')}
-          subtitle={t('settings.defaultScopeSubtitle')}
-          value={getScopeLabel()}
-          onPress={() => setScopePickerVisible(true)}
-        />
+        <PreferenceSelector icon="globe-outline" iconColor={colors.success} title={t('settings.defaultScope')} subtitle={t('settings.defaultScopeSubtitle')} value={getScopeLabel()} onPress={() => setScopePickerVisible(true)} />
       </View>
 
       {/* Feedback Preferences */}
       <View style={[styles.section, { backgroundColor: colors.surface }]}>
         <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>{t('settings.feedback')}</Text>
-        <PreferenceToggle
-          icon="volume-high-outline"
-          iconColor="#FF6B6B"
-          title={t('settings.soundEffects')}
-          subtitle={t('settings.soundEffectsSubtitle')}
-          value={preferences.soundEnabled}
-          onValueChange={updateSoundEnabled}
-        />
+        <PreferenceToggle icon="volume-high-outline" iconColor="#FF6B6B" title={t('settings.soundEffects')} subtitle={t('settings.soundEffectsSubtitle')} value={preferences.soundEnabled} onValueChange={updateSoundEnabled} />
         <View style={[styles.itemDivider, { backgroundColor: colors.divider }]} />
-        <PreferenceToggle
-          icon="phone-portrait-outline"
-          iconColor="#9B59B6"
-          title={t('settings.vibration')}
-          subtitle={t('settings.vibrationSubtitle')}
-          value={preferences.vibrationEnabled}
-          onValueChange={updateVibrationEnabled}
-        />
+        <PreferenceToggle icon="phone-portrait-outline" iconColor="#9B59B6" title={t('settings.vibration')} subtitle={t('settings.vibrationSubtitle')} value={preferences.vibrationEnabled} onValueChange={updateVibrationEnabled} />
       </View>
 
       {/* Notifications */}
       <View style={[styles.section, { backgroundColor: colors.surface }]}>
         <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>{t('settings.notifications')}</Text>
-        <SettingsItem
-          icon="notifications-outline"
-          iconColor={colors.info}
-          title={t('settings.pushNotifications')}
-          subtitle={t('settings.pushNotificationsSubtitle')}
-          showArrow={false}
-        />
+        <SettingsItem icon="notifications-outline" iconColor={colors.info} title={t('settings.pushNotifications')} subtitle={t('settings.pushNotificationsSubtitle')} showArrow={false} />
         <View style={[styles.itemDivider, { backgroundColor: colors.divider }]} />
-        <SettingsItem
-          icon="paper-plane-outline"
-          iconColor={colors.warning}
-          title={t('settings.testNotification')}
-          subtitle={t('settings.testNotificationSubtitle')}
-          onPress={handleTestNotification}
-        />
+        <SettingsItem icon="paper-plane-outline" iconColor={colors.warning} title={t('settings.testNotification')} subtitle={sendingTest ? "Sending..." : t('settings.testNotificationSubtitle')} onPress={handleTestNotification} />
       </View>
 
       {/* Privacy */}
       <View style={[styles.section, { backgroundColor: colors.surface }]}>
         <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>{t('settings.privacy')}</Text>
-        <SettingsItem
-          icon="shield-checkmark-outline"
-          iconColor={colors.success}
-          title={t('settings.privacyDashboard')}
-          subtitle={t('settings.privacyDashboardSubtitle')}
-          onPress={() => setPrivacyDashboardVisible(true)}
-        />
+        <SettingsItem icon="shield-checkmark-outline" iconColor={colors.success} title={t('settings.privacyDashboard')} subtitle={t('settings.privacyDashboardSubtitle')} onPress={() => setPrivacyDashboardVisible(true)} />
       </View>
 
       {/* Help & Support */}
       <View style={[styles.section, { backgroundColor: colors.surface }]}>
         <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>{t('settings.helpSupport')}</Text>
-        <SettingsItem
-          icon="chatbubble-ellipses-outline"
-          iconColor={colors.primary}
-          title="Send Feedback"
-          subtitle="Report a bug or suggest a feature"
-          onPress={() => setFeedbackModalVisible(true)}   // <-- opens new feedback modal
-        />
+        <SettingsItem icon="chatbubble-ellipses-outline" iconColor={colors.primary} title="Send Feedback" subtitle="Report a bug or suggest a feature" onPress={() => setFeedbackModalVisible(true)} />
         <View style={[styles.itemDivider, { backgroundColor: colors.divider }]} />
-        <SettingsItem
-          icon="mail-outline"
-          iconColor={colors.primary}
-          title={t('settings.contactSupport')}
-          subtitle="petrographics.adm@gmail.com"
-          onPress={handleEmailSupport}
-        />
+        <SettingsItem icon="mail-outline" iconColor={colors.primary} title={t('settings.contactSupport')} subtitle="petrographics.adm@gmail.com" onPress={handleEmailSupport} />
         <View style={[styles.itemDivider, { backgroundColor: colors.divider }]} />
-        <SettingsItem
-          icon="star-outline"
-          iconColor="#FFD700"
-          title={t('settings.rateApp')}
-          subtitle={t('settings.rateAppSubtitle')}
-          onPress={handleRateApp}
-        />
+        <SettingsItem icon="star-outline" iconColor="#FFD700" title={t('settings.rateApp')} subtitle={t('settings.rateAppSubtitle')} onPress={handleRateApp} />
         <View style={[styles.itemDivider, { backgroundColor: colors.divider }]} />
-        <SettingsItem
-          icon="share-social-outline"
-          iconColor={colors.info}
-          title={t('settings.shareApp')}
-          subtitle={t('settings.shareAppSubtitle')}
-          onPress={handleShareApp}
-        />
+        <SettingsItem icon="share-social-outline" iconColor={colors.info} title={t('settings.shareApp')} subtitle={t('settings.shareAppSubtitle')} onPress={handleShareApp} />
       </View>
 
       {/* Legal */}
       <View style={[styles.section, { backgroundColor: colors.surface }]}>
         <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>{t('settings.legal')}</Text>
-        <SettingsItem
-          icon="document-text-outline"
-          title={t('settings.privacyPolicy')}
-          onPress={() => setPrivacyModalVisible(true)}
-        />
+        <SettingsItem icon="document-text-outline" title={t('settings.privacyPolicy')} onPress={() => setPrivacyModalVisible(true)} />
         <View style={[styles.itemDivider, { backgroundColor: colors.divider }]} />
-        <SettingsItem
-          icon="reader-outline"
-          title={t('settings.termsOfService')}
-          onPress={() => setTermsModalVisible(true)}
-        />
+        <SettingsItem icon="reader-outline" title={t('settings.termsOfService')} onPress={() => setTermsModalVisible(true)} />
       </View>
 
-      {/* About / Developer Credits */}
+      {/* About */}
       <View style={[styles.section, { backgroundColor: colors.surface }]}>
         <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>{t('settings.about')}</Text>
-        <View style={styles.creditsContainer}>
-          <DeveloperCredits />
-        </View>
+        <View style={styles.creditsContainer}><DeveloperCredits /></View>
       </View>
 
-      {/* Version Info */}
       <View style={styles.versionContainer}>
-        <Text style={[styles.versionText, { color: colors.textSecondary }]}>
-          {t('settings.version')} {APP.version}
-        </Text>
+        <Text style={[styles.versionText, { color: colors.textSecondary }]}>{t('settings.version')} {APP.version}</Text>
       </View>
-
-      {/* Copyright Footer */}
       <View style={styles.footer}>
-        <Text style={[styles.copyright, { color: colors.textSecondary }]}>
-          ATG © 2026 CSHAD iSentinel
-        </Text>
-        <Text style={[styles.rights, { color: colors.textDisabled }]}>
-          All Rights Reserved
-        </Text>
+        <Text style={[styles.copyright, { color: colors.textSecondary }]}>ATG © 2026 CSHAD iSentinel</Text>
+        <Text style={[styles.rights, { color: colors.textDisabled }]}>All Rights Reserved</Text>
       </View>
 
-      {/* ---- MODALS ---- */}
-
-      {/* Legal Modals */}
-      <LegalModal
-        visible={privacyModalVisible}
-        onClose={() => setPrivacyModalVisible(false)}
-        title={t('settings.privacyPolicy')}
-        lastUpdated={PRIVACY_POLICY.lastUpdated}
-        content={PRIVACY_POLICY.content}
-      />
-
-      <LegalModal
-        visible={termsModalVisible}
-        onClose={() => setTermsModalVisible(false)}
-        title={t('settings.termsOfService')}
-        lastUpdated={TERMS_OF_SERVICE.lastUpdated}
-        content={TERMS_OF_SERVICE.content}
-      />
-
-      {/* Privacy Dashboard Modal */}
-      <PrivacyModal
-        visible={privacyDashboardVisible}
-        onClose={() => setPrivacyDashboardVisible(false)}
-      />
-
-      {/* Feedback Modal (new) */}
-      <FeedbackModal
-        visible={feedbackModalVisible}
-        onClose={() => setFeedbackModalVisible(false)}
-      />
-
-      {/* Appearance Picker */}
-      <OptionPickerModal
-        visible={appearancePickerVisible}
-        onClose={() => setAppearancePickerVisible(false)}
-        title={t('settings.appearance')}
-        options={APPEARANCE_OPTIONS}
-        selectedValue={themeMode}
-        onSelect={handleAppearanceChange}
-      />
-
-      {/* Language Picker */}
-      <OptionPickerModal
-        visible={languagePickerVisible}
-        onClose={() => setLanguagePickerVisible(false)}
-        title={t('settings.language')}
-        options={LANGUAGE_PICKER_OPTIONS}
-        selectedValue={currentLanguage}
-        onSelect={handleLanguageChange}
-      />
-
-      {/* Scope Picker */}
-      <OptionPickerModal
-        visible={scopePickerVisible}
-        onClose={() => setScopePickerVisible(false)}
-        title={t('settings.defaultScope')}
-        options={SCOPE_OPTIONS}
-        selectedValue={preferences.defaultScope}
-        onSelect={updateDefaultScope}
-      />
-
-      {/* Radius Picker */}
-      <OptionPickerModal
-        visible={radiusPickerVisible}
-        onClose={() => setRadiusPickerVisible(false)}
-        title={t('settings.newsRadius')}
-        options={RADIUS_OPTIONS}
-        selectedValue={preferences.newsRadius}
-        onSelect={updateNewsRadius}
-      />
-
-      {/* City Picker */}
-      <CityPickerModal
-        visible={cityPickerVisible}
-        onClose={() => setCityPickerVisible(false)}
-        onSelectCity={handleCitySelect}
-        currentCityId={preferences.homeLocation?.id ?? ''}
-      />
+      {/* Modals */}
+      <LegalModal visible={privacyModalVisible} onClose={() => setPrivacyModalVisible(false)} title={t('settings.privacyPolicy')} lastUpdated={PRIVACY_POLICY.lastUpdated} content={PRIVACY_POLICY.content} />
+      <LegalModal visible={termsModalVisible} onClose={() => setTermsModalVisible(false)} title={t('settings.termsOfService')} lastUpdated={TERMS_OF_SERVICE.lastUpdated} content={TERMS_OF_SERVICE.content} />
+      <PrivacyModal visible={privacyDashboardVisible} onClose={() => setPrivacyDashboardVisible(false)} />
+      <FeedbackModal visible={feedbackModalVisible} onClose={() => setFeedbackModalVisible(false)} />
+      <OptionPickerModal visible={appearancePickerVisible} onClose={() => setAppearancePickerVisible(false)} title={t('settings.appearance')} options={APPEARANCE_OPTIONS} selectedValue={themeMode} onSelect={handleAppearanceChange} />
+      <OptionPickerModal visible={languagePickerVisible} onClose={() => setLanguagePickerVisible(false)} title={t('settings.language')} options={LANGUAGE_PICKER_OPTIONS} selectedValue={currentLanguage} onSelect={handleLanguageChange} />
+      <OptionPickerModal visible={scopePickerVisible} onClose={() => setScopePickerVisible(false)} title={t('settings.defaultScope')} options={SCOPE_OPTIONS} selectedValue={preferences.defaultScope} onSelect={updateDefaultScope} />
+      <OptionPickerModal visible={radiusPickerVisible} onClose={() => setRadiusPickerVisible(false)} title={t('settings.newsRadius')} options={RADIUS_OPTIONS} selectedValue={preferences.newsRadius} onSelect={updateNewsRadius} />
+      <CityPickerModal visible={cityPickerVisible} onClose={() => setCityPickerVisible(false)} onSelectCity={handleCitySelect} currentCityId={preferences.homeLocation?.id ?? ''} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    paddingBottom: Spacing.xxl,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: Typography.sizes.body,
-    fontFamily: Typography.fonts.regular,
-    marginTop: Spacing.md,
-  },
-  header: {
-    paddingTop: 60,
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
-  },
-  title: {
-    fontSize: Typography.sizes.title,
-    fontFamily: Typography.fonts.bold,
-  },
-  section: {
-    marginTop: Spacing.lg,
-    marginHorizontal: Spacing.md,
-    borderRadius: 12,
-    overflow: "hidden",
-  },
-  sectionHeader: {
-    fontSize: Typography.sizes.label,
-    fontFamily: Typography.fonts.medium,
-    letterSpacing: 1,
-    paddingHorizontal: Spacing.md,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.xs,
-  },
-  itemDivider: {
-    height: 1,
-    marginLeft: 60,
-  },
-  creditsContainer: {
-    paddingBottom: Spacing.md,
-  },
-  versionContainer: {
-    alignItems: "center",
-    marginTop: Spacing.lg,
-  },
-  versionText: {
-    fontSize: Typography.sizes.caption,
-    fontFamily: Typography.fonts.mono,
-  },
-  footer: {
-    alignItems: "center",
-    marginTop: Spacing.md,
-    marginBottom: Spacing.xl,
-  },
-  copyright: {
-    fontSize: Typography.sizes.caption,
-    fontFamily: Typography.fonts.medium,
-  },
-  rights: {
-    fontSize: Typography.sizes.label,
-    fontFamily: Typography.fonts.regular,
-    marginTop: Spacing.xs,
-  },
+  container: { flex: 1 },
+  content: { paddingBottom: Spacing.xxl },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { fontSize: Typography.sizes.body, fontFamily: Typography.fonts.regular, marginTop: Spacing.md },
+  header: { paddingTop: 60, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md },
+  title: { fontSize: Typography.sizes.title, fontFamily: Typography.fonts.bold },
+  section: { marginTop: Spacing.lg, marginHorizontal: Spacing.md, borderRadius: 12, overflow: "hidden" },
+  sectionHeader: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.medium, letterSpacing: 1, paddingHorizontal: Spacing.md, paddingTop: Spacing.md, paddingBottom: Spacing.xs },
+  itemDivider: { height: 1, marginLeft: 60 },
+  creditsContainer: { paddingBottom: Spacing.md },
+  versionContainer: { alignItems: "center", marginTop: Spacing.lg },
+  versionText: { fontSize: Typography.sizes.caption, fontFamily: Typography.fonts.mono },
+  footer: { alignItems: "center", marginTop: Spacing.md, marginBottom: Spacing.xl },
+  copyright: { fontSize: Typography.sizes.caption, fontFamily: Typography.fonts.medium },
+  rights: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.regular, marginTop: Spacing.xs },
 });

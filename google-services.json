@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "431977906811",
+    "project_id": "cshad-news",
+    "storage_bucket": "cshad-news.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:431977906811:android:8355e3def650830c3b18de",
+        "android_client_info": {
+          "package_name": "cshad.isentinel.news"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD06pezXc9xnOHr0g_ROEC5UcsvRG4fhgE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
