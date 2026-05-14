@@ -71,6 +71,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     typedRoutes: true,
   },
 
+  updates: {
+    url: "https://u.expo.dev/41d9d284-b014-48ab-9238-fe2c0724fd98",
+    fallbackToCacheTimeout: 0,
+  },
+
   extra: {
     buildPhase: "002",
     phaseMonth: "March 2026",

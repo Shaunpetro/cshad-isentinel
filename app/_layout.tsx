@@ -1,8 +1,9 @@
 // app/_layout.tsx
-import React from "react";
+import React, { useEffect } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { View, StyleSheet } from "react-native";
+import * as Updates from 'expo-updates';
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { useAppReady } from "@/hooks/useAppReady";
@@ -14,6 +15,24 @@ function RootLayoutInner() {
   const { isReady, showCustomSplash, onLayoutReady, onSplashComplete } = useAppReady();
   const { colors } = useTheme();
   const { isInitialized: notificationsReady, error: notificationError } = useNotifications();
+
+  // Check for OTA updates (only in production/preview, not in dev)
+  useEffect(() => {
+    if (!__DEV__) {
+      async function checkForUpdate() {
+        try {
+          const update = await Updates.checkForUpdateAsync();
+          if (update.isAvailable) {
+            await Updates.fetchUpdateAsync();
+            // Apply the update on next restart — no prompt needed
+          }
+        } catch (e) {
+          // Silently ignore – update will be picked up next time
+        }
+      }
+      checkForUpdate();
+    }
+  }, []);
 
   React.useEffect(() => {
     if (notificationsReady) {
