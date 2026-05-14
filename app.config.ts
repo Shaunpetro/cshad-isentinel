@@ -5,6 +5,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: "CSHAD iSentinel News",
   slug: "cshad-isentinel-news",
   version: "1.263.4",
+  runtimeVersion: {
+    policy: "appVersion",
+  },
   orientation: "portrait",
   icon: "./assets/brand/cshad-isentinel-logo-icon.png",
   scheme: "cshad-isentinel",
