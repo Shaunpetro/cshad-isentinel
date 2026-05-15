@@ -19,7 +19,7 @@ jobs:
       - run: npm ci
       - run: npm run test:ci -- --passWithNoTests
 
-  # ── 2. Build release APK locally (daemon disabled) ──
+  # ── 2. Trigger EAS cloud build + download APK (only on version tags) ──
   build-release:
     needs: jest-tests
     if: startsWith(github.ref, 'refs/tags/v')
@@ -29,35 +29,48 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-      - name: Setup Expo & EAS
-        uses: expo/expo-github-action@v8
-        with:
-          expo-version: latest
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
       - run: npm ci
-      - name: Clean Gradle daemons and cache
-        run: |
-          rm -rf ~/.gradle/daemon ~/.gradle/caches 2>/dev/null
-          rm -rf ./android/.gradle 2>/dev/null
-      - name: Build Android APK locally
+
+      - name: Start EAS build
+        id: start
         env:
-          EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.GOOGLE_MAPS_API_KEY }}
-          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
-          EXPO_PUBLIC_SUPABASE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_KEY }}
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          eas build --local \
+          BUILD_ID=$(npx eas-cli build \
             --platform android \
             --profile preview \
             --non-interactive \
-            --output=./app-release.apk
+            --json \
+            --wait | tee /dev/stderr | jq -r '.id')
+          echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT
+
+      - name: Wait for build and download APK
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          BUILD_ID: ${{ steps.start.outputs.build_id }}
+        run: |
+          # Poll until the build is finished
+          while true; do
+            STATUS=$(curl -s -H "Authorization: Bearer $EXPO_TOKEN" \
+              "https://expo.dev/api/v2/projects/41d9d284-b014-48ab-9238-fe2c0724fd98/builds/$BUILD_ID" \
+              | jq -r '.status')
+            echo "Build status: $STATUS"
+            if [ "$STATUS" = "finished" ]; then
+              break
+            elif [ "$STATUS" = "errored" ] || [ "$STATUS" = "cancelled" ]; then
+              echo "Build failed with status $STATUS"
+              exit 1
+            fi
+            sleep 15
+          done
+
+          # Get the artifact URL
+          APK_URL=$(curl -s -H "Authorization: Bearer $EXPO_TOKEN" \
+            "https://expo.dev/api/v2/projects/41d9d284-b014-48ab-9238-fe2c0724fd98/builds/$BUILD_ID" \
+            | jq -r '.artifacts.buildUrl')
+          echo "Downloading APK from $APK_URL"
+          curl -L -o app-release.apk "$APK_URL"
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
