@@ -41,9 +41,6 @@ jobs:
             --non-interactive \
             --json \
             --wait \
-            --env "EXPO_PUBLIC_SUPABASE_URL=${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}" \
-            --env "EXPO_PUBLIC_SUPABASE_KEY=${{ secrets.EXPO_PUBLIC_SUPABASE_KEY }}" \
-            --env "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}" \
             > build.json
 
       - name: Extract APK URL from build result
@@ -54,7 +51,6 @@ jobs:
 
       - name: Download APK
         run: |
-          echo "Downloading APK from ${{ steps.extract.outputs.apk_url }}"
           curl -L -o app-release.apk "${{ steps.extract.outputs.apk_url }}"
 
       - name: Upload APK artifact
