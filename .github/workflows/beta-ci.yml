@@ -31,45 +31,27 @@ jobs:
           node-version: 20
       - run: npm ci
 
-      - name: Start EAS build
-        id: start
+      - name: Start EAS build (wait for finish)
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          BUILD_ID=$(npx eas-cli build \
+          npx eas-cli build \
             --platform android \
             --profile preview \
             --non-interactive \
             --json \
-            --wait | tee /dev/stderr | jq -r '.[0].id')
-          echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT
+            --wait > build.json
 
-      - name: Wait for build and download APK
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-          BUILD_ID: ${{ steps.start.outputs.build_id }}
+      - name: Extract APK URL from build result
+        id: extract
         run: |
-          # Poll until the build is finished
-          while true; do
-            STATUS=$(curl -s -H "Authorization: Bearer $EXPO_TOKEN" \
-              "https://expo.dev/api/v2/projects/41d9d284-b014-48ab-9238-fe2c0724fd98/builds/$BUILD_ID" \
-              | jq -r '.status')
-            echo "Build status: $STATUS"
-            if [ "$STATUS" = "finished" ]; then
-              break
-            elif [ "$STATUS" = "errored" ] || [ "$STATUS" = "cancelled" ]; then
-              echo "Build failed with status $STATUS"
-              exit 1
-            fi
-            sleep 15
-          done
+          APK_URL=$(jq -r '.[0].artifacts.buildUrl' build.json)
+          echo "apk_url=$APK_URL" >> $GITHUB_OUTPUT
 
-          # Get the artifact URL
-          APK_URL=$(curl -s -H "Authorization: Bearer $EXPO_TOKEN" \
-            "https://expo.dev/api/v2/projects/41d9d284-b014-48ab-9238-fe2c0724fd98/builds/$BUILD_ID" \
-            | jq -r '.artifacts.buildUrl')
-          echo "Downloading APK from $APK_URL"
-          curl -L -o app-release.apk "$APK_URL"
+      - name: Download APK
+        run: |
+          echo "Downloading APK from ${{ steps.extract.outputs.apk_url }}"
+          curl -L -o app-release.apk "${{ steps.extract.outputs.apk_url }}"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
