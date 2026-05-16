@@ -1,39 +1,67 @@
 // app/_layout.tsx
-import React, { useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { View, StyleSheet } from "react-native";
-import * as Updates from 'expo-updates';
+import { View, StyleSheet, Alert } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Updates from "expo-updates";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { useAppReady } from "@/hooks/useAppReady";
 import { CustomSplashScreen } from "@/components/core/SplashScreen";
+import { OnboardingScreen } from "@/components/core/OnboardingScreen";
 import { useNotifications } from "@/hooks/useNotifications";
 import { ThemeProvider, useTheme } from "@/contexts";
 
-function RootLayoutInner() {
-  const { isReady, showCustomSplash, onLayoutReady, onSplashComplete } = useAppReady();
-  const { colors } = useTheme();
-  const { isInitialized: notificationsReady, error: notificationError } = useNotifications();
+const ONBOARDING_COMPLETED_KEY = "pshad_onboarding_completed";
 
-  // Check for OTA updates (only in production/preview, not in dev)
+function RootLayoutInner() {
+  const { isReady, showCustomSplash, onLayoutReady, onSplashComplete } =
+    useAppReady();
+  const { colors } = useTheme();
+  const { isInitialized: notificationsReady, error: notificationError } =
+    useNotifications();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+
+  // Check onboarding status after splash
   useEffect(() => {
-    if (!__DEV__) {
+    if (isReady && !showCustomSplash) {
+      AsyncStorage.getItem(ONBOARDING_COMPLETED_KEY).then((value) => {
+        if (value !== "true") {
+          setShowOnboarding(true);
+        }
+        setOnboardingChecked(true);
+      });
+    }
+  }, [isReady, showCustomSplash]);
+
+  // OTA update check
+  useEffect(() => {
+    if (!__DEV__ && isReady) {
       async function checkForUpdate() {
         try {
           const update = await Updates.checkForUpdateAsync();
           if (update.isAvailable) {
             await Updates.fetchUpdateAsync();
-            // Apply the update on next restart — no prompt needed
+            Alert.alert(
+              "Update Ready",
+              "A new version is available. Restart now?",
+              [
+                { text: "Later", style: "cancel" },
+                { text: "Restart", onPress: () => Updates.reloadAsync() },
+              ]
+            );
           }
         } catch (e) {
-          // Silently ignore – update will be picked up next time
+          // Silently ignore
         }
       }
       checkForUpdate();
     }
-  }, []);
+  }, [isReady]);
 
+  // Notification setup logs
   React.useEffect(() => {
     if (notificationsReady) {
       if (notificationError) {
@@ -44,18 +72,32 @@ function RootLayoutInner() {
     }
   }, [notificationsReady, notificationError]);
 
-  if (!isReady) {
+  if (!isReady || !onboardingChecked) {
     return null;
   }
 
+  const handleOnboardingComplete = async () => {
+    await AsyncStorage.setItem(ONBOARDING_COMPLETED_KEY, "true");
+    setShowOnboarding(false);
+  };
+
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]} onLayout={onLayoutReady}>
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
+    <View
+      style={[styles.root, { backgroundColor: colors.background }]}
+      onLayout={onLayoutReady}
+    >
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />
       </Stack>
 
       {showCustomSplash && <CustomSplashScreen onComplete={onSplashComplete} />}
+      {showOnboarding && <OnboardingScreen onComplete={handleOnboardingComplete} />}
 
       <StatusBar style={colors.statusBar} />
     </View>
