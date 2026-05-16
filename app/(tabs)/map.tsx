@@ -1,7 +1,12 @@
 ﻿// app/(tabs)/map.tsx
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
-  View, Text, Pressable, StyleSheet, ActivityIndicator, TouchableOpacity,
+  View,
+  Text,
+  Pressable,
+  StyleSheet,
+  ActivityIndicator,
+  TouchableOpacity,
 } from "react-native";
 import MapView, { Marker, Callout, Circle } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -30,7 +35,6 @@ import RoadClosureIcon from '@assets/hazard-icons/road-closure.svg';
 import AccidentIcon from '@assets/hazard-icons/accident.svg';
 import OtherIcon from '@assets/hazard-icons/other.svg';
 
-// Map category to SVG component
 const HAZARD_ICONS: Record<string, React.FC<{ width: number; height: number }>> = {
   pothole: PotholeIcon,
   burst_pipe: BurstPipeIcon,
@@ -113,16 +117,25 @@ const findMatchingMajorCity = (
   return null;
 };
 
-function ToastMessage({ message, onHide }: { message: string; onHide: () => void }) {
-  const { colors } = useTheme();
-  useEffect(() => {
-    const timer = setTimeout(onHide, 2000);
-    return () => clearTimeout(timer);
-  }, [onHide]);
-
+// Voting confirmation modal
+function VoteModal({ type, visible, onHide }: { type: 'cleared' | 'still-there' | null; visible: boolean; onHide: () => void }) {
+  if (!visible || !type) return null;
+  const isCleared = type === 'cleared';
   return (
-    <View style={[styles.toast, { backgroundColor: '#4CAF50' }]}>
-      <Text style={styles.toastText}>{message}</Text>
+    <View style={styles.voteModalContainer}>
+      <View style={[styles.voteModal, { backgroundColor: isCleared ? '#4CAF50' : '#2196F3' }]}>
+        <Ionicons
+          name={isCleared ? 'checkmark-circle' : 'shield-checkmark'}
+          size={48}
+          color="#fff"
+        />
+        <Text style={styles.voteModalText}>
+          {isCleared ? 'Hazard reported cleared' : 'Hazard still there'}
+        </Text>
+        <Text style={styles.voteModalSubtext}>
+          Thank you for your vote!
+        </Text>
+      </View>
     </View>
   );
 }
@@ -140,6 +153,8 @@ export default function MapScreen() {
   const [hazardModalVisible, setHazardModalVisible] = useState(false);
   const [hazardMarkers, setHazardMarkers] = useState<MapMarker[]>([]);
   const [toast, setToast] = useState<string | null>(null);
+  const [voteModalType, setVoteModalType] = useState<'cleared' | 'still-there' | null>(null);
+  const [voteModalVisible, setVoteModalVisible] = useState(false);
   const hasAnimatedToCity = useRef<string | null>(null);
 
   const {
@@ -280,15 +295,26 @@ export default function MapScreen() {
   }, [showTips, newsTipMarkers]);
   const handleMapReady = useCallback(() => setMapReady(true), []);
 
+  // Updated voting handlers with modal feedback
   const handleVoteCleared = useCallback(async (hazardId: string) => {
     await voteHazardCleared(hazardId);
-    setToast("✅ Cleared vote recorded");
+    setVoteModalType('cleared');
+    setVoteModalVisible(true);
+    setTimeout(() => {
+      setVoteModalVisible(false);
+      setVoteModalType(null);
+    }, 10000);
     loadHazards();
   }, []);
 
   const handleVoteStillThere = useCallback(async (hazardId: string) => {
     await voteHazardStillThere(hazardId);
-    setToast("✅ Confirmed still there");
+    setVoteModalType('still-there');
+    setVoteModalVisible(true);
+    setTimeout(() => {
+      setVoteModalVisible(false);
+      setVoteModalType(null);
+    }, 10000);
     loadHazards();
   }, []);
 
@@ -472,7 +498,7 @@ export default function MapScreen() {
         </View>
       )}
 
-      {toast && <ToastMessage message={toast} onHide={() => setToast(null)} />}
+      <VoteModal type={voteModalType} visible={voteModalVisible} onHide={() => { setVoteModalVisible(false); setVoteModalType(null); }} />
 
       <SafeAreaView style={[styles.topBar, { backgroundColor: colors.surface + 'F0' }]} edges={['top']}>
         <View style={styles.topBarContent}>
@@ -614,8 +640,6 @@ const styles = StyleSheet.create({
   errorBanner: { position: 'absolute', top: 100, left: Spacing.md, right: Spacing.md, padding: Spacing.md, borderRadius: BorderRadius.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 15 },
   errorText: { color: '#FFFFFF', fontSize: Typography.sizes.caption, flex: 1 },
   retryText: { color: '#FFFFFF', fontFamily: Typography.fonts.bold, marginLeft: Spacing.md },
-  toast: { position: 'absolute', top: 60, left: Spacing.lg, right: Spacing.lg, padding: Spacing.md, borderRadius: BorderRadius.md, zIndex: 100, alignItems: 'center' },
-  toastText: { color: '#FFFFFF', fontSize: Typography.sizes.body, fontFamily: Typography.fonts.bold },
   topBar: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm, zIndex: 10 },
   topBarContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   topBarLeft: { flex: 1 },
@@ -658,4 +682,34 @@ const styles = StyleSheet.create({
   voteRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: Spacing.sm, borderTopWidth: 1, borderTopColor: '#E0E0E0', paddingTop: Spacing.sm },
   voteButton: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 4 },
   voteText: { fontSize: Typography.sizes.tiny, fontFamily: Typography.fonts.bold },
+  voteModalContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 200,
+  },
+  voteModal: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.lg,
+    alignItems: 'center',
+    maxWidth: '80%',
+  },
+  voteModalText: {
+    color: '#FFFFFF',
+    fontSize: Typography.sizes.body,
+    fontFamily: Typography.fonts.bold,
+    marginTop: Spacing.md,
+    textAlign: 'center',
+  },
+  voteModalSubtext: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: Typography.sizes.caption,
+    fontFamily: Typography.fonts.regular,
+    marginTop: Spacing.xs,
+    textAlign: 'center',
+  },
 });
