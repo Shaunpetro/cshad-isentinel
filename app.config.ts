@@ -76,7 +76,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   updates: {
     url: "https://u.expo.dev/41d9d284-b014-48ab-9238-fe2c0724fd98",
-    fallbackToCacheTimeout: 0,
+    fallbackToCacheTimeout: 3000,   // ← THIS FIXES THE HANG
     platforms: ["android", "ios"],
   },
 
