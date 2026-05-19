@@ -1,17 +1,13 @@
 // app/_layout.tsx
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import { Stack } from "expo-router";
 import { View, Text, StyleSheet } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { useAppReady } from "@/hooks/useAppReady";
 import { CustomSplashScreen } from "@/components/core/SplashScreen";
-import { OnboardingScreen } from "@/components/core/OnboardingScreen";
 import { useNotifications } from "@/hooks/useNotifications";
 import { ThemeProvider, useTheme } from "@/contexts";
-
-const ONBOARDING_COMPLETED_KEY = "pshad_onboarding_completed";
 
 // ---------- Error Boundary ----------
 class ErrorBoundary extends React.Component<
@@ -48,20 +44,9 @@ function RootLayoutInner() {
   const { isReady, showCustomSplash, onLayoutReady, onSplashComplete } = useAppReady();
   const { colors } = useTheme();
   const { isInitialized: notificationsReady, error: notificationError } = useNotifications();
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [onboardingChecked, setOnboardingChecked] = useState(false);
 
-  useEffect(() => {
-    if (isReady && !showCustomSplash) {
-      AsyncStorage.getItem(ONBOARDING_COMPLETED_KEY).then((value) => {
-        if (value !== "true") setShowOnboarding(true);
-        setOnboardingChecked(true);
-      });
-    }
-  }, [isReady, showCustomSplash]);
-
-  // OTA updates are now handled automatically by Expo's ON_LOAD policy.
-  // No manual check is performed here to avoid race conditions.
+  // OTA updates are handled automatically by Expo's ON_LOAD policy.
+  // No manual check is needed here.
 
   useEffect(() => {
     if (notificationsReady) {
@@ -70,12 +55,7 @@ function RootLayoutInner() {
     }
   }, [notificationsReady, notificationError]);
 
-  if (!isReady || !onboardingChecked) return null;
-
-  const handleOnboardingComplete = async () => {
-    await AsyncStorage.setItem(ONBOARDING_COMPLETED_KEY, "true");
-    setShowOnboarding(false);
-  };
+  if (!isReady) return null;
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]} onLayout={onLayoutReady}>
@@ -84,7 +64,6 @@ function RootLayoutInner() {
         <Stack.Screen name="+not-found" />
       </Stack>
       {showCustomSplash && <CustomSplashScreen onComplete={onSplashComplete} />}
-      {showOnboarding && <OnboardingScreen onComplete={handleOnboardingComplete} />}
     </View>
   );
 }
