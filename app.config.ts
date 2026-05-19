@@ -4,7 +4,7 @@ import { ExpoConfig, ConfigContext } from "expo/config";
 export default ({ config }: ConfigContext): ExpoConfig => ({
   name: "CSHAD iSentinel News",
   slug: "cshad-isentinel-news",
-  version: "1.263.4",
+  version: "1.264.0",
   runtimeVersion: {
     policy: "appVersion",
   },
@@ -23,12 +23,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   ios: {
     supportsTablet: true,
-    bundleIdentifier: "cshad.isentinel.news",
+    bundleIdentifier: "cshad.isentinel.news",        
     config: {
       googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
     },
     infoPlist: {
-      UIBackgroundModes: ["remote-notification"],
+      UIBackgroundModes: ["remote-notification"],    
     },
   },
 
@@ -38,7 +38,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: "#1C1C1C",
     },
     package: "cshad.isentinel.news",
-    googleServicesFile: "./google-services.json",
+    googleServicesFile: "./google-services.json",    
     config: {
       googleMaps: {
         apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
@@ -76,13 +76,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   updates: {
     url: "https://u.expo.dev/41d9d284-b014-48ab-9238-fe2c0724fd98",
-    fallbackToCacheTimeout: 3000,   // ← THIS FIXES THE HANG
+    checkAutomatically: "ON_LOAD",
+    fallbackToCacheTimeout: 3000,
     platforms: ["android", "ios"],
   },
 
   extra: {
-    buildPhase: "002",
-    phaseMonth: "March 2026",
+    buildPhase: "003",
+    phaseMonth: "May 2026",
     buildDate: new Date().toISOString(),
     developer: "Petro@ATG",
     eas: {
