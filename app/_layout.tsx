@@ -1,97 +1,76 @@
 // app/_layout.tsx
 import React, { useState, useEffect } from "react";
 import { Stack } from "expo-router";
-import { View, Text, StyleSheet } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import * as Updates from "expo-updates";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { useAppReady } from "@/hooks/useAppReady";
 import { CustomSplashScreen } from "@/components/core/SplashScreen";
-import { OnboardingScreen } from "@/components/core/OnboardingScreen";
 import { useNotifications } from "@/hooks/useNotifications";
 import { ThemeProvider, useTheme } from "@/contexts";
 
-const ONBOARDING_COMPLETED_KEY = "pshad_onboarding_completed";
+// ── OTA overlay (same as before, never blocks the app) ──
+function OTAOverlay() {
+  const { colors } = useTheme();
+  const [status, setStatus] = useState<"checking" | "updating" | "done" | "error">("checking");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-// ---------- Error Boundary ----------
-class ErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { error: Error | null }
-> {
-  state = { error: null as Error | null };
-
-  static getDerivedStateFromError(error: Error) {
-    return { error };
-  }
-
-  render() {
-    if (this.state.error) {
-      return (
-        <View style={errorStyles.container}>
-          <Text style={errorStyles.title}>Startup Error</Text>
-          <Text style={errorStyles.message}>{this.state.error.message}</Text>
-        </View>
-      );
+  useEffect(() => {
+    if (__DEV__) {
+      setStatus("done");
+      return;
     }
-    return this.props.children;
-  }
+
+    const run = async () => {
+      try {
+        const check = await Updates.checkForUpdateAsync();
+        if (check.isAvailable) {
+          setStatus("updating");
+          await Updates.fetchUpdateAsync();
+          Updates.reloadAsync();
+        } else {
+          setStatus("done");
+        }
+      } catch (e: any) {
+        setStatus("error");
+        setErrorMsg(e.message || "Update check failed");
+      }
+    };
+
+    const safety = setTimeout(() => setStatus("done"), 5000);
+    run();
+    return () => clearTimeout(safety);
+  }, []);
+
+  if (status === "done") return null;
+
+  return (
+    <View style={[styles.overlay, { backgroundColor: colors.background + "F0" }]}>
+      {status !== "error" && <ActivityIndicator size="small" color={colors.primary} />}
+      <Text style={[styles.overlayText, { color: colors.primary }]}>
+        {status === "checking" ? "Checking for updates..." :
+         status === "updating" ? "Updating..." : "Update check failed"}
+      </Text>
+      {errorMsg && (
+        <Text style={[styles.errorText, { color: colors.danger }]}>{errorMsg}</Text>
+      )}
+    </View>
+  );
 }
 
-const errorStyles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", alignItems: "center", padding: 32 },
-  title: { fontSize: 20, fontFamily: "DMSans-Bold", color: "#FF4757", marginBottom: 16 },
-  message: { fontSize: 14, fontFamily: "DMSans-Regular", color: "#FF4757", textAlign: "center" },
-});
-
-// ---------- Inner Layout ----------
+// ── Main layout: tabs load immediately; location requested on‑demand ──
 function RootLayoutInner() {
   const { isReady, showCustomSplash, onLayoutReady, onSplashComplete } = useAppReady();
   const { colors } = useTheme();
   const { isInitialized: notificationsReady, error: notificationError } = useNotifications();
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [onboardingChecked, setOnboardingChecked] = useState(false);
 
-  useEffect(() => {
-    if (isReady && !showCustomSplash) {
-      AsyncStorage.getItem(ONBOARDING_COMPLETED_KEY).then((value) => {
-        if (value !== "true") setShowOnboarding(true);
-        setOnboardingChecked(true);
-      });
-    }
-  }, [isReady, showCustomSplash]);
-
-  // OTA check – delayed to avoid blocking startup
-  useEffect(() => {
-    if (!__DEV__ && isReady) {
-      const timer = setTimeout(async () => {
-        try {
-          const update = await Updates.checkForUpdateAsync();
-          if (update.isAvailable) {
-            await Updates.fetchUpdateAsync();
-            Updates.reloadAsync();
-          }
-        } catch (e) {
-          // Silently fail
-        }
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [isReady]);
-
-  useEffect(() => {
+  React.useEffect(() => {
     if (notificationsReady) {
       if (notificationError) console.log("[RootLayout] Notifications note:", notificationError);
       else console.log("[RootLayout] Notifications initialized");
     }
   }, [notificationsReady, notificationError]);
-
-  if (!isReady || !onboardingChecked) return null;
-
-  const handleOnboardingComplete = async () => {
-    await AsyncStorage.setItem(ONBOARDING_COMPLETED_KEY, "true");
-    setShowOnboarding(false);
-  };
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]} onLayout={onLayoutReady}>
@@ -100,7 +79,7 @@ function RootLayoutInner() {
         <Stack.Screen name="+not-found" />
       </Stack>
       {showCustomSplash && <CustomSplashScreen onComplete={onSplashComplete} />}
-      {showOnboarding && <OnboardingScreen onComplete={handleOnboardingComplete} />}
+      <OTAOverlay />
     </View>
   );
 }
@@ -109,12 +88,33 @@ export default function RootLayout() {
   return (
     <I18nextProvider i18n={i18n}>
       <ThemeProvider>
-        <ErrorBoundary>
-          <RootLayoutInner />
-        </ErrorBoundary>
+        <RootLayoutInner />
       </ThemeProvider>
     </I18nextProvider>
   );
 }
 
-const styles = StyleSheet.create({ root: { flex: 1 } });
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  overlay: {
+    position: "absolute",
+    top: 60,
+    left: 16,
+    right: 16,
+    padding: 12,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    zIndex: 999,
+  },
+  overlayText: {
+    marginLeft: 8,
+    fontSize: 14,
+    fontFamily: "DMSans-Medium",
+  },
+  errorText: {
+    fontSize: 12,
+    fontFamily: "DMSans-Regular",
+    marginLeft: 8,
+  },
+});
