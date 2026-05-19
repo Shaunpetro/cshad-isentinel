@@ -3,7 +3,6 @@ import React, { useState, useEffect } from "react";
 import { Stack } from "expo-router";
 import { View, Text, StyleSheet } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Updates from "expo-updates";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { useAppReady } from "@/hooks/useAppReady";
@@ -61,23 +60,8 @@ function RootLayoutInner() {
     }
   }, [isReady, showCustomSplash]);
 
-  // OTA check – delayed to avoid blocking startup
-  useEffect(() => {
-    if (!__DEV__ && isReady) {
-      const timer = setTimeout(async () => {
-        try {
-          const update = await Updates.checkForUpdateAsync();
-          if (update.isAvailable) {
-            await Updates.fetchUpdateAsync();
-            Updates.reloadAsync();
-          }
-        } catch (e) {
-          // Silently fail
-        }
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [isReady]);
+  // OTA updates are now handled automatically by Expo's ON_LOAD policy.
+  // No manual check is performed here to avoid race conditions.
 
   useEffect(() => {
     if (notificationsReady) {

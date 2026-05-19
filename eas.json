@@ -1,36 +1,41 @@
 {
-    "cli": {
-      "version": ">= 14.0.0"
-    },
-    "build": {
-      "debug": {
-        "android": {
-          "buildType": "apk",
-          "gradleCommand": ":app:assembleDebug",
-          "distribution": "internal"
-        }
-      },
-      "preview": {
-        "android": {
-          "buildType": "apk",
-          "gradleCommand": ":app:assembleRelease",
-          "distribution": "internal"
-        },
-        "ios": {
-          "simulator": true,
-          "distribution": "internal"
-        }
-      },
-      "production": {
-        "android": {
-          "buildType": "app-bundle"
-        },
-        "ios": {
-          "autoIncrement": true
-        }
+  "cli": {
+    "version": ">= 14.0.0"
+  },
+  "build": {
+    "debug": {
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug",
+        "distribution": "internal"
       }
     },
-    "submit": {
-      "production": {}
+    "preview": {
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease",
+        "distribution": "internal"
+      },
+      "ios": {
+        "simulator": true,
+        "distribution": "internal"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "ios": {
+        "autoIncrement": true
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "serviceAccountKeyPath": "./play-store-key.json",
+        "track": "internal"
+      }
     }
   }
+}
