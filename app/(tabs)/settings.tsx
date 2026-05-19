@@ -126,6 +126,10 @@ export default function SettingsScreen() {
     } catch (error) {}
   };
 
+  const handleBecomeJournalist = () => {
+    Linking.openURL("https://cshad-isentinel-md.vercel.app/register/journalist");
+  };
+
   // Real remote push notification (Firebase‑backed)
   const handleTestNotification = async () => {
     if (sendingTest) return;
@@ -264,6 +268,8 @@ export default function SettingsScreen() {
         <SettingsItem icon="star-outline" iconColor="#FFD700" title={t('settings.rateApp')} subtitle={t('settings.rateAppSubtitle')} onPress={handleRateApp} />
         <View style={[styles.itemDivider, { backgroundColor: colors.divider }]} />
         <SettingsItem icon="share-social-outline" iconColor={colors.info} title={t('settings.shareApp')} subtitle={t('settings.shareAppSubtitle')} onPress={handleShareApp} />
+        <View style={[styles.itemDivider, { backgroundColor: colors.divider }]} />
+        <SettingsItem icon="person-add-outline" iconColor={colors.primary} title="Become a Journalist" subtitle="Get verified and post as a journalist" onPress={handleBecomeJournalist} />
       </View>
 
       {/* Legal */}
@@ -317,5 +323,5 @@ const styles = StyleSheet.create({
   versionText: { fontSize: Typography.sizes.caption, fontFamily: Typography.fonts.mono },
   footer: { alignItems: "center", marginTop: Spacing.md, marginBottom: Spacing.xl },
   copyright: { fontSize: Typography.sizes.caption, fontFamily: Typography.fonts.medium },
-  rights: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.regular, marginTop: Spacing.xs },
+  rights: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.regular, marginTop: Spacing.xs},
 });

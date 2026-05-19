@@ -9,15 +9,15 @@ import {
   Linking,
   Alert,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';       
 import { Typography, Spacing } from '@/config/theme';
 import { useTheme } from '@/contexts';
 
 // Universal links – work whether the app is installed or not
 const SOCIAL_LINKS = {
   whatsapp: 'https://wa.me/27813877744',
-  linkedin: 'https://linkedin.com/in/petromalamule',
-  email: 'mailto:petrographics.adm@gmail.com',
+  linkedin: 'https://linkedin.com/in/petromalamule', 
+  email: 'mailto:petrographics.adm@gmail.com',       
 };
 
 export function DeveloperCredits() {
@@ -27,7 +27,7 @@ export function DeveloperCredits() {
     try {
       await Linking.openURL(url);
     } catch {
-      // If the primary URL fails, try a fallback
+      // If the primary URL fails, try a fallback    
       if (name === 'WhatsApp') {
         try {
           await Linking.openURL('https://wa.me/27813877744');
@@ -41,7 +41,7 @@ export function DeveloperCredits() {
           Alert.alert('Error', 'Could not open LinkedIn');
         }
       } else if (name === 'Email') {
-        Alert.alert('Error', 'No email app found');
+        Alert.alert('Error', 'No email app found');  
       } else {
         Alert.alert('Error', `Could not open ${name}`);
       }
@@ -53,7 +53,7 @@ export function DeveloperCredits() {
       {/* App Branding */}
       <View style={styles.section}>
         <Image
-          source={require('../../../assets/brand/ihub-main-logo.png')}
+          source={require('../../../assets/brand/cshad-isentinel-logo-main.png')}
           style={styles.mainLogo}
           resizeMode="contain"
         />
