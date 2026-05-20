@@ -7,15 +7,18 @@ export interface Opportunity {
   body: string;
   category: 'tender' | 'job' | 'bursary';
   subcategory?: string;
+  province?: string;
   location_name?: string;
   latitude?: number;
   longitude?: number;
   closing_date: string;
+  date_advertised?: string;
   apply_url?: string;
   tender_docs?: { name: string; url: string }[];
   salary_range?: string;
   company_name?: string;
   is_premium: boolean;
+  submission_type?: string;
   created_at: string;
 }
 
@@ -65,12 +68,10 @@ export async function fetchOpportunities(options: FetchOpportunitiesOptions = {}
 
   let opportunities = data as Opportunity[];
 
-  // Filter by location if coordinates are provided
   if (latitude !== undefined && longitude !== undefined && radiusKm > 0) {
     opportunities = opportunities.filter((opp) => {
       if (opp.latitude === undefined || opp.longitude === undefined) {
-        // Items without coordinates are shown regardless (national scope)
-        return true;
+        return true; // national scope
       }
       const distance = calculateDistance(latitude, longitude, opp.latitude, opp.longitude);
       return distance <= radiusKm;
