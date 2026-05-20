@@ -30,6 +30,12 @@ const TABS: TabConfig[] = [
     iconFocused: "map",
   },
   {
+    name: "opportunities",
+    titleKey: "tabs.opportunities",
+    icon: "ribbon-outline",
+    iconFocused: "ribbon",
+  },
+  {
     name: "tip",
     titleKey: "tabs.tip",
     icon: "shield-outline",

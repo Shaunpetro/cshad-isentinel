@@ -32,7 +32,8 @@
     "map": "Map",
     "tip": "Tip",
     "alerts": "Alerts",
-    "settings": "Settings"
+    "settings": "Settings",
+    "opportunities": "Opportunities"
   },
   "news": {
     "title": "Safety News",
@@ -291,16 +292,22 @@
     "permissionDenied": "Location disabled",
     "unavailable": "Location unavailable"
   },
-  "journalist": {
-  "types": {
-    "journalist": "Journalist",
-    "official": "Official",
-    "community": "Community"
+  "opportunities": {
+    "tenders": "Tenders",
+    "jobs": "Jobs",
+    "bursaries": "Bursaries"
   },
-  "follow": "Follow",
-  "following": "Following",
-  "reports": "reports",
-  "recentReports": "recent reports",
-  "followers": "followers"
-}
+  "journalist": {
+    "verifiedBadge": "Verified Journalist",
+    "types": {
+      "journalist": "Journalist",
+      "official": "Official",
+      "community": "Community"
+    },
+    "follow": "Follow",
+    "following": "Following",
+    "reports": "reports",
+    "recentReports": "recent reports",
+    "followers": "followers"
+  }
 }

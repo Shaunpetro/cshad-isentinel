@@ -32,7 +32,8 @@
     "map": "Imephu",
     "tip": "Icebiso",
     "alerts": "Izexwayiso",
-    "settings": "Izilungiselelo"
+    "settings": "Izilungiselelo",
+    "opportunities": "Amathuba"
   },
   "news": {
     "title": "Izindaba Zokuphepha",
@@ -291,16 +292,22 @@
     "permissionDenied": "Indawo ivaliwe",
     "unavailable": "Indawo ayitholakali"
   },
-  "journalist": {
-  "types": {
-    "journalist": "Intatheli",
-    "official": "Osemthethweni",
-    "community": "Umphakathi"
+  "opportunities": {
+    "tenders": "Amathenda",
+    "jobs": "Imisebenzi",
+    "bursaries": "Imifundaze"
   },
-  "follow": "Landela",
-  "following": "Uyalandela",
-  "reports": "imibiko",
-  "recentReports": "imibiko yakamuva",
-  "followers": "abalandeli"
-}
+  "journalist": {
+    "verifiedBadge": "Intatheli Eqinisekisiwe",
+    "types": {
+      "journalist": "Intatheli",
+      "official": "Osemthethweni",
+      "community": "Umphakathi"
+    },
+    "follow": "Landela",
+    "following": "Uyalandela",
+    "reports": "imibiko",
+    "recentReports": "imibiko yakamuva",
+    "followers": "abalandeli"
+  }
 }

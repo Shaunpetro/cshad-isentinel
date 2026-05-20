@@ -32,7 +32,8 @@
     "map": "Kaart",
     "tip": "Wenk",
     "alerts": "Waarskuwings",
-    "settings": "Instellings"
+    "settings": "Instellings",
+    "opportunities": "Geleenthede"
   },
   "news": {
     "title": "Veiligheidsnuus",
@@ -291,16 +292,22 @@
     "permissionDenied": "Ligging gedeaktiveer",
     "unavailable": "Ligging onbeskikbaar"
   },
-  "journalist": {
-  "types": {
-    "journalist": "Joernalis",
-    "official": "Amptelik",
-    "community": "Gemeenskap"
+  "opportunities": {
+    "tenders": "Tenders",
+    "jobs": "Werk",
+    "bursaries": "Beurse"
   },
-  "follow": "Volg",
-  "following": "Volg Tans",
-  "reports": "verslae",
-  "recentReports": "onlangse verslae",
-  "followers": "volgelinge"
-}
+  "journalist": {
+    "verifiedBadge": "Geverifieerde Joernalis",
+    "types": {
+      "journalist": "Joernalis",
+      "official": "Amptelik",
+      "community": "Gemeenskap"
+    },
+    "follow": "Volg",
+    "following": "Volg Tans",
+    "reports": "verslae",
+    "recentReports": "onlangse verslae",
+    "followers": "volgelinge"
+  }
 }
