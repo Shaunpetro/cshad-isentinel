@@ -7,8 +7,8 @@ import {
   Pressable,
   Image,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useTranslation } from 'react-i18next';
+import { Ionicons } from '@expo/vector-icons';       
+import { useTranslation } from 'react-i18next';      
 import { useTheme } from '@/contexts/ThemeContext';
 import { Typography, Spacing, BorderRadius, Shadows } from '@/config/theme';
 
@@ -90,7 +90,7 @@ export function FeedCard({
       case 'tip': return t('alerts.communityTips').toUpperCase();
       case 'report': return t('feed.journalistReport', 'JOURNALIST REPORT');
       case 'official': return t('feed.official', 'OFFICIAL');
-      case 'breaking': return t('news.breaking');
+      case 'breaking': return t('news.breaking');    
       case 'weather': return t('alerts.weather.alert');
       case 'infrastructure': return t('alerts.infrastructure').toUpperCase();
     }
@@ -100,7 +100,7 @@ export function FeedCard({
   const typeConfig = TYPE_ICONS[displayType] || TYPE_ICONS.news;
   const severityColor = item.severity ? SEVERITY_COLORS[item.severity] : undefined;
 
-  const sourceObj = typeof item.source === 'string'
+  const sourceObj = typeof item.source === 'string'  
     ? { name: item.source, isVerified: item.isVerified }
     : item.source;
 
@@ -109,7 +109,7 @@ export function FeedCard({
 
   const descriptionText = item.summary || item.description;
 
-  const formatNumber = (num?: number): string => {
+  const formatNumber = (num?: number): string => {   
     if (!num) return '0';
     if (num >= 1000) return `${(num / 1000).toFixed(1)}k`;
     return num.toString();
@@ -118,7 +118,7 @@ export function FeedCard({
   const formatTimestamp = (timestamp: string | Date): string => {
     const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
     const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
+    const diffMs = now.getTime() - date.getTime();   
     const diffMins = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -151,7 +151,7 @@ export function FeedCard({
       )}
 
       <View style={styles.header}>
-        <View style={styles.sourceContainer}>
+        <View style={styles.sourceContainer}>        
           {sourceObj.avatar ? (
             <Image source={{ uri: sourceObj.avatar }} style={styles.avatar} />
           ) : (
@@ -160,16 +160,23 @@ export function FeedCard({
             </View>
           )}
           <View style={styles.sourceInfo}>
-            <View style={styles.sourceNameRow}>
+            <View style={styles.sourceNameRow}>      
               <Text style={[styles.sourceName, { color: colors.text }]} numberOfLines={1}>
                 {sourceObj.name}
               </Text>
-              {sourceObj.isVerified && (
+              {sourceObj.isVerified && item.sourceType === 'journalist' ? (
+                <View style={[styles.verifiedJournalistBadge, { backgroundColor: colors.primary + '20' }]}>
+                  <Ionicons name="checkmark-circle" size={12} color={colors.primary} />
+                  <Text style={[styles.verifiedJournalistText, { color: colors.primary }]}>
+                    {t('journalist.verifiedBadge', 'Verified Journalist')}
+                  </Text>
+                </View>
+              ) : sourceObj.isVerified ? (
                 <Ionicons name="checkmark-circle" size={14} color={colors.info} />
-              )}
+              ) : null}
             </View>
             <Text style={[styles.timestamp, { color: colors.textSecondary }]}>
-              {formatTimestamp(item.timestamp)}
+              {formatTimestamp(item.timestamp)}      
             </Text>
           </View>
         </View>
@@ -256,21 +263,21 @@ export function FeedCard({
             <View style={styles.statItem}>
               <Ionicons name="eye-outline" size={14} color={colors.textSecondary} />
               <Text style={[styles.statText, { color: colors.textSecondary }]}>
-                {formatNumber(item.stats.views)}
+                {formatNumber(item.stats.views)}     
               </Text>
             </View>
           )}
-          {item.stats?.comments !== undefined && (
+          {item.stats?.comments !== undefined && (   
             <View style={styles.statItem}>
               <Ionicons name="chatbubble-outline" size={14} color={colors.textSecondary} />
               <Text style={[styles.statText, { color: colors.textSecondary }]}>
-                {formatNumber(item.stats.comments)}
+                {formatNumber(item.stats.comments)}  
               </Text>
             </View>
           )}
           {!item.stats?.views && !item.stats?.comments && item.category && (
             <Text style={[styles.statText, { color: colors.textSecondary }]}>
-              {getCategoryLabel(item.category)}
+              {getCategoryLabel(item.category)}      
             </Text>
           )}
         </View>
@@ -298,7 +305,7 @@ export function FeedCard({
             <Pressable
               onPress={onFollow}
               style={styles.actionButton}
-              accessibilityLabel="Follow story"
+              accessibilityLabel="Follow story"      
             >
               <Ionicons name="notifications-outline" size={18} color={colors.textSecondary} />
             </Pressable>
@@ -357,9 +364,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    flexWrap: 'wrap',
   },
   sourceName: {
     fontSize: Typography.sizes.caption,
+    fontFamily: Typography.fonts.bold,
+  },
+  verifiedJournalistBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: BorderRadius.sm,
+    gap: 4,
+  },
+  verifiedJournalistText: {
+    fontSize: 10,
     fontFamily: Typography.fonts.bold,
   },
   timestamp: {
@@ -407,7 +427,7 @@ const styles = StyleSheet.create({
   description: {
     fontSize: Typography.sizes.caption,
     fontFamily: Typography.fonts.regular,
-    lineHeight: Typography.sizes.caption * 1.5,
+    lineHeight: Typography.sizes.caption * 1.5,      
     marginTop: Spacing.xs,
   },
   image: {
