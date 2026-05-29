@@ -25,6 +25,7 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/native": "^7.1.33",
     "@supabase/supabase-js": "^2.103.0",
+    "cheerio": "^1.2.0",
     "expo": "~55.0.8",
     "expo-blur": "~55.0.14",
     "expo-clipboard": "~55.0.13",
@@ -72,7 +73,7 @@
     "@types/react": "~19.2.2",
     "babel-plugin-module-resolver": "^5.0.3",
     "jest-expo": "^55.0.11",
-    "puppeteer": "^25.0.4",
+    "puppeteer": "^25.1.0",
     "react": "19.2.0",
     "react-native-svg-transformer": "^1.5.3",
     "typescript": "~5.9.2"

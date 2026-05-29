@@ -1,5 +1,5 @@
 // app/(tabs)/opportunities.tsx
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -39,7 +39,7 @@ export default function OpportunitiesScreen() {
   // Test subscription toggle
   const [isSubscribed, setIsSubscribed] = useState(false);
 
-  // Extract filter options
+  // Extract filter options (only for tenders, but we keep it generic)
   const filterOptions = useMemo(() => {
     const provinces = new Set<string>();
     const subcategories = new Set<string>();
@@ -60,6 +60,13 @@ export default function OpportunitiesScreen() {
   const [selectedProvince, setSelectedProvince] = useState<string | null>(null);
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [selectedSubmissionType, setSelectedSubmissionType] = useState<string | null>(null);
+
+  // **CLEAR FILTERS WHEN CATEGORY CHANGES**
+  useEffect(() => {
+    setSelectedProvince(null);
+    setSelectedSubcategory(null);
+    setSelectedSubmissionType(null);
+  }, [activeCategory]);
 
   // Active filter count for badge
   const activeFilterCount = useMemo(() => {

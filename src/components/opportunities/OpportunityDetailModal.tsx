@@ -38,9 +38,6 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
   const isPremiumLocked = opportunity.is_premium && !isSubscribed;
   const docs = opportunity.tender_docs || [];
 
-  // Clean raw newline escapes from API text
-  const formatText = (input?: string) => (input || '').replace(/\\n/g, '\n');
-
   const handleApply = () => {
     if (opportunity.apply_url) {
       const url = opportunity.apply_url;
@@ -90,7 +87,11 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
     });
   };
 
+  const isTender = opportunity.category === 'tender';
+
   const renderBriefing = () => {
+    // Only show briefing for tenders
+    if (!isTender) return null;
     const hasBriefing = (opportunity as any).briefing_required;
     if (hasBriefing === undefined || hasBriefing === null) return null;
     if (!hasBriefing) {
@@ -102,13 +103,13 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
       );
     }
     const mandatory = (opportunity as any).briefing_mandatory;
-    const details = formatText((opportunity as any).briefing_details || '');
+    const details = (opportunity as any).briefing_details || '';
     return (
       <View style={styles.briefingContainer}>
         <View style={styles.row}>
           <Ionicons name="people" size={14} color={colors.warning} />
           <Text style={[styles.metaText, { color: colors.warning }]}>
-            Briefing: {mandatory ? 'Mandatory' : 'Optional'}
+            <Text style={[styles.metaLabel, { color: colors.warning }]}>Briefing:</Text> {mandatory ? 'Mandatory' : 'Optional'}
           </Text>
         </View>
         {details ? (
@@ -129,7 +130,6 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
         statusBarTranslucent
         onRequestClose={onClose}
       >
-        {/* Backdrop with stronger scrim */}
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose}>
           <BlurView intensity={blurIntensity} tint={tint} style={StyleSheet.absoluteFill} />
         </Pressable>
@@ -174,6 +174,19 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
                   {opportunity.company_name}
                 </Text>
               )}
+
+              {opportunity.source_id && (
+                <View style={styles.row}>
+                  <Ionicons name="document-text" size={14} color={colors.textSecondary} />
+                  <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                    <Text style={[styles.metaLabel, { color: colors.textSecondary }]}>
+                      {isTender ? 'Tender Number:' : 'Reference:'}
+                    </Text>{' '}
+                    {opportunity.source_id}
+                  </Text>
+                </View>
+              )}
+
               {opportunity.location_name && (
                 <View style={styles.row}>
                   <Ionicons name="location" size={14} color={colors.primary} />
@@ -195,35 +208,31 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
                 <View style={styles.row}>
                   <Ionicons name="calendar" size={14} color={colors.textSecondary} />
                   <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                    Advertised: {formatDateTime(opportunity.date_advertised)}
+                    <Text style={[styles.metaLabel, { color: colors.textSecondary }]}>Advertised:</Text> {formatDateTime(opportunity.date_advertised)}
                   </Text>
                 </View>
               )}
               <View style={styles.row}>
                 <Ionicons name="timer" size={14} color={colors.textSecondary} />
                 <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                  Closing: {formatDateTime(opportunity.closing_date)}
+                  <Text style={[styles.metaLabel, { color: colors.textSecondary }]}>Closing:</Text> {formatDateTime(opportunity.closing_date)}
                 </Text>
               </View>
               {opportunity.submission_type && (
                 <View style={styles.row}>
                   <Ionicons name="send" size={14} color={colors.textSecondary} />
                   <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                    {opportunity.submission_type}
+                    <Text style={[styles.metaLabel, { color: colors.textSecondary }]}>Submission:</Text> {opportunity.submission_type}
                   </Text>
                 </View>
               )}
 
               {renderBriefing()}
 
-              {/* Body – premium locked shows preview + banner, else full text */}
               {isPremiumLocked ? (
                 <View style={styles.premiumContainer}>
-                  <Text
-                    style={[styles.body, { color: colors.text }]}
-                    numberOfLines={4}
-                  >
-                    {formatText(opportunity.body)}
+                  <Text style={[styles.body, { color: colors.text }]}>
+                    {(opportunity as any).body || opportunity.title}
                   </Text>
                   <View style={styles.upgradeBanner}>
                     <View style={styles.upgradeBannerContent}>
@@ -242,11 +251,10 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
                 </View>
               ) : (
                 <Text style={[styles.body, { color: colors.text }]}>
-                  {formatText(opportunity.body)}
+                  {opportunity.body}
                 </Text>
               )}
 
-              {/* Documents */}
               {docs.length > 0 && (
                 <View style={styles.section}>
                   <Text style={[styles.sectionTitle, { color: colors.text }]}>Documents</Text>
@@ -285,7 +293,6 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
                 </View>
               )}
 
-              {/* Apply Button */}
               {opportunity.apply_url && (
                 <Pressable
                   style={({ pressed }) => [
@@ -298,6 +305,15 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
                   <Text style={styles.applyText}>Apply Now</Text>
                 </Pressable>
               )}
+
+              <Pressable
+                style={[styles.closeBottom, { borderColor: colors.border }]}
+                onPress={onClose}
+              >
+                <Text style={[styles.closeBottomText, { color: colors.text }]}>Close</Text>
+              </Pressable>
+
+              <View style={{ height: 20 }} />
             </ScrollView>
           </View>
         </View>
@@ -365,6 +381,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     marginBottom: 4,
+  },
+  metaLabel: {
+    fontFamily: 'DMSans-Bold',
   },
   metaText: {
     fontSize: Typography.sizes.caption,
@@ -454,5 +473,15 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: Typography.sizes.body,
     fontFamily: 'DMSans-Bold',
+  },
+  closeBottom: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    marginTop: Spacing.md,
+  },
+  closeBottomText: {
+    fontSize: Typography.sizes.body,
+    fontFamily: 'DMSans-Medium',
   },
 });

@@ -2,11 +2,15 @@
 import React from 'react';
 import { View, Text, Modal, ScrollView, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/contexts';
 import { Typography, Spacing, BorderRadius } from '@/config/theme';
 
+type Category = 'tender' | 'job' | 'bursary';
+
 interface FilterSheetProps {
   visible: boolean;
+  activeCategory: Category;
   provinces: string[];
   subcategories: string[];
   submissionTypes: string[];
@@ -23,6 +27,7 @@ interface FilterSheetProps {
 
 export function FilterSheet({
   visible,
+  activeCategory,
   provinces,
   subcategories,
   submissionTypes,
@@ -37,6 +42,13 @@ export function FilterSheet({
   onClose,
 }: FilterSheetProps) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
+
+  const getSubcategoryLabel = () => {
+    if (activeCategory === 'job') return 'Industry';
+    if (activeCategory === 'bursary') return 'Field of Study';
+    return 'Category';
+  };
 
   const renderChipGroup = (
     title: string,
@@ -75,6 +87,7 @@ export function FilterSheet({
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={[styles.container, { backgroundColor: colors.background }]}>
+          {/* Header */}
           <View style={[styles.header, { borderBottomColor: colors.divider }]}>
             <Text style={[styles.headerTitle, { color: colors.text }]}>Filters</Text>
             <Pressable onPress={onClose} hitSlop={12}>
@@ -83,11 +96,17 @@ export function FilterSheet({
           </View>
 
           <ScrollView style={styles.content}>
+            {/* Province filter – always shown if data exists */}
             {provinces.length > 0 && renderChipGroup('Province', provinces, selectedProvince, onSelectProvince)}
-            {subcategories.length > 0 && renderChipGroup('Category', subcategories, selectedSubcategory, onSelectSubcategory)}
-            {submissionTypes.length > 0 && renderChipGroup('Submission Type', submissionTypes, selectedSubmissionType, onSelectSubmissionType)}
+
+            {/* Subcategory filter – shown for all categories, label changes */}
+            {subcategories.length > 0 && renderChipGroup(getSubcategoryLabel(), subcategories, selectedSubcategory, onSelectSubcategory)}
+
+            {/* Submission type filter – only for tenders */}
+            {activeCategory === 'tender' && submissionTypes.length > 0 && renderChipGroup('Submission Type', submissionTypes, selectedSubmissionType, onSelectSubmissionType)}
           </ScrollView>
 
+          {/* Footer */}
           <View style={[styles.footer, { borderTopColor: colors.divider }]}>
             <Pressable
               style={[styles.clearButton, { borderColor: colors.border }]}

@@ -19,11 +19,11 @@ export function useOpportunities(category: Category) {
     setError(null);
 
     try {
+      // Temporarily fetch all opportunities without closing-date filter
       const data = await fetchOpportunities({
         category,
-        latitude: currentCity?.latitude,
-        longitude: currentCity?.longitude,
-        radiusKm: 50,
+        // We'll omit location filtering for now to ensure data appears
+        limit: 50,
       });
       setOpportunities(data);
     } catch (err) {
@@ -32,7 +32,7 @@ export function useOpportunities(category: Category) {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [category, currentCity?.latitude, currentCity?.longitude]);
+  }, [category]); // remove location dependency for now
 
   useEffect(() => {
     fetchData();
