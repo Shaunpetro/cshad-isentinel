@@ -27,7 +27,7 @@ jobs:
         with:
           node-version: 20
       - run: npm ci
-      - run: node scripts/scrape-jobs.js
+      - run: node scripts/scrape-jobs-live.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
@@ -42,7 +42,7 @@ jobs:
         with:
           node-version: 20
       - run: npm ci
-      - run: node scripts/scrape-bursaries.js
+      - node scripts/scrape-bursaries-live.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

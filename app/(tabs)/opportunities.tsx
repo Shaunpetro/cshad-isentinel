@@ -205,6 +205,7 @@ export default function OpportunitiesScreen() {
       {/* Filter Sheet */}
       <FilterSheet
         visible={filterSheetVisible}
+        activeCategory={activeCategory}   // <-- add this line
         provinces={filterOptions.provinces}
         subcategories={filterOptions.subcategories}
         submissionTypes={filterOptions.submissionTypes}

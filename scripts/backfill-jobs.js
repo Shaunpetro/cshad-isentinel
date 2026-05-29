@@ -1,4 +1,4 @@
-// scripts/scrape-etenders.js
+// scripts/backfill-details.js
 const { createClient } = require('@supabase/supabase-js');
 const puppeteer = require('puppeteer');
 
@@ -7,27 +7,20 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const E_TENDERS_URL = 'https://www.etenders.gov.za/Home/opportunities?id=1';
-const MAX_PAGES = 5; // daily update pages
-const NAV_TIMEOUT = 60000;
+const NAV_TIMEOUT = 90000;   // 90 seconds
+const MAX_RETRIES = 3;
 
 function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function parseDate(dateStr) {
-  if (!dateStr) return new Date().toISOString();
+  if (!dateStr) return null;
   const relDays = dateStr.match(/in\s+(\d+)\s+days?/i);
   if (relDays) {
     const days = parseInt(relDays[1], 10);
     const future = new Date();
     future.setDate(future.getDate() + days);
-    return future.toISOString();
-  }
-  const relHours = dateStr.match(/in\s+(\d+)\s+hours?/i);
-  if (relHours) {
-    const hours = parseInt(relHours[1], 10);
-    const future = new Date();
-    future.setHours(future.getHours() + hours);
     return future.toISOString();
   }
   let clean = dateStr.replace(/(\d)(st|nd|rd|th)\b/gi, '$1').replace(/,/g, '').trim();
@@ -54,7 +47,28 @@ function parseDate(dateStr) {
       return new Date(year, month, day, hours, minutes).toISOString();
     }
   }
-  return new Date().toISOString();
+  return null;
+}
+
+async function navigateWithRetry(page, url) {
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`  Navigation attempt ${attempt}/${MAX_RETRIES}...`);
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT });
+      await page.waitForSelector('#tendeList tbody tr', { visible: true, timeout: 20000 });
+      console.log('  Navigation successful.');
+      return;
+    } catch (err) {
+      console.warn(`  Attempt ${attempt} failed: ${err.message}`);
+      if (attempt < MAX_RETRIES) {
+        const delay = 10000 * attempt;
+        console.log(`  Retrying in ${delay / 1000} seconds...`);
+        await wait(delay);
+      } else {
+        throw new Error(`Failed to navigate after ${MAX_RETRIES} attempts: ${err.message}`);
+      }
+    }
+  }
 }
 
 (async () => {
@@ -67,25 +81,40 @@ function parseDate(dateStr) {
   page.setDefaultNavigationTimeout(NAV_TIMEOUT);
 
   try {
-    await page.goto(E_TENDERS_URL, { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT });
-    await page.waitForSelector('#tendeList tbody tr', { visible: true, timeout: 20000 });
+    console.log('Navigating to eTenders...');
+    await navigateWithRetry(page, E_TENDERS_URL);
 
-    let totalInserted = 0;
+    const { data: opportunities, error } = await supabase
+      .from('opportunities')
+      .select('id, source_id, title')
+      .is('source_id', null)
+      .limit(500);
+
+    if (error) {
+      console.error('Fetch error:', error);
+      return;
+    }
+
+    console.log(`Found ${opportunities.length} records to update`);
+
+    let totalUpdated = 0;
     let currentPage = 1;
+    const maxPages = 200;
 
-    while (currentPage <= MAX_PAGES) {
-      console.log(`Page ${currentPage}: expanding rows...`);
+    while (currentPage <= maxPages && totalUpdated < opportunities.length) {
+      console.log(`Page ${currentPage}...`);
 
       const visibleTitles = await page.$$eval('#tendeList tbody tr td.sorting_1', cells =>
         cells.map(cell => cell.innerText.trim()).filter(Boolean)
       );
 
-      console.log(`  Found ${visibleTitles.length} tenders`);
-
       for (const title of visibleTitles) {
-        console.log(`    Processing: ${title}`);
+        const match = opportunities.find(opp => opp.title === title);
+        if (!match) continue;
 
-        // Expand the row
+        console.log(`Updating: ${title}`);
+
+        // Expand row
         await page.evaluate((t) => {
           const cells = document.querySelectorAll('#tendeList tbody tr td.sorting_1');
           for (const cell of cells) {
@@ -114,7 +143,7 @@ function parseDate(dateStr) {
         ).catch(() => false);
 
         if (!detailAppeared) {
-          console.log('      Detail row did not appear');
+          console.log('  Detail row did not appear');
           await page.evaluate((t) => {
             const cells = document.querySelectorAll('#tendeList tbody tr td.sorting_1');
             for (const cell of cells) {
@@ -131,6 +160,7 @@ function parseDate(dateStr) {
 
         await wait(500);
 
+        // Extract detail data
         const details = await page.evaluate((t) => {
           const rows = document.querySelectorAll('#tendeList tbody tr');
           for (const r of rows) {
@@ -156,29 +186,7 @@ function parseDate(dateStr) {
                 }
               }
 
-              const docLinks = Array.from(next.querySelectorAll('a[href*="Download"]'));
-              const docs = docLinks.map(link => ({
-                name: link.innerText.trim(),
-                url: link.href,
-              }));
-
-              return { ...data, docs, _fullBriefingHTML: fullBriefingHTML };
-            }
-          }
-          return null;
-        }, title);
-
-        const basicInfo = await page.evaluate((t) => {
-          const rows = document.querySelectorAll('#tendeList tbody tr');
-          for (const r of rows) {
-            if (r.querySelector('td.sorting_1')?.innerText.trim() === t) {
-              const cells = r.querySelectorAll('td');
-              return {
-                category: cells[1]?.innerText?.trim() || '',
-                eSubmission: cells[3]?.innerText?.trim() || '',
-                advertised: cells[4]?.innerText?.trim() || '',
-                closing: cells[5]?.innerText?.trim() || '',
-              };
+              return { ...data, _fullBriefingHTML: fullBriefingHTML };
             }
           }
           return null;
@@ -197,97 +205,57 @@ function parseDate(dateStr) {
         }, title);
         await wait(300);
 
-        if (!details) {
-          console.log('      Could not extract details');
-          continue;
-        }
+        if (!details) continue;
 
-        const companyName = details['Organ Of State'] || basicInfo?.eSubmission || '';
-        const sourceId = details['Tender Number'] || null;
-        const closingDate = details['Closing Date']
-          ? parseDate(details['Closing Date'])
-          : parseDate(basicInfo?.closing || '');
-        const advertisedDate = details['Date Published']
-          ? parseDate(details['Date Published'])
-          : parseDate(basicInfo?.advertised || '');
+        const updateData = {};
+        if (details['Tender Number']) updateData.source_id = details['Tender Number'];
+        if (details['Province']) updateData.province = details['Province'];
+        if (details['Date Published']) {
+          const parsed = parseDate(details['Date Published']);
+          if (parsed) updateData.date_advertised = parsed;
+        }
+        if (details['Closing Date']) {
+          const parsed = parseDate(details['Closing Date']);
+          if (parsed) updateData.closing_date = parsed;
+        }
+        if (details['Tender Type']) updateData.submission_type = details['Tender Type'];
 
         const briefingIsThere = details['Is there a briefing session?'];
-        const briefingRequired = briefingIsThere && briefingIsThere.toLowerCase() !== 'no' && briefingIsThere.toLowerCase() !== 'n/a';
-        const briefingMandatory = details['Is it compulsory?']?.toLowerCase() === 'yes';
-        const briefingDateTime = details['Briefing Date and Time'] || 'N/A';
-        const briefingVenue = details['Briefing Venue'] || 'N/A';
-        let briefingDetails = null;
-
-        if (briefingRequired) {
+        if (briefingIsThere && briefingIsThere.toLowerCase() !== 'no' && briefingIsThere.toLowerCase() !== 'n/a') {
+          updateData.briefing_required = true;
+          updateData.briefing_mandatory = details['Is it compulsory?']?.toLowerCase() === 'yes';
+          const dateTime = details['Briefing Date and Time'] || 'N/A';
+          const venue = details['Briefing Venue'] || 'N/A';
           const html = details._fullBriefingHTML || '';
           const urlMatch = html.match(/(https?:\/\/[^\s"<>]+)/i);
-          const isDigital = /virtual|online|teams|zoom|meet|webinar/i.test(briefingVenue);
+          const isDigital = /virtual|online|teams|zoom|meet|webinar/i.test(venue);
           if (isDigital || urlMatch) {
             const link = urlMatch ? urlMatch[0] : '';
-            briefingDetails = `Date/Time: ${briefingDateTime}\nVenue: ${briefingVenue}${link ? `\nLink: ${link}` : ''}`;
+            updateData.briefing_details = `Date/Time: ${dateTime}\nVenue: ${venue}${link ? `\nLink: ${link}` : ''}`;
           } else {
-            briefingDetails = `Date/Time: ${briefingDateTime}\nVenue: ${briefingVenue}`;
+            updateData.briefing_details = `Date/Time: ${dateTime}\nVenue: ${venue}`;
           }
-        }
-
-        const submissionType = details['Tender Type'] || 'See tender document';
-        const documents = details.docs || [];
-        const body = details['Special Conditions']
-          ? `${title}\n\nSpecial Conditions: ${details['Special Conditions']}`
-          : title;
-
-        // Duplicate check
-        let duplicate = false;
-        if (sourceId) {
-          const { data: existing } = await supabase
-            .from('opportunities')
-            .select('id')
-            .eq('source_id', sourceId)
-            .maybeSingle();
-          if (existing) duplicate = true;
         } else {
-          const { data: existing } = await supabase
+          updateData.briefing_required = false;
+          updateData.briefing_mandatory = false;
+          updateData.briefing_details = null;
+        }
+
+        if (Object.keys(updateData).length > 0) {
+          const { error: updateError } = await supabase
             .from('opportunities')
-            .select('id')
-            .eq('title', title)
-            .eq('company_name', companyName)
-            .maybeSingle();
-          if (existing) duplicate = true;
-        }
-
-        if (duplicate) {
-          console.log('      Skipping (duplicate)');
-          continue;
-        }
-
-        const { error } = await supabase.from('opportunities').insert({
-          title: title,
-          body: body,
-          category: 'tender',
-          subcategory: basicInfo?.category || '',
-          company_name: companyName,
-          province: details['Province'] || null,
-          closing_date: closingDate,
-          date_advertised: advertisedDate,
-          apply_url: E_TENDERS_URL,
-          tender_docs: documents,
-          is_premium: false,
-          submission_type: submissionType,
-          briefing_required: briefingRequired,
-          briefing_mandatory: briefingMandatory,
-          briefing_details: briefingDetails,
-          status: 'published',
-          source_id: sourceId,
-        });
-
-        if (error) {
-          console.error(`      Insert error: ${error.message}`);
-        } else {
-          totalInserted++;
-          console.log(`      Inserted`);
+            .update(updateData)
+            .eq('id', match.id);
+          if (updateError) {
+            console.error(`  Update error: ${updateError.message}`);
+          } else {
+            totalUpdated++;
+            console.log(`  Updated`);
+          }
         }
       }
 
+      // Paginate
       const isDisabled = await page.$('#tendeList_next.disabled');
       if (isDisabled) break;
 
@@ -300,7 +268,7 @@ function parseDate(dateStr) {
       currentPage++;
     }
 
-    console.log(`Scraping complete. Total new tenders: ${totalInserted}`);
+    console.log(`Backfill complete. Updated ${totalUpdated} records.`);
   } catch (err) {
     console.error('Fatal error:', err);
     process.exit(1);
