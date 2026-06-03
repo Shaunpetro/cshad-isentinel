@@ -1,0 +1,35 @@
+# Cursor Rules for CSHAD iSentinel News
+
+## Project Overview
+- React Native app using Expo SDK 55
+- Supabase backend
+- Firebase push notifications
+- Google Maps integration
+- Multi-language (EN, AF, ZU)
+
+## Key Conventions
+- Package name: cshad.isentinel.news
+- Never use the old package: com.atg.pshad.sentinel
+- All files must have a first-line comment with the project-relative path
+- Full file replacements only (no partial edits unless 1-2 lines)
+- Commit after every logical change
+- All tools must be free and work from South Africa
+
+## Path Aliases
+- @/ = src/
+- @assets/ = assets/
+
+## Build Commands
+- Type check: npx tsc --noEmit
+- Run dev: npx expo start --dev-client
+- Build APK: npx eas-cli build --platform android --profile preview
+- Push OTA: npx eas update --branch preview --platform android --message "..."
+
+## Environment Variables
+Always use process.env.EXPO_PUBLIC_* for client-side env vars.
+Document new keys in .env.example when adding.
+
+## Common Issues
+- libworklets.so duplicates: use EAS cloud build, not local
+- Blank screen on launch: check fallbackToCacheTimeout is 3000
+- Missing Supabase keys: check EAS environment variables are set
