@@ -70,7 +70,7 @@ export function CustomSplashScreen({ onComplete }: Props) {
       </Animated.View>
 
       <Animated.Text style={[styles.subtitle, { opacity: subtitleOpacity }]}>
-        Powered by AI
+      Community Safety & Opportunities
       </Animated.Text>
 
       <Animated.View
