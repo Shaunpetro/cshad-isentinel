@@ -42,7 +42,21 @@ jobs:
         with:
           node-version: 20
       - run: npm ci
-      - node scripts/scrape-bursaries-live.js
+      - run: node scripts/scrape-bursaries-live.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+  scrape-newsapi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      - run: node scripts/scrape-newsapi.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}

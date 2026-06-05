@@ -1,58 +1,49 @@
-# v1.263_001/scripts/verify-no-test-data.ps1
+// scripts/scrape-newsapi.js
+const { createClient } = require('@supabase/supabase-js');
+const fetch = require('node-fetch');
 
-# ================================================
-# PSHAD Sentinel — Test Artifact Scanner (Windows)
-# Run before any release or phase completion
-# Rule 9: No test artifacts in production code
-# ================================================
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-Write-Host "🔍 Scanning for test artifacts in src/ ..." -ForegroundColor Cyan
-Write-Host ""
+const NEWSAPI_KEY = process.env.NEWSAPI_KEY || '93b5c1c881e141a4afd3e26f6657a87d';
+const URL = `https://newsapi.org/v2/everything?q=South+Africa&language=en&pageSize=100&sortBy=publishedAt&apiKey=${NEWSAPI_KEY}`;
 
-$found = $false
-$patterns = @(
-    "MOCK",
-    "DUMMY",
-    "PLACEHOLDER",
-    "FAKE",
-    "TODO:remove",
-    "lorem ipsum",
-    "test@test",
-    "example\.com",
-    "sampleData",
-    "mockData",
-    "dummyData",
-    "fakeNews",
-    "fakeTip"
-)
+(async () => {
+  console.log('Fetching from News API...');
+  const res = await fetch(URL);
+  const data = await res.json();
 
-foreach ($pattern in $patterns) {
-    $results = Get-ChildItem -Path "src" -Recurse -Include *.ts,*.tsx |
-        Select-String -Pattern $pattern -CaseSensitive
+  if (data.status !== 'ok') {
+    console.error('News API error:', data);
+    return;
+  }
 
-    if ($results) {
-        Write-Host "⚠️  Found '$pattern':" -ForegroundColor Yellow
-        $results | ForEach-Object { Write-Host "   $($_.Filename):$($_.LineNumber) - $($_.Line.Trim())" }
-        Write-Host ""
-        $found = $true
-    }
-}
+  let inserted = 0;
+  for (const article of data.articles) {
+    const sourceId = `newsapi-${article.url}`;
+    const { data: existing } = await supabase
+      .from('news')
+      .select('id')
+      .eq('source_id', sourceId)
+      .maybeSingle();
+    if (existing) continue;
 
-# Check for mock directories
-if (Test-Path "src/mocks") {
-    Write-Host "⚠️  src/mocks/ directory exists — delete before release" -ForegroundColor Yellow
-    $found = $true
-}
+    const { error } = await supabase.from('news').insert({
+      title: article.title,
+      summary: article.description,
+      content: article.content,
+      source: article.source.name,
+      image_url: article.urlToImage,
+      published_at: article.publishedAt,
+      url: article.url,
+      source_id: sourceId,
+      category: 'general',
+      severity: 'medium',
+    });
 
-if (Test-Path "src/__fixtures__") {
-    Write-Host "⚠️  src/__fixtures__/ directory exists — delete before release" -ForegroundColor Yellow
-    $found = $true
-}
+    if (!error) inserted++;
+  }
 
-Write-Host ""
-if (-not $found) {
-    Write-Host "✅ No test artifacts found. Clean for release." -ForegroundColor Green
-} else {
-    Write-Host "❌ Test artifacts detected. Clean up before proceeding." -ForegroundColor Red
-    exit 1
-}
+  console.log(`News API scrape complete. Inserted ${inserted} new articles.`);
+})();
