@@ -54,3 +54,4 @@ __snapshots__/
 # Temporary files
 tmp/
 temp/
+pshad-sentinel-ihub*.json
