@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts';
 import { Typography, Spacing, BorderRadius } from '@/config/theme';
 
@@ -22,6 +23,7 @@ const CATEGORY_OPTIONS: TicketCategory[] = ['bug', 'feature', 'beta', 'problem',
 
 export function PersistentFeedbackButton() {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [visible, setVisible] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -46,10 +48,13 @@ export function PersistentFeedbackButton() {
     setVisible(false);
   };
 
+  // Position the button just above the tab bar
+  const bottomPosition = 60 + insets.bottom + 12; // tab height + safe area + margin
+
   return (
     <>
       <Pressable
-        style={[styles.fab, { backgroundColor: colors.primary }]}
+        style={[styles.fab, { backgroundColor: colors.primary, bottom: bottomPosition }]}
         onPress={() => setVisible(true)}
       >
         <Ionicons name="chatbubble-ellipses" size={24} color="#FFFFFF" />
@@ -139,7 +144,6 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 20,
-    bottom: 30,
     width: 56,
     height: 56,
     borderRadius: 28,

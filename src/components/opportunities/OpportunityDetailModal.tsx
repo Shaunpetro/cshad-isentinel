@@ -51,7 +51,7 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
 
   const handleDownload = async (url: string, fileName: string) => {
     try {
-      const fileUri = (FileSystem as any).cacheDirectory + fileName;
+      const fileUri = (FileSystem as any).documentDirectory + fileName;
       const { uri } = await FileSystem.downloadAsync(url, fileUri);
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri);

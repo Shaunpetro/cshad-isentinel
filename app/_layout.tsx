@@ -3,6 +3,7 @@ import React, { useEffect } from "react";
 import { Stack } from "expo-router";
 import { View, Text, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { useAppReady } from "@/hooks/useAppReady";
@@ -57,6 +58,7 @@ function RootLayoutInner() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]} onLayout={onLayoutReady}>
+      <StatusBar style={colors.statusBar === 'light' ? 'light' : 'dark'} />
       <UpdateBanner />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
