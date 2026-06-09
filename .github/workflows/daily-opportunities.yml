@@ -76,7 +76,7 @@ jobs:
 
   audit-rss-feeds:
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' && github.event.schedule == '0 6 1 * *'  # only on the 1st of the month
+    if: github.event_name == 'schedule' && github.event.schedule == '0 6 1 * *'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
