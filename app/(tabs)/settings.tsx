@@ -108,6 +108,12 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleWhatsAppSupport = () => {
+    const message = encodeURIComponent("Hi, I need help with CSHAD iSentinel");
+    const url = `https://wa.me/27813877744?text=${message}`;
+    Linking.openURL(url).catch(() => Alert.alert(t('common.error'), "Could not open WhatsApp"));
+  };
+
   const handleRateApp = () => {
     Alert.alert(
       t('settings.rateApp'),
@@ -130,7 +136,6 @@ export default function SettingsScreen() {
     Linking.openURL("https://cshad-isentinel-md.vercel.app/register/journalist");
   };
 
-  // Real remote push notification (Firebase‑backed)
   const handleTestNotification = async () => {
     if (sendingTest) return;
     setSendingTest(true);
@@ -218,6 +223,34 @@ export default function SettingsScreen() {
         <Text style={[styles.title, { color: colors.text }]}>{t('settings.title')}</Text>
       </View>
 
+      {/* Permissions */}
+      <View style={[styles.section, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>PERMISSIONS</Text>
+        <SettingsItem
+          icon="location-outline"
+          iconColor={colors.primary}
+          title="Location"
+          subtitle={preferences.homeLocation?.name ? `Set to ${preferences.homeLocation.name}` : 'Not set'}
+          onPress={() => Linking.openSettings()}
+        />
+        <View style={[styles.itemDivider, { backgroundColor: colors.divider }]} />
+        <SettingsItem
+          icon="notifications-outline"
+          iconColor={colors.warning}
+          title="Notifications"
+          subtitle="Safety alerts & updates"
+          onPress={() => Linking.openSettings()}
+        />
+        <View style={[styles.itemDivider, { backgroundColor: colors.divider }]} />
+        <SettingsItem
+          icon="camera-outline"
+          iconColor={colors.info}
+          title="Camera"
+          subtitle="For attaching photos to tips"
+          onPress={() => Linking.openSettings()}
+        />
+      </View>
+
       {/* Display Preferences */}
       <View style={[styles.section, { backgroundColor: colors.surface }]}>
         <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>{t('settings.display')}</Text>
@@ -261,7 +294,15 @@ export default function SettingsScreen() {
       {/* Help & Support */}
       <View style={[styles.section, { backgroundColor: colors.surface }]}>
         <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>{t('settings.helpSupport')}</Text>
-        <SettingsItem icon="chatbubble-ellipses-outline" iconColor={colors.primary} title="Send Feedback" subtitle="Report a bug or suggest a feature" onPress={() => setFeedbackModalVisible(true)} />
+        <SettingsItem
+          icon="chatbubble-ellipses-outline"
+          iconColor={colors.primary}
+          title="Send Feedback"
+          subtitle="Report a bug or suggest a feature"
+          onPress={() => Linking.openURL('https://cshad-isentinel-md.vercel.app/feedback')}
+        />
+        <View style={[styles.itemDivider, { backgroundColor: colors.divider }]} />
+        <SettingsItem icon="logo-whatsapp" iconColor="#25D366" title="WhatsApp Support" subtitle="Chat with us on WhatsApp" onPress={handleWhatsAppSupport} />
         <View style={[styles.itemDivider, { backgroundColor: colors.divider }]} />
         <SettingsItem icon="mail-outline" iconColor={colors.primary} title={t('settings.contactSupport')} subtitle="petrographics.adm@gmail.com" onPress={handleEmailSupport} />
         <View style={[styles.itemDivider, { backgroundColor: colors.divider }]} />
@@ -323,5 +364,5 @@ const styles = StyleSheet.create({
   versionText: { fontSize: Typography.sizes.caption, fontFamily: Typography.fonts.mono },
   footer: { alignItems: "center", marginTop: Spacing.md, marginBottom: Spacing.xl },
   copyright: { fontSize: Typography.sizes.caption, fontFamily: Typography.fonts.medium },
-  rights: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.regular, marginTop: Spacing.xs},
+  rights: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.regular, marginTop: Spacing.xs },
 });

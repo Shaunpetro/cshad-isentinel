@@ -24,28 +24,16 @@ const TABS: TabConfig[] = [
     iconFocused: "newspaper",
   },
   {
-    name: "map",
-    titleKey: "tabs.map",
-    icon: "map-outline",
-    iconFocused: "map",
-  },
-  {
     name: "opportunities",
     titleKey: "tabs.opportunities",
     icon: "ribbon-outline",
     iconFocused: "ribbon",
   },
   {
-    name: "tip",
-    titleKey: "tabs.tip",
-    icon: "shield-outline",
-    iconFocused: "shield",
-  },
-  {
     name: "alerts",
     titleKey: "tabs.alerts",
-    icon: "notifications-outline",
-    iconFocused: "notifications",
+    icon: "shield-outline",
+    iconFocused: "shield",
   },
   {
     name: "settings",

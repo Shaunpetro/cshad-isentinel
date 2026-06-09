@@ -2,14 +2,16 @@
 import React, { useEffect } from "react";
 import { Stack } from "expo-router";
 import { View, Text, StyleSheet } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { I18nextProvider } from "react-i18next";
 import i18n from "@/i18n";
 import { useAppReady } from "@/hooks/useAppReady";
 import { CustomSplashScreen } from "@/components/core/SplashScreen";
 import { useNotifications } from "@/hooks/useNotifications";
 import { ThemeProvider, useTheme } from "@/contexts";
+import { PersistentFeedbackButton } from "@/components/feedback/PersistentFeedbackButton";
+import { UpdateBanner } from "@/components/common/UpdateBanner";
 
-// ---------- Error Boundary ----------
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { error: Error | null }
@@ -23,10 +25,10 @@ class ErrorBoundary extends React.Component<
   render() {
     if (this.state.error) {
       return (
-        <View style={errorStyles.container}>
+        <SafeAreaView style={errorStyles.container}>
           <Text style={errorStyles.title}>Startup Error</Text>
           <Text style={errorStyles.message}>{this.state.error.message}</Text>
-        </View>
+        </SafeAreaView>
       );
     }
     return this.props.children;
@@ -39,14 +41,10 @@ const errorStyles = StyleSheet.create({
   message: { fontSize: 14, fontFamily: "DMSans-Regular", color: "#FF4757", textAlign: "center" },
 });
 
-// ---------- Inner Layout ----------
 function RootLayoutInner() {
   const { isReady, showCustomSplash, onLayoutReady, onSplashComplete } = useAppReady();
   const { colors } = useTheme();
   const { isInitialized: notificationsReady, error: notificationError } = useNotifications();
-
-  // OTA updates are handled automatically by Expo's ON_LOAD policy.
-  // No manual check is needed here.
 
   useEffect(() => {
     if (notificationsReady) {
@@ -59,10 +57,12 @@ function RootLayoutInner() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]} onLayout={onLayoutReady}>
+      <UpdateBanner />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />
       </Stack>
+      <PersistentFeedbackButton />
       {showCustomSplash && <CustomSplashScreen onComplete={onSplashComplete} />}
     </View>
   );
@@ -73,7 +73,9 @@ export default function RootLayout() {
     <I18nextProvider i18n={i18n}>
       <ThemeProvider>
         <ErrorBoundary>
-          <RootLayoutInner />
+          <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }} edges={["top"]}>
+            <RootLayoutInner />
+          </SafeAreaView>
         </ErrorBoundary>
       </ThemeProvider>
     </I18nextProvider>

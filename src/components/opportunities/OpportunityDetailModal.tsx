@@ -51,9 +51,8 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
 
   const handleDownload = async (url: string, fileName: string) => {
     try {
-      const fileUri = (FileSystem as any).documentDirectory + fileName;
-      const downloadResumable = FileSystem.createDownloadResumable(url, fileUri);
-      const { uri } = await downloadResumable.downloadAsync();
+      const fileUri = FileSystem.cacheDirectory + fileName;
+      const { uri } = await FileSystem.downloadAsync(url, fileUri);
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri);
       } else {
@@ -90,7 +89,6 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
   const isTender = opportunity.category === 'tender';
 
   const renderBriefing = () => {
-    // Only show briefing for tenders
     if (!isTender) return null;
     const hasBriefing = (opportunity as any).briefing_required;
     if (hasBriefing === undefined || hasBriefing === null) return null;
