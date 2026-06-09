@@ -20,7 +20,6 @@ interface FilterOption {
 }
 
 const FILTER_OPTIONS: FilterOption[] = [
-  { id: 'live', labelKey: 'time.live', icon: 'radio' },
   { id: 'today', labelKey: 'news.today', icon: 'today' },
   { id: 'week', labelKey: 'time.week', icon: 'calendar' },
   { id: 'month', labelKey: 'time.month', icon: 'calendar-outline' },
@@ -52,7 +51,6 @@ export function TimeFilterBar({
       <View style={[styles.filterRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         {FILTER_OPTIONS.map((option) => {
           const isActive = activeFilter === option.id;
-          const isLive = option.id === 'live';
 
           return (
             <TouchableOpacity
@@ -64,7 +62,6 @@ export function TimeFilterBar({
               onPress={() => onFilterChange(option.id)}
               activeOpacity={0.7}
             >
-              {isLive && isActive && <View style={styles.liveDot} />}
               <Ionicons
                 name={option.icon}
                 size={14}

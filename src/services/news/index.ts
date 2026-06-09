@@ -1,4 +1,6 @@
 // src/services/news/index.ts
 export * from './types';
-export * from './newsService';
-export * from './newsMapper';
+export { fetchNews, fetchNewsById, fetchBreakingNews, subscribeToNews } from './newsService';
+export { mapRecordsToNewsItems, mapRecordToNewsItem } from './newsMapper';
+export type { TimeFilter } from './newsService';
+export { REFRESH_INTERVALS } from './newsService';

@@ -83,7 +83,7 @@ export default function NewsScreen() {
   // Filter news by selected category client-side
   const news = useMemo(() => {
     if (activeCategory === "all") return allNews;
-    return allNews.filter((article) => article.category === activeCategory);
+    return allNews.filter((article: NewsItem) => article.category === activeCategory);
   }, [allNews, activeCategory]);
 
   // Handle article press - Navigate to detail screen

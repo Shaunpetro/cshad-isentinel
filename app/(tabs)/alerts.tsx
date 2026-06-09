@@ -7,7 +7,6 @@ import {
   FlatList,
   RefreshControl,
   ActivityIndicator,
-  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,7 +31,6 @@ import {
   type Journalist,
   type NationalAlert,
 } from '@/components/hub';
-import { TipForm } from '@/components/tip/TipForm';
 import type { SavedArea } from '@/services/infrastructure';
 
 export default function AlertsScreen() {
@@ -66,7 +64,6 @@ export default function AlertsScreen() {
   });
 
   const [suburbPickerVisible, setSuburbPickerVisible] = useState(false);
-  const [showTipForm, setShowTipForm] = useState(false);
 
   const filterCounts: Partial<Record<HubFilter, number>> = {
     tips: feedItems.filter((item) => item.type === 'tip').length,
@@ -151,32 +148,9 @@ export default function AlertsScreen() {
           onFilterChange={handleFilterChange}
           counts={filterCounts}
         />
-
-        {/* Tip form toggle */}
-        <View style={styles.tipToggleRow}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>
-            {activeFilter === 'tips' ? t('alerts.communityTips') : getFilterName(activeFilter, t)}
-          </Text>
-          <Ionicons.Button
-            name={showTipForm ? 'close-circle-outline' : 'add-circle-outline'}
-            backgroundColor="transparent"
-            color={colors.primary}
-            size={22}
-            onPress={() => setShowTipForm(!showTipForm)}
-          >
-            <Text style={{ color: colors.primary, fontFamily: 'DMSans-Medium', fontSize: 14 }}>
-              {showTipForm ? t('common.cancel') : t('tip.submitTip')}
-            </Text>
-          </Ionicons.Button>
-        </View>
-        {showTipForm && (
-          <View style={styles.tipFormContainer}>
-            <TipForm onSuccess={() => { setShowTipForm(false); refresh(); }} />
-          </View>
-        )}
       </View>
     ),
-    [nationalAlertItems, activeWeatherAlert, weather, loadshedding, stats, activeFilter, filterCounts, colors, showTipForm, t, handleNationalAlertPress, dismissNationalAlert, handleFilterChange, currentCity, refresh, setFilter]
+    [nationalAlertItems, activeWeatherAlert, weather, loadshedding, stats, activeFilter, filterCounts, colors, handleNationalAlertPress, dismissNationalAlert, handleFilterChange, currentCity, setFilter]
   );
 
   const renderFooter = useCallback(
@@ -252,18 +226,6 @@ export default function AlertsScreen() {
   );
 }
 
-function getFilterName(filter: HubFilter, t: any): string {
-  const map: Record<string, string> = {
-    tips: 'Community Tips',
-    live: 'Active Incidents',
-    weather: 'Weather Alerts',
-    infrastructure: 'Infrastructure',
-    national: 'National',
-    all: 'All',
-  };
-  return map[filter] || filter;
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.sm },
@@ -271,9 +233,6 @@ const styles = StyleSheet.create({
   locationRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 4 },
   locationText: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.medium },
   radiusText: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.regular },
-  tipToggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.md, paddingTop: Spacing.lg },
-  sectionTitle: { fontSize: Typography.sizes.body, fontFamily: Typography.fonts.bold },
-  tipFormContainer: { paddingHorizontal: Spacing.md, paddingBottom: Spacing.md },
   footer: { paddingBottom: Spacing.xl },
   bottomSpacing: { height: 100 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: Spacing.xl * 2, paddingHorizontal: Spacing.lg },

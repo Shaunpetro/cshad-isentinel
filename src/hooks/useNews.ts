@@ -1,60 +1,45 @@
-// src/services/news/newsService.ts
-import { supabase } from '@/services/supabase/config';
-import type { NewsRecord } from './types';
+// src/hooks/useNews.ts
+import { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  fetchNews,
+  fetchNewsById,
+  fetchBreakingNews,
+  subscribeToNews,
+  mapRecordsToNewsItems,
+  mapRecordToNewsItem,
+  type NewsQueryParams,
+  type TimeFilter,
+  REFRESH_INTERVALS,
+} from '@/services/news';
+import type { NewsItem, NewsCategory } from '@/types';
 
-export interface NewsQueryParams {
-  category?: string;
+export interface UseNewsOptions {
+  category?: NewsCategory;
   scope?: 'local' | 'city' | 'national';
   latitude?: number;
   longitude?: number;
   cityName?: string;
   radiusKm?: number;
-  timeFilter?: string;
+  timeFilter?: TimeFilter;
   limit?: number;
-  offset?: number;
+  realtime?: boolean;
+  autoRefresh?: boolean;
 }
 
-export type TimeFilter = 'today' | 'week' | 'month' | 'all';
-
-export const REFRESH_INTERVALS: Record<TimeFilter, number> = {
-  today: 5 * 60 * 1000,
-  week: 15 * 60 * 1000,
-  month: 30 * 60 * 1000,
-  all: 60 * 60 * 1000,
-};
-
-function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
+export interface UseNewsResult {
+  news: NewsItem[];
+  breakingNews: NewsItem[];
+  isLoading: boolean;
+  isRefreshing: boolean;
+  error: string | null;
+  refresh: () => Promise<void>;
+  loadMore: () => Promise<void>;
+  hasMore: boolean;
+  lastUpdated: Date | null;
+  totalCount: number | null;
 }
 
-function getTimeFilterDate(timeFilter: TimeFilter): string | null {
-  const now = new Date();
-  switch (timeFilter) {
-    case 'today':
-      now.setHours(0, 0, 0, 0);
-      return now.toISOString();
-    case 'week':
-      now.setDate(now.getDate() - 7);
-      return now.toISOString();
-    case 'month':
-      now.setMonth(now.getMonth() - 1);
-      return now.toISOString();
-    default:
-      return null;
-  }
-}
-
-export async function fetchNews(params: NewsQueryParams = {}) {
+export function useNews(options: UseNewsOptions = {}): UseNewsResult {
   const {
     category,
     scope = 'national',
@@ -64,105 +49,223 @@ export async function fetchNews(params: NewsQueryParams = {}) {
     radiusKm,
     timeFilter = 'all',
     limit = 20,
-    offset = 0,
-  } = params;
+    realtime = true,
+    autoRefresh = true,
+  } = options;
 
-  let query = supabase
-    .from('news')
-    .select('*', { count: 'exact' })
-    .order('published_at', { ascending: false })
-    .range(offset, offset + limit - 1);
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [breakingNews, setBreakingNews] = useState<NewsItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
 
-  if (category && category !== 'all') {
-    query = query.eq('category', category);
-  }
+  const unsubscribeRef = useRef<(() => void) | null>(null);
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true);
 
-  const timeDate = getTimeFilterDate(timeFilter as TimeFilter);
-  if (timeDate) {
-    query = query.gte('published_at', timeDate);
-  }
+  const buildParams = useCallback(
+    (customOffset?: number): NewsQueryParams => ({
+      category,
+      scope,
+      latitude,
+      longitude,
+      cityName,
+      radiusKm,
+      timeFilter,
+      limit,
+      offset: customOffset ?? offset,
+    }),
+    [category, scope, latitude, longitude, cityName, radiusKm, timeFilter, limit, offset]
+  );
 
-  const { data, error, count } = await query;
+  const fetchNewsData = useCallback(
+    async (isRefresh = false, isBackground = false) => {
+      try {
+        if (isRefresh && !isBackground) {
+          setIsRefreshing(true);
+          setOffset(0);
+        } else if (offset === 0 && !isBackground) {
+          setIsLoading(true);
+        }
 
-  if (error) {
-    console.error('[NewsService] Error fetching news:', error);
-    return { data: [], error: error.message, count: 0 };
-  }
+        if (!isBackground) {
+          setError(null);
+        }
 
-  let articles = (data || []) as NewsRecord[];
+        const params = buildParams(isRefresh ? 0 : undefined);
+        const result = await fetchNews(params);
 
-  // Apply dynamic radius filtering for local scope
-  if (scope === 'local' && latitude !== undefined && longitude !== undefined && radiusKm && radiusKm > 0) {
-    articles = articles.filter((article) => {
-      if (!article.latitude || !article.longitude) return true; // keep national/international
-      const distance = calculateDistance(latitude, longitude, article.latitude, article.longitude);
-      return distance <= radiusKm;
-    });
-  }
+        if (!isMountedRef.current) return;
 
-  return { data: articles, error: null, count: count || 0 };
-}
+        if (result.error) {
+          if (!isBackground) {
+            setError(result.error);
+          }
+          return;
+        }
 
-export async function fetchNewsById(id: string) {
-  const { data, error } = await supabase
-    .from('news')
-    .select('*')
-    .eq('id', id)
-    .single();
+        const items = mapRecordsToNewsItems(result.data);
 
-  if (error) {
-    return { data: null, error: error.message };
-  }
+        if (isRefresh || offset === 0) {
+          setNews(items);
+        } else {
+          setNews((prev) => [...prev, ...items]);
+        }
 
-  return { data: data as NewsRecord, error: null };
-}
+        setTotalCount(result.count);
+        setHasMore(items.length === limit);
+        setLastUpdated(new Date());
 
-export async function fetchBreakingNews(limit = 10) {
-  const { data, error, count } = await supabase
-    .from('news')
-    .select('*', { count: 'exact' })
-    .eq('is_breaking', true)
-    .order('published_at', { ascending: false })
-    .limit(limit);
-
-  if (error) {
-    return { data: [], error: error.message, count: 0 };
-  }
-
-  return { data: (data || []) as NewsRecord[], error: null, count: count || 0 };
-}
-
-export function subscribeToNews(
-  onInsert: (record: NewsRecord) => void,
-  onUpdate: (record: NewsRecord) => void,
-  options?: { cityName?: string }
-) {
-  console.log('[NewsService] Setting up realtime subscription');
-
-  const channel = supabase
-    .channel('news-realtime-' + (options?.cityName || 'all'))
-    .on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'news' },
-      (payload) => {
-        console.log('[NewsService] New article received');
-        onInsert(payload.new as NewsRecord);
+        const breakingResult = await fetchBreakingNews(10);
+        if (!breakingResult.error && isMountedRef.current) {
+          setBreakingNews(mapRecordsToNewsItems(breakingResult.data));
+        }
+      } catch (err) {
+        if (!isMountedRef.current) return;
+        const message = err instanceof Error ? err.message : 'Failed to fetch news';
+        if (!isBackground) {
+          setError(message);
+        }
+        console.error('[useNews] Error:', message);
+      } finally {
+        if (isMountedRef.current) {
+          setIsLoading(false);
+          setIsRefreshing(false);
+        }
       }
-    )
-    .on(
-      'postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: 'news' },
-      (payload) => {
-        console.log('[NewsService] Article updated');
-        onUpdate(payload.new as NewsRecord);
-      }
-    )
-    .subscribe((status) => {
-      console.log('[NewsService] Realtime subscription status:', status);
-    });
+    },
+    [buildParams, limit, offset]
+  );
 
-  return () => {
-    console.log('[NewsService] Unsubscribing from channel');
-    supabase.removeChannel(channel);
+  const refresh = useCallback(async () => {
+    await fetchNewsData(true, false);
+  }, [fetchNewsData]);
+
+  const backgroundRefresh = useCallback(async () => {
+    console.log('[useNews] Background refresh...');
+    await fetchNewsData(true, true);
+  }, [fetchNewsData]);
+
+  const loadMore = useCallback(async () => {
+    if (!hasMore || isLoading) return;
+    setOffset((prev) => prev + limit);
+  }, [hasMore, isLoading, limit]);
+
+  useEffect(() => {
+    fetchNewsData(true);
+  }, [category, scope, latitude, longitude, cityName, radiusKm, timeFilter]);
+
+  useEffect(() => {
+    if (offset > 0) {
+      fetchNewsData(false);
+    }
+  }, [offset]);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+
+    const interval = REFRESH_INTERVALS[timeFilter] || REFRESH_INTERVALS.all;
+    console.log(`[useNews] Auto-refresh set to ${interval / 1000}s for timeFilter: ${timeFilter}`);
+
+    refreshIntervalRef.current = setInterval(() => {
+      backgroundRefresh();
+    }, interval);
+
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+    };
+  }, [autoRefresh, timeFilter, backgroundRefresh]);
+
+  useEffect(() => {
+    if (!realtime) return;
+
+    unsubscribeRef.current = subscribeToNews(
+      (record: any) => {
+        const newItem = mapRecordToNewsItem(record);
+        setNews((prev) => [newItem, ...prev]);
+        setLastUpdated(new Date());
+        if (newItem.isBreaking) {
+          setBreakingNews((prev) => [newItem, ...prev.slice(0, 9)]);
+        }
+      },
+      (record: any) => {
+        const updatedItem = mapRecordToNewsItem(record);
+        setNews((prev) =>
+          prev.map((item) => (item.id === updatedItem.id ? updatedItem : item))
+        );
+        setBreakingNews((prev) =>
+          prev.map((item) => (item.id === updatedItem.id ? updatedItem : item))
+        );
+      },
+      { cityName: scope === 'local' ? cityName : undefined }
+    );
+
+    return () => {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+      }
+    };
+  }, [realtime, scope, cityName]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  return {
+    news,
+    breakingNews,
+    isLoading,
+    isRefreshing,
+    error,
+    refresh,
+    loadMore,
+    hasMore,
+    lastUpdated,
+    totalCount,
   };
+}
+
+export function useNewsArticle(id: string | undefined) {
+  const [article, setArticle] = useState<NewsItem | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!id) {
+      setIsLoading(false);
+      return;
+    }
+
+    async function fetchArticle() {
+      setIsLoading(true);
+      setError(null);
+
+      const result = await fetchNewsById(id as string);
+
+      if (result.error) {
+        setError(result.error);
+        setArticle(null);
+      } else if (result.data) {
+        setArticle(mapRecordToNewsItem(result.data));
+      } else {
+        setError('Article not found');
+        setArticle(null);
+      }
+
+      setIsLoading(false);
+    }
+
+    fetchArticle();
+  }, [id]);
+
+  return { article, isLoading, error };
 }

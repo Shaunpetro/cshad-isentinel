@@ -38,7 +38,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: "#1C1C1C",
     },
     package: "cshad.isentinel.news",
-    versionCode: 4,                     // <-- added for Play Console
+    versionCode: 5,                     // <-- added for Play Console
     googleServicesFile: "./google-services.json",    
     config: {
       googleMaps: {
