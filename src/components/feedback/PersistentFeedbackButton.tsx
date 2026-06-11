@@ -1,5 +1,5 @@
 // src/components/feedback/PersistentFeedbackButton.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,59 +8,151 @@ import {
   Pressable,
   TextInput,
   ScrollView,
-  Linking,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
-import { usePathname } from 'expo-router';
+import { usePathname, useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts';
 import { Typography, Spacing, BorderRadius } from '@/config/theme';
+import { submitTicket } from '@/services/tickets/submitTicket';
 
 type TicketCategory = 'bug' | 'feature' | 'beta' | 'problem' | 'other';
 
 const CATEGORY_OPTIONS: TicketCategory[] = ['bug', 'feature', 'beta', 'problem', 'other'];
 
+const CATEGORY_PREFIXES: Record<TicketCategory, string> = {
+  bug: 'Bug: ',
+  feature: 'Feature Request: ',
+  beta: 'Beta Testing Issue: ',
+  problem: 'General Problem: ',
+  other: 'Other: ',
+};
+
 export function PersistentFeedbackButton() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
+  const navigation = useNavigation();
   const [visible, setVisible] = useState(false);
+  const [submitCount, setSubmitCount] = useState(0);
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
+  const [captchaQuestion, setCaptchaQuestion] = useState('');
+  const [showCaptcha, setShowCaptcha] = useState(false);
 
-  // Basic fields (always visible)
+  // Basic fields
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [category, setCategory] = useState<TicketCategory>('bug');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
 
-  // Bug‑specific fields (only visible when category === 'bug')
-  const [steps, setSteps] = useState(`Screen: ${pathname}`);
+  // Bug‑specific fields
+  const [steps, setSteps] = useState('');
   const [expected, setExpected] = useState('');
   const [actual, setActual] = useState('');
 
-  // Auto‑populated environment
+  // Screen breadcrumbs
+  const screenTrailRef = useRef<string[]>([]);
+
+  // Track navigation
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('state', () => {
+      const state = navigation.getState();
+      if (state) {
+        const currentRoute = state.routes[state.index]?.name || '';
+        if (screenTrailRef.current[screenTrailRef.current.length - 1] !== currentRoute) {
+          screenTrailRef.current.push(currentRoute);
+          if (screenTrailRef.current.length > 10) screenTrailRef.current.shift(); // keep last 10
+        }
+      }
+    });
+    return unsubscribe;
+  }, [navigation]);
+
   const deviceInfo = `${Device.brand || ''} ${Device.modelName || ''} (${Device.osName || ''} ${Device.osVersion || ''})`;
   const appVersion = Constants.expoConfig?.version || '1.264.0';
   const environment = `${deviceInfo} — App v${appVersion}`;
 
-  const handleSubmit = () => {
-    const params = new URLSearchParams({
+  // Auto‑populate steps when modal opens
+  useEffect(() => {
+    if (visible) {
+      const trail = screenTrailRef.current.join(' → ');
+      setSteps(`Screen trail: ${trail}\nCurrent: ${pathname}`);
+    }
+  }, [visible, pathname]);
+
+  // Auto‑prefix subject based on category
+  useEffect(() => {
+    const prefix = CATEGORY_PREFIXES[category];
+    // Strip any known prefix first
+    let newSubject = subject;
+    for (const p of Object.values(CATEGORY_PREFIXES)) {
+      if (newSubject.startsWith(p)) {
+        newSubject = newSubject.slice(p.length);
+        break;
+      }
+    }
+    setSubject(prefix + newSubject);
+  }, [category]);
+
+  const generateCaptcha = () => {
+    const a = Math.floor(Math.random() * 10) + 1;
+    const b = Math.floor(Math.random() * 10) + 1;
+    setCaptchaQuestion(`What is ${a} + ${b}?`);
+    setCaptchaAnswer((a + b).toString());
+  };
+
+  const handleSubmit = async () => {
+    if (showCaptcha) {
+      if (captchaAnswer !== captchaQuestion.split('+')[1]?.trim()) {
+        Alert.alert('Incorrect', 'Please try the math question again.');
+        setCaptchaAnswer('');
+        generateCaptcha();
+        return;
+      }
+    }
+
+    const result = await submitTicket({
       name: name.trim(),
       email: email.trim(),
       category,
-      subject: `${category.charAt(0).toUpperCase() + category.slice(1)}: ${subject.trim()}`,
+      subject,
       message: message.trim(),
       steps_to_reproduce: steps.trim(),
       expected_behavior: expected.trim(),
       actual_behavior: actual.trim(),
       environment,
-      source: 'mobile',
-    }).toString();
+    });
 
-    Linking.openURL(`https://cshad-isentinel-md.vercel.app/feedback?${params}`);
-    setVisible(false);
+    if (result.success) {
+      Alert.alert('Success', 'Ticket submitted!', [
+        {
+          text: 'OK',
+          onPress: () => {
+            // Reset form
+            setName(''); setEmail(''); setSubject(''); setMessage('');
+            setSteps(''); setExpected(''); setActual('');
+            setSubmitCount(0);
+            setShowCaptcha(false);
+            setCaptchaAnswer('');
+            // Reset screen trail
+            screenTrailRef.current = [];
+            setVisible(false);
+          },
+        },
+      ]);
+    } else {
+      const newCount = submitCount + 1;
+      setSubmitCount(newCount);
+      if (newCount >= 3) {
+        setShowCaptcha(true);
+        generateCaptcha();
+      }
+      Alert.alert('Error', result.message || 'Submission failed. Please try again.');
+    }
   };
 
   const bottomPosition = 60 + insets.bottom + 12;
@@ -140,11 +232,11 @@ export function PersistentFeedbackButton() {
                 textAlignVertical="top"
               />
 
-              {/* Bug‑specific fields — only when category is 'bug' */}
+              {/* Bug‑specific fields */}
               {category === 'bug' && (
                 <>
                   <Text style={[styles.label, { color: colors.text, marginTop: Spacing.sm }]}>
-                    Steps to Reproduce
+                    Steps to Reproduce (auto‑tracked)
                   </Text>
                   <TextInput
                     style={[styles.inputMultiline, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
@@ -175,9 +267,24 @@ export function PersistentFeedbackButton() {
                 </>
               )}
 
-              {/* Environment field (always visible, auto‑populated) */}
+              {/* Environment field (auto‑populated) */}
               <Text style={[styles.label, { color: colors.text, marginTop: Spacing.sm }]}>Environment (auto‑detected)</Text>
               <Text style={[styles.envText, { color: colors.textSecondary }]}>{environment}</Text>
+
+              {/* Captcha after 3 failures */}
+              {showCaptcha && (
+                <View style={styles.captchaContainer}>
+                  <Text style={[styles.label, { color: colors.text }]}>{captchaQuestion}</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border, width: 100 }]}
+                    placeholder="Answer"
+                    placeholderTextColor={colors.textSecondary}
+                    value={captchaAnswer}
+                    onChangeText={setCaptchaAnswer}
+                    keyboardType="numeric"
+                  />
+                </View>
+              )}
 
               <Pressable
                 style={[styles.submitButton, { backgroundColor: colors.primary }]}
@@ -283,6 +390,10 @@ const styles = StyleSheet.create({
     padding: Spacing.sm,
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: BorderRadius.md,
+  },
+  captchaContainer: {
+    alignItems: 'center',
+    marginBottom: Spacing.md,
   },
   submitButton: {
     paddingVertical: 14,

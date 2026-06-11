@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import * as WebBrowser from 'expo-web-browser';
 import { useTheme } from '@/contexts';
 import { Typography, Spacing, BorderRadius } from '@/config/theme';
 import { SubscriptionModal } from './SubscriptionModal';
@@ -49,17 +50,24 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
     }
   };
 
-  const handleDownload = async (url: string, fileName: string) => {
+  // Hybrid download: try file download + share, fallback to in‑app browser
+  const handleDownload = async (url: string) => {
     try {
+      const fileName = url.split('/').pop() || 'document';
       const fileUri = (FileSystem as any).documentDirectory + fileName;
       const { uri } = await FileSystem.downloadAsync(url, fileUri);
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri);
       } else {
-        Alert.alert('Download complete', `File saved to ${uri}`);
+        await WebBrowser.openBrowserAsync(url);
       }
-    } catch (error: any) {
-      Alert.alert('Download failed', error.message || 'An error occurred');
+    } catch {
+      // Fallback to in‑app browser
+      try {
+        await WebBrowser.openBrowserAsync(url);
+      } catch {
+        Alert.alert('Error', 'Could not open document');
+      }
     }
   };
 
@@ -227,10 +235,11 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
 
               {renderBriefing()}
 
+              {/* Description: free tier shows faded preview */}
               {isPremiumLocked ? (
                 <View style={styles.premiumContainer}>
-                  <Text style={[styles.body, { color: colors.text }]}>
-                    {(opportunity as any).body || opportunity.title}
+                  <Text style={[styles.body, { color: colors.text }]} numberOfLines={4}>
+                    {opportunity.body}
                   </Text>
                   <View style={styles.upgradeBanner}>
                     <View style={styles.upgradeBannerContent}>
@@ -253,6 +262,7 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
                 </Text>
               )}
 
+              {/* Documents: free tier shows locked */}
               {docs.length > 0 && (
                 <View style={styles.section}>
                   <Text style={[styles.sectionTitle, { color: colors.text }]}>Documents</Text>
@@ -264,9 +274,12 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
                         { backgroundColor: isPremiumLocked ? colors.divider : colors.surface + '80' },
                       ]}
                       onPress={() => {
-                        if (!isPremiumLocked) handleDownload(doc.url, doc.name);
+                        if (isPremiumLocked) {
+                          setSubscriptionVisible(true);
+                        } else {
+                          handleDownload(doc.url);
+                        }
                       }}
-                      disabled={isPremiumLocked}
                     >
                       <Ionicons
                         name="document-text"

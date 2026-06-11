@@ -7,30 +7,25 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const E_TENDERS_URL = 'https://www.etenders.gov.za/Home/opportunities?id=1';
-const MAX_PAGES = 5; // daily update pages
+const MAX_PAGES = 5;
 const NAV_TIMEOUT = 60000;
 
 function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/**
+ * Parse a date string from the detail row.
+ * Uses ONLY the detail‑row dates (Date Published / Closing Date).
+ * NO relative "in 21 days" fallback.
+ */
 function parseDate(dateStr) {
   if (!dateStr) return new Date().toISOString();
-  const relDays = dateStr.match(/in\s+(\d+)\s+days?/i);
-  if (relDays) {
-    const days = parseInt(relDays[1], 10);
-    const future = new Date();
-    future.setDate(future.getDate() + days);
-    return future.toISOString();
-  }
-  const relHours = dateStr.match(/in\s+(\d+)\s+hours?/i);
-  if (relHours) {
-    const hours = parseInt(relHours[1], 10);
-    const future = new Date();
-    future.setHours(future.getHours() + hours);
-    return future.toISOString();
-  }
+
+  // Remove ordinal suffixes and commas
   let clean = dateStr.replace(/(\d)(st|nd|rd|th)\b/gi, '$1').replace(/,/g, '').trim();
+
+  // Extract time if present (e.g., " - 11:00")
   const timeMatch = clean.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i);
   let hours = 0, minutes = 0;
   if (timeMatch) {
@@ -40,11 +35,14 @@ function parseDate(dateStr) {
     if (timeMatch[3] && timeMatch[3].toUpperCase() === 'AM' && hours === 12) hours = 0;
     clean = clean.substring(0, timeMatch.index).trim();
   }
+
   const d = new Date(clean);
   if (!isNaN(d.getTime())) {
     if (timeMatch) d.setHours(hours, minutes, 0, 0);
     return d.toISOString();
   }
+
+  // dd/MM/yyyy fallback
   const parts = clean.split(/[\s\/]+/);
   if (parts.length === 3 && !isNaN(parts[0])) {
     const day = parseInt(parts[0], 10);
@@ -54,6 +52,8 @@ function parseDate(dateStr) {
       return new Date(year, month, day, hours, minutes).toISOString();
     }
   }
+
+  // Last resort: today
   return new Date().toISOString();
 }
 
@@ -85,7 +85,6 @@ function parseDate(dateStr) {
       for (const title of visibleTitles) {
         console.log(`    Processing: ${title}`);
 
-        // Expand the row
         await page.evaluate((t) => {
           const cells = document.querySelectorAll('#tendeList tbody tr td.sorting_1');
           for (const cell of cells) {
@@ -176,15 +175,12 @@ function parseDate(dateStr) {
               return {
                 category: cells[1]?.innerText?.trim() || '',
                 eSubmission: cells[3]?.innerText?.trim() || '',
-                advertised: cells[4]?.innerText?.trim() || '',
-                closing: cells[5]?.innerText?.trim() || '',
               };
             }
           }
           return null;
         }, title);
 
-        // Close the row
         await page.evaluate((t) => {
           const cells = document.querySelectorAll('#tendeList tbody tr td.sorting_1');
           for (const cell of cells) {
@@ -202,14 +198,12 @@ function parseDate(dateStr) {
           continue;
         }
 
+        // Use ONLY detail‑row dates
+        const closingDate = details['Closing Date'] ? parseDate(details['Closing Date']) : new Date().toISOString();
+        const advertisedDate = details['Date Published'] ? parseDate(details['Date Published']) : new Date().toISOString();
+
         const companyName = details['Organ Of State'] || basicInfo?.eSubmission || '';
         const sourceId = details['Tender Number'] || null;
-        const closingDate = details['Closing Date']
-          ? parseDate(details['Closing Date'])
-          : parseDate(basicInfo?.closing || '');
-        const advertisedDate = details['Date Published']
-          ? parseDate(details['Date Published'])
-          : parseDate(basicInfo?.advertised || '');
 
         const briefingIsThere = details['Is there a briefing session?'];
         const briefingRequired = briefingIsThere && briefingIsThere.toLowerCase() !== 'no' && briefingIsThere.toLowerCase() !== 'n/a';

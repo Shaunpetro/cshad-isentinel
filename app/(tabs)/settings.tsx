@@ -27,7 +27,6 @@ import {
 import { PrivacyModal } from "@/components/privacy";
 import { CityPickerModal } from "@/components/news";
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from "@/content/legal";
-import { sendRealPushNotification } from "@/services/notifications";
 import { usePreferences } from "@/hooks/usePreferences";
 import { useLanguage, LanguageCode } from "@/hooks/useLanguage";
 import { useTheme } from "@/contexts";
@@ -63,8 +62,6 @@ export default function SettingsScreen() {
   const [scopePickerVisible, setScopePickerVisible] = useState(false);
   const [radiusPickerVisible, setRadiusPickerVisible] = useState(false);
   const [cityPickerVisible, setCityPickerVisible] = useState(false);
-  const [sendingTest, setSendingTest] = useState(false);
-  const [ratingModalVisible, setRatingModalVisible] = useState(false);
 
   const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=cshad.isentinel.news";
 
@@ -137,31 +134,6 @@ export default function SettingsScreen() {
 
   const handleBecomeJournalist = () => {
     Linking.openURL("https://cshad-isentinel-md.vercel.app/register/journalist");
-  };
-
-  const handleTestNotification = async () => {
-    if (sendingTest) return;
-    setSendingTest(true);
-    try {
-      const result = await sendRealPushNotification();
-      if (result.success) {
-        Alert.alert(
-          t('settings.testNotification'),
-          "Real push notification sent! Check your notification tray.",
-          [{ text: t('common.ok') }]
-        );
-      } else {
-        Alert.alert(
-          t('common.error'),
-          result.error || "Could not send push notification. Are you on a physical device?",
-          [{ text: t('common.ok') }]
-        );
-      }
-    } catch (error) {
-      Alert.alert(t('common.error'), "An unexpected error occurred.");
-    } finally {
-      setSendingTest(false);
-    }
   };
 
   const handleCitySelect = (city: SACity) => {
@@ -238,14 +210,6 @@ export default function SettingsScreen() {
         />
         <View style={[styles.itemDivider, { backgroundColor: colors.divider }]} />
         <SettingsItem
-          icon="notifications-outline"
-          iconColor={colors.warning}
-          title="Notifications"
-          subtitle="Safety alerts & updates"
-          onPress={() => Linking.openSettings()}
-        />
-        <View style={[styles.itemDivider, { backgroundColor: colors.divider }]} />
-        <SettingsItem
           icon="camera-outline"
           iconColor={colors.info}
           title="Camera"
@@ -278,14 +242,6 @@ export default function SettingsScreen() {
         <PreferenceToggle icon="volume-high-outline" iconColor="#FF6B6B" title={t('settings.soundEffects')} subtitle={t('settings.soundEffectsSubtitle')} value={preferences.soundEnabled} onValueChange={updateSoundEnabled} />
         <View style={[styles.itemDivider, { backgroundColor: colors.divider }]} />
         <PreferenceToggle icon="phone-portrait-outline" iconColor="#9B59B6" title={t('settings.vibration')} subtitle={t('settings.vibrationSubtitle')} value={preferences.vibrationEnabled} onValueChange={updateVibrationEnabled} />
-      </View>
-
-      {/* Notifications */}
-      <View style={[styles.section, { backgroundColor: colors.surface }]}>
-        <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>{t('settings.notifications')}</Text>
-        <SettingsItem icon="notifications-outline" iconColor={colors.info} title={t('settings.pushNotifications')} subtitle={t('settings.pushNotificationsSubtitle')} showArrow={false} />
-        <View style={[styles.itemDivider, { backgroundColor: colors.divider }]} />
-        <SettingsItem icon="paper-plane-outline" iconColor={colors.warning} title={t('settings.testNotification')} subtitle={sendingTest ? "Sending..." : t('settings.testNotificationSubtitle')} onPress={handleTestNotification} />
       </View>
 
       {/* Privacy */}

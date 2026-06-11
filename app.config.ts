@@ -14,7 +14,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   userInterfaceStyle: "automatic",
 
   splash: {
-    image: "./assets/brand/cshad-isentinel-logo-fs.png",   // ← new logo for native splash
+    image: "./assets/brand/cshad-isentinel-logo-fs.png",
     resizeMode: "contain",
     backgroundColor: "#1C1C1C",
   },
@@ -38,7 +38,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: "#1C1C1C",
     },
     package: "cshad.isentinel.news",
-    versionCode: 5,   // already bumped earlier
+    versionCode: 5,
     googleServicesFile: "./google-services.json",
     config: {
       googleMaps: {
@@ -61,15 +61,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-secure-store",
     "expo-dev-client",
     "expo-sharing",
-    [
-      "expo-notifications",
-      {
-        icon: "./assets/brand/cshad-isentinel-logo-icon.png",
-        color: "#00D4AA",
-        defaultChannel: "default",
-        sounds: [],
-      },
-    ],
+    // expo-notifications removed for Beta 4 rebuild
   ],
 
   experiments: {
@@ -84,7 +76,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   extra: {
     buildPhase: "003",
-    phaseMonth: "May 2026",
+    phaseMonth: "June 2026",
     buildDate: new Date().toISOString(),
     developer: "Petro@ATG",
     eas: {
