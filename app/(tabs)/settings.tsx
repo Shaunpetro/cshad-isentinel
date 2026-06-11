@@ -38,6 +38,7 @@ import {
   HomeLocation,
 } from "@/services/preferences";
 import { SACity } from "@/services/location";
+import * as StoreReview from "expo-store-review";
 
 export default function SettingsScreen() {
   const { colors, mode: themeMode, setMode: setThemeMode } = useTheme();
@@ -63,6 +64,9 @@ export default function SettingsScreen() {
   const [radiusPickerVisible, setRadiusPickerVisible] = useState(false);
   const [cityPickerVisible, setCityPickerVisible] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
+  const [ratingModalVisible, setRatingModalVisible] = useState(false);
+
+  const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=cshad.isentinel.news";
 
   const APPEARANCE_OPTIONS: PickerOption<AppearanceMode>[] = [
     { value: 'dark', label: t('settings.dark'), subtitle: t('settings.appearanceSubtitle'), icon: 'moon' },
@@ -114,20 +118,19 @@ export default function SettingsScreen() {
     Linking.openURL(url).catch(() => Alert.alert(t('common.error'), "Could not open WhatsApp"));
   };
 
-  const handleRateApp = () => {
-    Alert.alert(
-      t('settings.rateApp'),
-      "This will open the app store when the app is published. Thank you for your support!",
-      [{ text: t('common.ok') }]
-    );
+  const handleRateApp = async () => {
+    if (await StoreReview.hasAction()) {
+      await StoreReview.requestReview();
+    } else {
+      Linking.openURL(PLAY_STORE_URL);
+    }
   };
 
   const handleShareApp = async () => {
     try {
       await Share.share({
         title: "CSHAD iSentinel News",
-        message:
-          "Check out CSHAD iSentinel News - A privacy-first community safety app for South Africa. Download it now!",
+        message: `Check out CSHAD iSentinel News - A privacy-first community safety app for South Africa.\n\nDownload it now: ${PLAY_STORE_URL}`,
       });
     } catch (error) {}
   };

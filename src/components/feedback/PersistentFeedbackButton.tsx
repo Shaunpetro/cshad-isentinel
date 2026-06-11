@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
+import { usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts';
 import { Typography, Spacing, BorderRadius } from '@/config/theme';
@@ -24,15 +25,25 @@ const CATEGORY_OPTIONS: TicketCategory[] = ['bug', 'feature', 'beta', 'problem',
 export function PersistentFeedbackButton() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const pathname = usePathname();
   const [visible, setVisible] = useState(false);
+
+  // Basic fields (always visible)
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [category, setCategory] = useState<TicketCategory>('bug');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
 
+  // Bug‑specific fields (only visible when category === 'bug')
+  const [steps, setSteps] = useState(`Screen: ${pathname}`);
+  const [expected, setExpected] = useState('');
+  const [actual, setActual] = useState('');
+
+  // Auto‑populated environment
   const deviceInfo = `${Device.brand || ''} ${Device.modelName || ''} (${Device.osName || ''} ${Device.osVersion || ''})`;
   const appVersion = Constants.expoConfig?.version || '1.264.0';
+  const environment = `${deviceInfo} — App v${appVersion}`;
 
   const handleSubmit = () => {
     const params = new URLSearchParams({
@@ -40,7 +51,11 @@ export function PersistentFeedbackButton() {
       email: email.trim(),
       category,
       subject: `${category.charAt(0).toUpperCase() + category.slice(1)}: ${subject.trim()}`,
-      message: `${message.trim()}\n\n---\nApp Version: ${appVersion}\nDevice: ${deviceInfo}`,
+      message: message.trim(),
+      steps_to_reproduce: steps.trim(),
+      expected_behavior: expected.trim(),
+      actual_behavior: actual.trim(),
+      environment,
       source: 'mobile',
     }).toString();
 
@@ -48,8 +63,7 @@ export function PersistentFeedbackButton() {
     setVisible(false);
   };
 
-  // Position the button just above the tab bar
-  const bottomPosition = 60 + insets.bottom + 12; // tab height + safe area + margin
+  const bottomPosition = 60 + insets.bottom + 12;
 
   return (
     <>
@@ -126,6 +140,45 @@ export function PersistentFeedbackButton() {
                 textAlignVertical="top"
               />
 
+              {/* Bug‑specific fields — only when category is 'bug' */}
+              {category === 'bug' && (
+                <>
+                  <Text style={[styles.label, { color: colors.text, marginTop: Spacing.sm }]}>
+                    Steps to Reproduce
+                  </Text>
+                  <TextInput
+                    style={[styles.inputMultiline, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+                    placeholder="Steps to reproduce..."
+                    placeholderTextColor={colors.textSecondary}
+                    value={steps}
+                    onChangeText={setSteps}
+                    multiline
+                    numberOfLines={3}
+                    textAlignVertical="top"
+                  />
+                  <Text style={[styles.label, { color: colors.text }]}>Expected Behavior</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+                    placeholder="What did you expect to happen?"
+                    placeholderTextColor={colors.textSecondary}
+                    value={expected}
+                    onChangeText={setExpected}
+                  />
+                  <Text style={[styles.label, { color: colors.text }]}>Actual Behavior</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
+                    placeholder="What actually happened?"
+                    placeholderTextColor={colors.textSecondary}
+                    value={actual}
+                    onChangeText={setActual}
+                  />
+                </>
+              )}
+
+              {/* Environment field (always visible, auto‑populated) */}
+              <Text style={[styles.label, { color: colors.text, marginTop: Spacing.sm }]}>Environment (auto‑detected)</Text>
+              <Text style={[styles.envText, { color: colors.textSecondary }]}>{environment}</Text>
+
               <Pressable
                 style={[styles.submitButton, { backgroundColor: colors.primary }]}
                 onPress={handleSubmit}
@@ -164,7 +217,7 @@ const styles = StyleSheet.create({
   },
   modal: {
     borderRadius: BorderRadius.xl,
-    maxHeight: '80%',
+    maxHeight: '90%',
     overflow: 'hidden',
   },
   header: {
@@ -193,7 +246,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   inputMultiline: {
-    minHeight: 100,
+    minHeight: 80,
     borderWidth: 1,
     borderRadius: BorderRadius.md,
     paddingHorizontal: Spacing.md,
@@ -222,6 +275,14 @@ const styles = StyleSheet.create({
   categoryText: {
     fontSize: Typography.sizes.label,
     fontFamily: 'DMSans-Medium',
+  },
+  envText: {
+    fontSize: Typography.sizes.label,
+    fontFamily: 'DMSans-Regular',
+    marginBottom: Spacing.md,
+    padding: Spacing.sm,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: BorderRadius.md,
   },
   submitButton: {
     paddingVertical: 14,

@@ -10,7 +10,10 @@ import {
 } from "react-native";
 import { Colors, Typography } from "@/config/theme";
 
-const { width } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+
+// Calculate logo size: 60% of screen width, but capped at 300px
+const LOGO_SIZE = Math.min(SCREEN_WIDTH * 0.6, 300);
 
 interface Props {
   onComplete: () => void;
@@ -70,7 +73,7 @@ export function CustomSplashScreen({ onComplete }: Props) {
       </Animated.View>
 
       <Animated.Text style={[styles.subtitle, { opacity: subtitleOpacity }]}>
-      Community Safety & Opportunities
+        Community Safety & Opportunities
       </Animated.Text>
 
       <Animated.View
@@ -97,10 +100,12 @@ const styles = StyleSheet.create({
   logoWrapper: {
     alignItems: "center",
     marginTop: -50,
+    width: LOGO_SIZE,
+    height: LOGO_SIZE,
   },
   mainLogo: {
-    width: Math.min(width * 0.6, 300),
-    height: Math.min(width * 0.6, 300),
+    width: "100%",
+    height: "100%",
   },
   subtitle: {
     color: Colors.carbon.white,

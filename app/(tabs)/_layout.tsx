@@ -14,6 +14,7 @@ interface TabConfig {
   titleKey: string;
   icon: TabIcon;
   iconFocused: TabIcon;
+  showLabel?: boolean;
 }
 
 const TABS: TabConfig[] = [
@@ -22,6 +23,12 @@ const TABS: TabConfig[] = [
     titleKey: "tabs.news",
     icon: "newspaper-outline",
     iconFocused: "newspaper",
+  },
+  {
+    name: "map",
+    titleKey: "tabs.map",
+    icon: "map-outline",
+    iconFocused: "map",
   },
   {
     name: "opportunities",
@@ -40,6 +47,7 @@ const TABS: TabConfig[] = [
     titleKey: "tabs.settings",
     icon: "settings-outline",
     iconFocused: "settings",
+    showLabel: false,   // gear icon only
   },
 ];
 
@@ -73,7 +81,8 @@ export default function TabLayout() {
           key={tab.name}
           name={tab.name}
           options={{
-            title: t(tab.titleKey),
+            title: tab.showLabel === false ? '' : t(tab.titleKey),
+            tabBarLabel: tab.showLabel === false ? () => null : t(tab.titleKey),
             tabBarIcon: ({ focused, color, size }) => (
               <Ionicons
                 name={focused ? tab.iconFocused : tab.icon}

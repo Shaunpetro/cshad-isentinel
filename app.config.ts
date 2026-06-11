@@ -14,7 +14,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   userInterfaceStyle: "automatic",
 
   splash: {
-    image: "./assets/brand/cshad-isentinel-logo-main.png",
+    image: "./assets/brand/cshad-isentinel-logo-fs.png",   // ← new logo for native splash
     resizeMode: "contain",
     backgroundColor: "#1C1C1C",
   },
@@ -23,12 +23,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   ios: {
     supportsTablet: true,
-    bundleIdentifier: "cshad.isentinel.news",        
+    bundleIdentifier: "cshad.isentinel.news",
     config: {
       googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
     },
     infoPlist: {
-      UIBackgroundModes: ["remote-notification"],    
+      UIBackgroundModes: ["remote-notification"],
     },
   },
 
@@ -38,8 +38,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: "#1C1C1C",
     },
     package: "cshad.isentinel.news",
-    versionCode: 5,                     // <-- added for Play Console
-    googleServicesFile: "./google-services.json",    
+    versionCode: 5,   // already bumped earlier
+    googleServicesFile: "./google-services.json",
     config: {
       googleMaps: {
         apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ?? "",
