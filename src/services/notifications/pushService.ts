@@ -24,13 +24,14 @@ export async function requestPermissions(): Promise<PermissionResult> {
     return { granted: false, canAskAgain: false };
   }
 
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
+  // Temporary type assertion – will be removed in Bug 7
+  const { status: existingStatus } = await Notifications.getPermissionsAsync() as any;
 
   if (existingStatus === 'granted') {
     return { granted: true, canAskAgain: false };
   }
 
-  const { status, canAskAgain } = await Notifications.requestPermissionsAsync();
+  const { status, canAskAgain } = await Notifications.requestPermissionsAsync() as any;
 
   return {
     granted: status === 'granted',

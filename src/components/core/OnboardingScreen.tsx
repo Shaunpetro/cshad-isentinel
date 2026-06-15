@@ -60,7 +60,7 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
   };
 
   const requestNotifications = async () => {
-    const { status } = await Notifications.requestPermissionsAsync();
+    const { status } = await Notifications.requestPermissionsAsync() as any;
     if (status === 'granted') setNotificationsGranted(true);
   };
 

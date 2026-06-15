@@ -3,7 +3,8 @@ import { ExpoConfig, ConfigContext } from "expo/config";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   name: "CSHAD iSentinel News",
-  slug: "cshad-isentinel-news",
+  slug: "cshadnews",
+  owner: "shaunatg",
   version: "1.264.0",
   runtimeVersion: {
     policy: "appVersion",
@@ -61,6 +62,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-secure-store",
     "expo-dev-client",
     "expo-sharing",
+    "expo-web-browser",
     // expo-notifications removed for Beta 4 rebuild
   ],
 
@@ -69,18 +71,18 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
 
   updates: {
-    url: "https://u.expo.dev/41d9d284-b014-48ab-9238-fe2c0724fd98",
+    url: "https://u.expo.dev/ce9ad511-1168-4d71-941d-35a5f4214892",
     checkAutomatically: "ON_LOAD",
     fallbackToCacheTimeout: 3000,
   },
 
   extra: {
-    buildPhase: "003",
+    buildPhase: "004",
     phaseMonth: "June 2026",
     buildDate: new Date().toISOString(),
     developer: "Petro@ATG",
     eas: {
-      projectId: "41d9d284-b014-48ab-9238-fe2c0724fd98",
+      projectId: "ce9ad511-1168-4d71-941d-35a5f4214892",
     },
   },
 });
