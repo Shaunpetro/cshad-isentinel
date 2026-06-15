@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '@/contexts';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { OpportunityCard } from '@/components/opportunities/OpportunityCard';
@@ -18,6 +19,8 @@ import { OpportunityDetailModal } from '@/components/opportunities/OpportunityDe
 import { FilterSheet } from '@/components/opportunities/FilterSheet';
 import { Typography, Spacing, BorderRadius } from '@/config/theme';
 import type { Opportunity } from '@/services/opportunities';
+
+const PREMIUM_KEY = 'pshad_premium_subscribed';
 
 type Category = 'tender' | 'job' | 'bursary';
 
@@ -36,8 +39,24 @@ export default function OpportunitiesScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
 
-  // Test subscription toggle
-  const [isSubscribed, setIsSubscribed] = useState(false);
+  // Premium toggle with AsyncStorage persistence
+  const [isSubscribed, setIsSubscribed] = useState<boolean>(false);
+
+  // Load persisted premium state on mount
+  useEffect(() => {
+    AsyncStorage.getItem(PREMIUM_KEY).then((val) => {
+      if (val === 'true') setIsSubscribed(true);
+    });
+  }, []);
+
+  // Persist premium state on change
+  const toggleSubscription = useCallback(() => {
+    setIsSubscribed((prev) => {
+      const next = !prev;
+      AsyncStorage.setItem(PREMIUM_KEY, next ? 'true' : 'false');
+      return next;
+    });
+  }, []);
 
   // Extract filter options (only for tenders, but we keep it generic)
   const filterOptions = useMemo(() => {
@@ -61,7 +80,7 @@ export default function OpportunitiesScreen() {
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [selectedSubmissionType, setSelectedSubmissionType] = useState<string | null>(null);
 
-  // **CLEAR FILTERS WHEN CATEGORY CHANGES**
+  // Clear filters when category changes
   useEffect(() => {
     setSelectedProvince(null);
     setSelectedSubcategory(null);
@@ -163,10 +182,10 @@ export default function OpportunitiesScreen() {
         </Pressable>
       </View>
 
-      {/* Subscription Toggle (for testing) */}
+      {/* Subscription Toggle (with persistence) */}
       <Pressable
         style={[styles.toggleButton, { backgroundColor: isSubscribed ? colors.success : colors.warning }]}
-        onPress={() => setIsSubscribed(!isSubscribed)}
+        onPress={toggleSubscription}
       >
         <Text style={styles.toggleButtonText}>
           {isSubscribed ? 'Premium Subscribed' : 'Free User (Tap to subscribe)'}
@@ -205,7 +224,7 @@ export default function OpportunitiesScreen() {
       {/* Filter Sheet */}
       <FilterSheet
         visible={filterSheetVisible}
-        activeCategory={activeCategory}   // <-- add this line
+        activeCategory={activeCategory}
         provinces={filterOptions.provinces}
         subcategories={filterOptions.subcategories}
         submissionTypes={filterOptions.submissionTypes}
