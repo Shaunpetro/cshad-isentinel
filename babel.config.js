@@ -20,7 +20,8 @@ module.exports = function (api) {
           },
         },
       ],
-      "@babel/plugin-transform-class-properties",   // added: fixes private field syntax
+      "@babel/plugin-transform-class-properties",
+      "@babel/plugin-transform-private-methods",   // <-- add this
     ],
   };
 };
