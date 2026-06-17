@@ -3,7 +3,7 @@ import { ExpoConfig, ConfigContext } from "expo/config";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   name: "CSHAD iSentinel News",
-  slug: "cshadnews",
+  slug: "cshad-isentinel-news",
   owner: "shaunatg",
   version: "1.264.0",
   runtimeVersion: {
@@ -39,7 +39,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: "#1C1C1C",
     },
     package: "cshad.isentinel.news",
-    versionCode: 5,
+    versionCode: 6,
     googleServicesFile: "./google-services.json",
     config: {
       googleMaps: {
@@ -63,7 +63,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     "expo-dev-client",
     "expo-sharing",
     "expo-web-browser",
-    // expo-notifications removed for Beta 4 rebuild
   ],
 
   experiments: {
@@ -77,7 +76,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
 
   extra: {
-    buildPhase: "004",
+    buildPhase: "003",
     phaseMonth: "June 2026",
     buildDate: new Date().toISOString(),
     developer: "Petro@ATG",
