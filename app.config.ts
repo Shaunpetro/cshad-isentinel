@@ -3,7 +3,7 @@ import { ExpoConfig, ConfigContext } from "expo/config";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   name: "CSHAD iSentinel News",
-  slug: "cshad-isentinel-news",
+  slug: "cshadnews",
   owner: "shaunatg",
   version: "1.264.0",
   runtimeVersion: {
