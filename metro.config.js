@@ -1,13 +1,15 @@
-// Learn more https://docs.expo.io/guides/customizing-metro
+// metro.config.js
 const { getDefaultConfig } = require("expo/metro-config");
 
 /** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname);
 
-// Add SVG transformer
+// Add SVG transformer (unchanged)
 config.transformer = {
   ...config.transformer,
   babelTransformerPath: require.resolve("react-native-svg-transformer"),
+  // Force Hermes-stable profile for maximum ES5 compatibility
+  unstable_transformProfile: 'hermes-stable',
 };
 
 config.resolver = {
@@ -16,5 +18,4 @@ config.resolver = {
   sourceExts: [...config.resolver.sourceExts, "svg"],
 };
 
-// Path aliases resolved automatically from tsconfig.json
 module.exports = config;
