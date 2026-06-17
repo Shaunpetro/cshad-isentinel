@@ -2,7 +2,10 @@
 module.exports = function (api) {
   api.cache(true);
   return {
-    presets: ["babel-preset-expo"],
+    presets: [
+      "@babel/preset-typescript",   // must be first to transform TypeScript before class plugins
+      "babel-preset-expo",
+    ],
     plugins: [
       [
         "module-resolver",
@@ -20,8 +23,9 @@ module.exports = function (api) {
           },
         },
       ],
+      // These must come after TypeScript transform
       "@babel/plugin-transform-class-properties",
-      "@babel/plugin-transform-private-methods",   // <-- add this
+      "@babel/plugin-transform-private-methods",
     ],
   };
 };
