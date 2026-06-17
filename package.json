@@ -26,6 +26,7 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/native": "^7.1.33",
     "@supabase/supabase-js": "^2.103.0",
+    "babel-preset-expo": "^56.0.15",
     "cheerio": "^1.2.0",
     "expo": "~55.0.26",
     "expo-blur": "~55.0.14",
