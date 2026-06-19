@@ -1,4 +1,5 @@
 // scripts/scrape-bursaries-live.js
+globalThis.WebSocket = require('ws');
 const { createClient } = require('@supabase/supabase-js');
 const puppeteer = require('puppeteer');
 const cheerio = require('cheerio');

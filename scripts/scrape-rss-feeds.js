@@ -1,4 +1,5 @@
 // scripts/scrape-rss-feeds.js
+globalThis.WebSocket = require('ws');
 const { createClient } = require('@supabase/supabase-js');
 const Parser = require('rss-parser');
 const https = require('https');

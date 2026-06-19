@@ -1,4 +1,5 @@
 // scripts/scrape-etenders.js
+globalThis.WebSocket = require('ws');
 const { createClient } = require('@supabase/supabase-js');
 const puppeteer = require('puppeteer');
 

@@ -1,4 +1,5 @@
 // scripts/scrape-newsapi.js
+globalThis.WebSocket = require('ws');
 const { createClient } = require('@supabase/supabase-js');
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 

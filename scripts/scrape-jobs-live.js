@@ -1,4 +1,5 @@
 // scripts/scrape-jobs-live.js
+globalThis.WebSocket = require('ws');
 const { createClient } = require('@supabase/supabase-js');
 
 const supabaseUrl = process.env.SUPABASE_URL;
