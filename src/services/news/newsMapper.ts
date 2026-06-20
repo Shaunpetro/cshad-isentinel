@@ -53,22 +53,37 @@ const KNOWN_AUTHORS = [
  */
 function decodeHtmlEntities(text: string): string {
   if (!text) return '';
-  
+
   let decoded = text;
-  
+
   for (const [entity, char] of Object.entries(HTML_ENTITIES)) {
     decoded = decoded.split(entity).join(char);
   }
-  
+
   decoded = decoded.replace(/&#(\d+);/g, (_, code) => {
     return String.fromCharCode(parseInt(code, 10));
   });
-  
+
   decoded = decoded.replace(/&#x([0-9a-fA-F]+);/g, (_, code) => {
     return String.fromCharCode(parseInt(code, 16));
   });
-  
+
   return decoded;
+}
+
+/**
+ * Convert block-level HTML tags to newline characters so paragraphs are preserved
+ */
+function preserveParagraphs(text: string): string {
+  if (!text) return '';
+
+  return text
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/?p[^>]*>/gi, '\n')
+    .replace(/<\/?div[^>]*>/gi, '\n')
+    .replace(/<\/?h[1-6][^>]*>/gi, '\n')
+    .replace(/<\/?li[^>]*>/gi, '\n')
+    .replace(/<\/?tr[^>]*>/gi, '\n');
 }
 
 /**
@@ -76,20 +91,20 @@ function decodeHtmlEntities(text: string): string {
  */
 function stripHtmlTags(text: string): string {
   if (!text) return '';
-  
+
   let cleaned = text;
-  
+
   cleaned = cleaned.replace(/<!$$CDATA\[([\s\S]*?)$$\]>/gi, '\$1');
   cleaned = cleaned.replace(/<script[\s\S]*?<\/script>/gi, '');
   cleaned = cleaned.replace(/<style[\s\S]*?<\/style>/gi, '');
   cleaned = cleaned.replace(/<[^>]*>/g, ' ');
   cleaned = cleaned.replace(/<[a-zA-Z][^<]*$/g, '');
   cleaned = cleaned.replace(/^[^>]*>/g, '');
-  cleaned = cleaned.replace(/\s+(class|data-[a-z-]+|href|src|id|style)=["'][^"']*["']/gi, '');
+  cleaned = cleaned.replace(/\s+(class|data-[a-z-]+|href|src|id|style)=["'][^"']*["']/gi, '');       
   cleaned = cleaned.replace(/\s+(class|data-[a-z-]+|href|src|id|style)=[^\s>]*/gi, '');
   cleaned = cleaned.replace(/https?:\/\/[^\s"'<>]+/g, '');
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
-  
+
   return cleaned;
 }
 
@@ -98,14 +113,14 @@ function stripHtmlTags(text: string): string {
  */
 function removeBylines(text: string): string {
   if (!text) return '';
-  
+
   let cleaned = text;
-  
+
   cleaned = cleaned.replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun),?\s*\d{1,2}\/\d{1,2}\/\d{4}\s*[-–]\s*\d{1,2}:\d{2}/gi, '');
   cleaned = cleaned.replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[^\s]*/g, '');
   cleaned = cleaned.replace(/^by\s+[A-Z][a-zA-Z]+(\s+[A-Z][a-zA-Z]+)?\s*/i, '');
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
-  
+
   return cleaned;
 }
 
@@ -114,52 +129,71 @@ function removeBylines(text: string): string {
  */
 function isAuthorOnlyOrTooShort(text: string): boolean {
   if (!text) return true;
-  
+
   const trimmed = text.toLowerCase().trim();
-  
-  // Too short to be useful
+
   if (trimmed.length < 20) return true;
-  
-  // Check against known author patterns
+
   for (const author of KNOWN_AUTHORS) {
     if (trimmed === author || trimmed.startsWith(author + ' ')) {
-      // Check if there's meaningful content after the author name
       const afterAuthor = trimmed.replace(author, '').trim();
       if (afterAuthor.length < 20) return true;
     }
   }
-  
-  // Pattern: Just 2-3 capitalized words (likely a name)
+
   const words = text.trim().split(/\s+/);
   if (words.length <= 3) {
     const allCapitalized = words.every(w => /^[A-Z][a-z]+$/.test(w));
     if (allCapitalized) return true;
   }
-  
+
   return false;
 }
 
 /**
- * Clean text content from RSS feeds
+ * Clean text content from RSS feeds (for summary, does NOT preserve paragraphs)
  */
 function cleanRssContent(text: string): string {
   if (!text) return '';
-  
+
   let cleaned = stripHtmlTags(text);
   cleaned = decodeHtmlEntities(cleaned);
   cleaned = removeBylines(cleaned);
-  
-  cleaned = cleaned.replace(/\s*Read more\s*\u2192?\s*$/i, '');
-  cleaned = cleaned.replace(/\s*Continue reading\s*\u2192?\s*$/i, '');
-  cleaned = cleaned.replace(/\s*$$\u2026$$\s*$/i, '\u2026');
-  cleaned = cleaned.replace(/\s*\.\.\.\s*$/i, '\u2026');
+
+  cleaned = cleaned.replace(/\s*Read more\s*→?\s*$/i, '');
+  cleaned = cleaned.replace(/\s*Continue reading\s*→?\s*$/i, '');
+  cleaned = cleaned.replace(/\s*\(…\)\s*$/i, '…');
+  cleaned = cleaned.replace(/\s*\.\.\.\s*$/i, '…');
   cleaned = cleaned.replace(/\s*The post .+ appeared first on .+\.?\s*\]?>?\s*$/i, '');
   cleaned = cleaned.replace(/\]\]>\s*$/g, '');
   cleaned = cleaned.replace(/^\s*<!\[CDATA\[/g, '');
   cleaned = cleaned.replace(/\b(addtoany_list|a2a_kit|a2a_kit_size_\d+)\b/gi, '');
   cleaned = cleaned.replace(/\bda\b\s*$/i, '');
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
-  
+
+  return cleaned;
+}
+
+/**
+ * Clean body content – preserves paragraph breaks
+ */
+function cleanBodyContent(text: string): string {
+  if (!text) return '';
+
+  // 1. Convert block tags to newlines BEFORE stripping tags
+  let cleaned = preserveParagraphs(text);
+  // 2. Strip remaining HTML tags
+  cleaned = stripHtmlTags(cleaned);
+  // 3. Decode entities
+  cleaned = decodeHtmlEntities(cleaned);
+  // 4. Remove bylines
+  cleaned = removeBylines(cleaned);
+
+  // 5. Clean up excessive whitespace but keep newlines intact
+  cleaned = cleaned.replace(/[ \t]+/g, ' ');          // collapse spaces/tabs (not newlines)
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');       // max 2 consecutive newlines
+  cleaned = cleaned.trim();
+
   return cleaned;
 }
 
@@ -168,11 +202,11 @@ function cleanRssContent(text: string): string {
  */
 function cleanTitle(text: string): string {
   if (!text) return '';
-  
+
   let cleaned = decodeHtmlEntities(text);
   cleaned = stripHtmlTags(cleaned);
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
-  
+
   return cleaned;
 }
 
@@ -181,16 +215,16 @@ function cleanTitle(text: string): string {
  */
 function removeDuplicateTitle(title: string, summary: string): string {
   if (!title || !summary) return summary;
-  
+
   const titleLower = title.toLowerCase().trim();
   const summaryLower = summary.toLowerCase().trim();
-  
+
   if (summaryLower.startsWith(titleLower)) {
     let cleaned = summary.substring(title.length).trim();
-    cleaned = cleaned.replace(/^[:\-–—,.\s]+/, '').trim();
+    cleaned = cleaned.replace(/^[:\-–—,.s]+/, '').trim();
     return cleaned || summary;
   }
-  
+
   return summary;
 }
 
@@ -207,19 +241,15 @@ function generateFallbackSummary(title: string, source: string): string {
 export function mapRecordToNewsItem(record: NewsRecord): NewsItem {
   const cleanedTitle = cleanTitle(record.title);
   let cleanedSummary = cleanRssContent(record.summary);
-  
-  // Remove duplicate title from summary
+
   cleanedSummary = removeDuplicateTitle(cleanedTitle, cleanedSummary);
-  
-  // If summary is just an author name or too short, use fallback
+
   if (isAuthorOnlyOrTooShort(cleanedSummary)) {
-    // Try to use body content if available
     if (record.content) {
       const cleanedBody = cleanRssContent(record.content);
       if (!isAuthorOnlyOrTooShort(cleanedBody)) {
-        // Use first 200 chars of body as summary
-        cleanedSummary = cleanedBody.length > 200 
-          ? cleanedBody.substring(0, 200).trim() + '\u2026'
+        cleanedSummary = cleanedBody.length > 200
+          ? cleanedBody.substring(0, 200).trim() + '…'
           : cleanedBody;
       } else {
         cleanedSummary = generateFallbackSummary(cleanedTitle, record.source);
@@ -228,12 +258,13 @@ export function mapRecordToNewsItem(record: NewsRecord): NewsItem {
       cleanedSummary = generateFallbackSummary(cleanedTitle, record.source);
     }
   }
-  
+
   return {
     id: record.id,
     title: cleanedTitle,
     summary: cleanedSummary,
-    body: record.content ? cleanRssContent(record.content) : undefined,
+    // Use the paragraph-aware cleaner for the body
+    body: record.content ? cleanBodyContent(record.content) : undefined,
     category: record.category as NewsCategory,
     severity: record.severity as NewsSeverity,
     source: record.source,

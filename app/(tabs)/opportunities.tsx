@@ -8,6 +8,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Pressable,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +18,7 @@ import { useOpportunities } from '@/hooks/useOpportunities';
 import { OpportunityCard } from '@/components/opportunities/OpportunityCard';
 import { OpportunityDetailModal } from '@/components/opportunities/OpportunityDetailModal';
 import { FilterSheet } from '@/components/opportunities/FilterSheet';
+import { SubscriptionModal } from '@/components/opportunities/SubscriptionModal';
 import { Typography, Spacing, BorderRadius } from '@/config/theme';
 import type { Opportunity } from '@/services/opportunities';
 
@@ -39,26 +41,35 @@ export default function OpportunitiesScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
 
-  // Premium toggle with AsyncStorage persistence
+  // Premium state with persistence
   const [isSubscribed, setIsSubscribed] = useState<boolean>(false);
+  const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
 
-  // Load persisted premium state on mount
   useEffect(() => {
     AsyncStorage.getItem(PREMIUM_KEY).then((val) => {
       if (val === 'true') setIsSubscribed(true);
     });
   }, []);
 
-  // Persist premium state on change
-  const toggleSubscription = useCallback(() => {
-    setIsSubscribed((prev) => {
-      const next = !prev;
-      AsyncStorage.setItem(PREMIUM_KEY, next ? 'true' : 'false');
-      return next;
-    });
+  const handleTogglePress = useCallback(() => {
+    if (!isSubscribed) {
+      setSubscriptionModalVisible(true);
+    } else {
+      // optional: allow toggling off for demo
+      setIsSubscribed(false);
+      AsyncStorage.setItem(PREMIUM_KEY, 'false');
+    }
+  }, [isSubscribed]);
+
+  const handleSelectPlan = useCallback((plan: any) => {
+    // demo: any plan activates premium immediately
+    setIsSubscribed(true);
+    AsyncStorage.setItem(PREMIUM_KEY, 'true');
+    setSubscriptionModalVisible(false);
+    Alert.alert('Demo Subscription', `You selected ${plan.name}. Premium activated!`);
   }, []);
 
-  // Extract filter options (only for tenders, but we keep it generic)
+  // Extract filter options
   const filterOptions = useMemo(() => {
     const provinces = new Set<string>();
     const subcategories = new Set<string>();
@@ -126,10 +137,7 @@ export default function OpportunitiesScreen() {
     );
   };
 
-  const handleApplyFilters = () => {
-    setFilterSheetVisible(false);
-  };
-
+  const handleApplyFilters = () => setFilterSheetVisible(false);
   const handleClearFilters = () => {
     setSelectedProvince(null);
     setSelectedSubcategory(null);
@@ -182,10 +190,10 @@ export default function OpportunitiesScreen() {
         </Pressable>
       </View>
 
-      {/* Subscription Toggle (with persistence) */}
+      {/* Premium toggle (now opens subscription modal on free) */}
       <Pressable
         style={[styles.toggleButton, { backgroundColor: isSubscribed ? colors.success : colors.warning }]}
-        onPress={toggleSubscription}
+        onPress={handleTogglePress}
       >
         <Text style={styles.toggleButtonText}>
           {isSubscribed ? 'Premium Subscribed' : 'Free User (Tap to subscribe)'}
@@ -238,6 +246,13 @@ export default function OpportunitiesScreen() {
         onClear={handleClearFilters}
         onClose={() => setFilterSheetVisible(false)}
       />
+
+      {/* Subscription Modal (triggered from main toggle) */}
+      <SubscriptionModal
+        visible={subscriptionModalVisible}
+        onClose={() => setSubscriptionModalVisible(false)}
+        onSelectPlan={handleSelectPlan}
+      />
     </View>
   );
 }
@@ -251,38 +266,18 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.xs,
     borderBottomWidth: 0.5,
   },
-  tabsRow: {
-    flex: 1,
-    flexDirection: 'row',
-  },
+  tabsRow: { flex: 1, flexDirection: 'row' },
   tab: { flex: 1, alignItems: 'center', paddingVertical: Spacing.sm, gap: 4 },
   tabText: { fontSize: Typography.sizes.label },
-  filterButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    position: 'relative',
-  },
+  filterButton: { paddingHorizontal: 12, paddingVertical: 8, position: 'relative' },
   filterBadge: {
-    position: 'absolute',
-    top: 2,
-    right: 2,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+    position: 'absolute', top: 2, right: 2, minWidth: 16, height: 16,
+    borderRadius: 8, justifyContent: 'center', alignItems: 'center',
   },
-  filterBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontFamily: 'DMSans-Bold',
-  },
+  filterBadgeText: { color: '#FFFFFF', fontSize: 10, fontFamily: 'DMSans-Bold' },
   toggleButton: {
-    marginHorizontal: Spacing.md,
-    marginTop: Spacing.sm,
-    paddingVertical: 8,
-    borderRadius: BorderRadius.md,
-    alignItems: 'center',
+    marginHorizontal: Spacing.md, marginTop: Spacing.sm,
+    paddingVertical: 8, borderRadius: BorderRadius.md, alignItems: 'center',
   },
   toggleButtonText: { color: '#FFFFFF', fontFamily: 'DMSans-Bold', fontSize: Typography.sizes.label },
   loading: { flex: 1, justifyContent: 'center', alignItems: 'center' },

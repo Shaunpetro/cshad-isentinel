@@ -7,7 +7,7 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const E_TENDERS_URL = 'https://www.etenders.gov.za/Home/opportunities?id=1';
-const MAX_PAGES = 5;
+const MAX_PAGES = 120;
 const NAV_TIMEOUT = 60000;
 
 function wait(ms) {

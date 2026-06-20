@@ -223,18 +223,18 @@ export default function NewsDetailScreen() {
 
           {/* Body (if available) */}
           {article.body ? (
-            <Text style={[styles.body, { color: colors.textSecondary }]}>
-              {article.body}
-            </Text>
-          ) : (
-            <View
-              style={[styles.noBodyContainer, { backgroundColor: colors.surface }]}
-            >
-              <Text style={[styles.noBodyText, { color: colors.textDisabled }]}>
-                {t("news.readMore")}
+            article.body.split('\n').map((para, idx) => (
+              <Text key={idx} style={[styles.body, { color: colors.textSecondary }]}>
+                {para}
               </Text>
-            </View>
-          )}
+          ))
+        ) : (
+          <View style={[styles.noBodyContainer, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.noBodyText, { color: colors.textDisabled }]}>
+              {t("news.readMore")}
+            </Text>
+          </View>
+        )}
 
           {/* Source Link */}
           {article.sourceUrl && (
