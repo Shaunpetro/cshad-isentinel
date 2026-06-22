@@ -48,7 +48,7 @@ export function useNews(options: UseNewsOptions = {}): UseNewsResult {
     cityName,
     radiusKm,
     timeFilter = 'all',
-    limit = 20,
+    limit = 250,
     realtime = true,
     autoRefresh = true,
   } = options;

@@ -23,7 +23,7 @@ export function useOpportunities(category: Category) {
       const data = await fetchOpportunities({
         category,
         // We'll omit location filtering for now to ensure data appears
-        limit: 50,
+        limit: 200,
       });
       setOpportunities(data);
     } catch (err) {

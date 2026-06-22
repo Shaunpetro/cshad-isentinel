@@ -63,7 +63,7 @@ export async function fetchNews(params: NewsQueryParams = {}) {
     cityName,
     radiusKm,
     timeFilter = 'all',
-    limit = 20,
+    limit = 250,
     offset = 0,
   } = params;
 

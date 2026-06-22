@@ -29,7 +29,7 @@ interface FetchOpportunitiesOptions {
 }
 
 export async function fetchOpportunities(options: FetchOpportunitiesOptions = {}): Promise<Opportunity[]> {
-  const { category, limit = 50 } = options;
+  const { category, limit = 200 } = options;
 
   let query = supabase
     .from('opportunities')
