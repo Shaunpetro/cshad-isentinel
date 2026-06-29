@@ -1,18 +1,13 @@
-// app/(tabs)/alerts.tsx
+// app/(stack)/safety.tsx
+// Beta 4 - Phase 1: Safety Hub stack screen
+
 import React, { useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  RefreshControl,
-  ActivityIndicator,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { useTheme } from '@/contexts/ThemeContext';
+import { useColorScheme } from 'react-native';
+import { DarkTheme, LightTheme } from '@/config/theme';
 import { useLocation } from '@/hooks/useLocation';
 import { useHub } from '@/hooks/useHub';
 import { Typography, Spacing } from '@/config/theme';
@@ -21,20 +16,20 @@ import {
   HubFilterBar,
   FeedCard,
   JournalistRow,
-  NotificationSettings,
   WeatherAlertCard,
   NationalBreakingBanner,
   InfrastructureCard,
   SuburbPickerModal,
   type HubFilter,
   type FeedItem,
-  type Journalist,
   type NationalAlert,
 } from '@/components/hub';
 import type { SavedArea } from '@/services/infrastructure';
 
-export default function AlertsScreen() {
-  const { colors } = useTheme();
+export default function SafetyScreen() {
+  const colorScheme = useColorScheme();
+  const theme = colorScheme === 'dark' ? DarkTheme : LightTheme;
+  const colors = theme.colors;
   const { t } = useTranslation();
   const router = useRouter();
 
@@ -88,12 +83,12 @@ export default function AlertsScreen() {
 
   const handleFeedItemPress = useCallback((item: FeedItem) => {
     if (item.type === 'news' || item.type === 'tip') {
-      router.push({ pathname: '/news/[id]', params: { id: item.id } });
+      router.push({ pathname: "/article/[id]", params: { id: item.id } });
     }
   }, [router]);
 
   const handleNationalAlertPress = useCallback((alert: NationalAlert) => {
-    router.push({ pathname: '/news/[id]', params: { id: alert.id } });
+    router.push({ pathname: "/article/[id]", params: { id: alert.id } });
   }, [router]);
 
   const renderFeedItem = useCallback(
@@ -150,7 +145,7 @@ export default function AlertsScreen() {
         />
       </View>
     ),
-    [nationalAlertItems, activeWeatherAlert, weather, loadshedding, stats, activeFilter, filterCounts, colors, handleNationalAlertPress, dismissNationalAlert, handleFilterChange, currentCity, setFilter]
+    [nationalAlertItems, activeWeatherAlert, weather, loadshedding, stats, activeFilter, filterCounts, handleNationalAlertPress, dismissNationalAlert, handleFilterChange, currentCity, setFilter]
   );
 
   const renderFooter = useCallback(
@@ -170,30 +165,14 @@ export default function AlertsScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView edges={['top']} style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: colors.text }]}>{t('alerts.title')}</Text>
-        </View>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} style={{ flex: 1 }} />
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView edges={['top']} style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>Safety Hub</Text>
-        <View style={styles.locationRow}>
-          <Ionicons name="location" size={14} color={colors.primary} />
-          <Text style={[styles.locationText, { color: colors.primary }]}>
-            {currentCity?.name || 'South Africa'}
-          </Text>
-          {radiusKm && (
-            <Text style={[styles.radiusText, { color: colors.textSecondary }]}>• {radiusKm}km</Text>
-          )}
-        </View>
-      </View>
-
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
         data={feedItems}
         renderItem={renderFeedItem}
@@ -204,7 +183,7 @@ export default function AlertsScreen() {
           <View style={styles.emptyContainer}>
             <Ionicons name="checkmark-circle-outline" size={48} color={colors.success} />
             <Text style={[styles.emptyText, { color: colors.text }]}>{t('alerts.allClear')}</Text>
-            <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>{t('alerts.noAlerts')}</Text>
+            <Text style={[styles.emptySubtext, { color: theme.text.secondary }]}>{t('alerts.noAlerts')}</Text>
           </View>
         }
         refreshControl={
@@ -222,17 +201,12 @@ export default function AlertsScreen() {
           refresh();
         }}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.md, paddingBottom: Spacing.sm },
-  title: { fontSize: Typography.sizes.title, fontFamily: Typography.fonts.bold },
-  locationRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 4 },
-  locationText: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.medium },
-  radiusText: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.regular },
   footer: { paddingBottom: Spacing.xl },
   bottomSpacing: { height: 100 },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: Spacing.xl * 2, paddingHorizontal: Spacing.lg },

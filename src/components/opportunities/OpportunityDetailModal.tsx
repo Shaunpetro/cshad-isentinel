@@ -36,7 +36,8 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
 
   if (!opportunity) return null;
 
-  const isPremiumLocked = opportunity.is_premium && !isSubscribed;
+  // 🔁 UPDATED: Only lock tenders, not all premium opportunities
+  const isPremiumLocked = opportunity.category === 'tender' && !isSubscribed;
   const docs = opportunity.tender_docs || [];
 
   const handleApply = () => {
@@ -50,7 +51,7 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
     }
   };
 
-  // Hybrid download: try file download + share, fallback to in‑app browser
+  // Hybrid download: try file download + share, fallback to inâ€‘app browser
   const handleDownload = async (url: string) => {
     try {
       const fileName = url.split('/').pop() || 'document';
@@ -62,7 +63,7 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
         await WebBrowser.openBrowserAsync(url);
       }
     } catch {
-      // Fallback to in‑app browser
+      // Fallback to inâ€‘app browser
       try {
         await WebBrowser.openBrowserAsync(url);
       } catch {

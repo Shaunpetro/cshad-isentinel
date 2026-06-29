@@ -14,7 +14,10 @@
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease",
-        "distribution": "internal"
+        "distribution": "internal",
+        "env": {
+          "EXPO_NEW_ARCH": "1"
+        }
       },
       "ios": {
         "simulator": true,
@@ -23,7 +26,10 @@
     },
     "production": {
       "android": {
-        "buildType": "app-bundle"
+        "buildType": "app-bundle",
+        "env": {
+          "EXPO_NEW_ARCH": "1"
+        }
       },
       "ios": {
         "autoIncrement": true

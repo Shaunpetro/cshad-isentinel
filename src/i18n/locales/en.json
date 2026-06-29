@@ -35,6 +35,25 @@
     "settings": "Settings",
     "opportunities": "Opportunities"
   },
+  "home": {
+    "brand": "CSHAD iSentinel",
+    "breakingNews": "Breaking News",
+    "sectionNavigator": {
+      "news": "News",
+      "safety": "Safety Hub",
+      "live": "Live Hub",
+      "opportunities": "Opportunities",
+      "map": "Map",
+      "settings": "Settings"
+    },
+    "personalisedFeed": "Your Personalised Feed"
+  },
+  "live": {
+    "title": "Live Hub",
+    "podcasts": "Podcasts",
+    "watchNow": "Watch Now",
+    "creatorBadge": "Verified Creator"
+  },
   "news": {
     "title": "Safety News",
     "subtitle": "Community safety intelligence",

@@ -1,9 +1,11 @@
-// app/(tabs)/index.tsx
+// app/(stack)/news.tsx
+// Beta 4 - Phase 1: News feed stack screen
+
 import React, { useState, useCallback, useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { Typography, Spacing } from "@/config/theme";
+import { Typography, Spacing } from "../../src/config/theme";
 import {
   NewsList,
   CategoryFilter,
@@ -15,17 +17,20 @@ import {
   TimeFilterBar,
   LocationBanner,
   LocationPermissionModal,
-} from "@/components/news";
-import { useLocation } from "@/hooks/useLocation";
-import { useNews } from "@/hooks/useNews";
-import { usePreferences } from "@/hooks/usePreferences";
-import { useTheme } from "@/contexts";
-import type { NewsItem, NewsCategory } from "@/types";
-import type { TimeFilter } from "@/services/news";
+} from "../../src/components/news";
+import { useLocation } from "../../src/hooks/useLocation";
+import { useNews } from "../../src/hooks/useNews";
+import { usePreferences } from "../../src/hooks/usePreferences";
+import { useColorScheme } from 'react-native';
+import { DarkTheme, LightTheme } from '@/config/theme'; // fixed
+import type { NewsItem, NewsCategory } from "../../src/types";
+import type { TimeFilter } from "../../src/services/news";
 
 export default function NewsScreen() {
   const router = useRouter();
-  const { colors } = useTheme();
+  const colorScheme = useColorScheme();
+  const theme = colorScheme === 'dark' ? DarkTheme : LightTheme;
+  const colors = theme.colors;
   const { t } = useTranslation();
   const { preferences } = usePreferences();
 
@@ -68,7 +73,6 @@ export default function NewsScreen() {
     error,
     refresh,
     lastUpdated,
-    totalCount: allNewsCount,
   } = useNews({
     scope: newsScope,
     latitude: currentCity?.latitude,
@@ -86,11 +90,10 @@ export default function NewsScreen() {
     return allNews.filter((article: NewsItem) => article.category === activeCategory);
   }, [allNews, activeCategory]);
 
-  // Handle article press - Navigate to detail screen
+  // Handle article press - Navigate to detail screen (updated path)
   const handleArticlePress = useCallback(
     (article: NewsItem) => {
-      console.log("[NewsScreen] Navigating to article:", article.id);
-      router.push({ pathname: "/news/[id]", params: { id: article.id } });
+      router.push({ pathname: "/article/[id]", params: { id: article.id } });
     },
     [router]
   );
@@ -145,7 +148,7 @@ export default function NewsScreen() {
         <View
           style={[
             styles.locationHeaderWrapper,
-            { backgroundColor: colors.surface },
+            { backgroundColor: theme.colors.surface },
           ]}
         >
           <LocationHeader
@@ -194,7 +197,7 @@ export default function NewsScreen() {
 
         {/* Results count */}
         <View style={styles.resultsBar}>
-          <Text style={[styles.resultsText, { color: colors.textSecondary }]}>
+          <Text style={[styles.resultsText, { color: theme.colors.textSecondary }]}>
             {news.length}{" "}
             {news.length === 1 ? t("news.article") : t("news.articles")}
             {activeCategory !== "all" &&
@@ -233,7 +236,7 @@ export default function NewsScreen() {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <NewsList
         articles={news}
         isLoading={isLoading}
@@ -274,7 +277,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   locationHeaderWrapper: {
-    paddingTop: 60,
+    paddingTop: 0, // stack header provides spacing
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.md,
   },

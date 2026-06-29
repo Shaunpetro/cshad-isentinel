@@ -1,0 +1,224 @@
+I'll now produce the complete Beta 4 handover with the full file‑structure plan, including what stays, what changes, and what goes. I'll keep the strategic content we've already developed and add the concrete technical roadmap you need to start copying the project and coding.
+
+---
+
+# CSHAD iSentinel News — Beta 4 “July Build” Complete Handover (with File‑Structure Map)
+
+**Date:** 23 June 2026  
+**Purpose:** Single source of truth for all development, strategy, and operations for the July release and beyond.  
+**Includes:** Step‑by‑step start, full file inventory, obsolete files, new files, and modifications.
+
+---
+
+## 1. PROJECT IDENTITY & CURRENT STATE
+
+(As previously defined — unchanged from Beta 3 final state.)
+
+---
+
+## 2. HOW WE WORK (unchanged)
+
+(15 Master Rules, the planning‑then‑code workflow, and the beta‑copy process.)
+
+---
+
+## 3. BETA 3 → BETA 4 STARTUP PROCEDURE
+
+### 3.1 Create the new workspace
+```powershell
+# Copy entire beta3 directory to beta4
+Copy-Item -Path C:\Dev\cshad-isentinel-beta3 -Destination C:\Dev\cshad-isentinel-beta4 -Recurse
+cd C:\Dev\cshad-isentinel-beta4
+git checkout -b beta4
+```
+
+### 3.2 Restore dependencies
+```powershell
+npm install --legacy-peer-deps
+```
+
+### 3.3 Environment variables
+Copy `.env` from beta3 and update:
+- `EXPO_PUBLIC_OPENWEATHERMAP_API_KEY` with the new rotated key.
+- `EXPO_PUBLIC_APP_VERSION` to `1.265.0`.
+
+### 3.4 Log in to EAS
+```powershell
+npx expo login   # use shaunatg-2
+eas whoami
+eas project:info  # should show project ce9ad511...
+```
+
+### 3.5 Verify clean base
+```powershell
+npx tsc --noEmit          # must be 0 errors
+npx expo start --dev-client  # Metro must bundle
+```
+
+### 3.6 Optional test APK
+```powershell
+eas build --platform android --profile preview --non-interactive
+```
+
+---
+
+## 4. FILE STRUCTURE CHANGES (BETA 3 → BETA 4)
+
+### 4.1 Files that remain UNCHANGED (keep as‑is)
+All service files, hooks, utilities, and components that are not directly tied to the tab navigation or the new home screen remain untouched. They will be reused by the new stack screens.
+
+- `src/services/**/*` (all services)
+- `src/hooks/**/*` (all hooks, unless we need new ones)
+- `src/config/theme.ts` (will be extended, but not replaced)
+- `src/config/constants.ts`
+- `src/i18n/**/*`
+- `src/content/**/*`
+- `assets/**/*`
+- `scripts/**/*`
+- `eas.json`
+- `babel.config.js`, `metro.config.js`, `tsconfig.json`
+- `.env.example` (will be updated with new vars)
+- `android/`, `ios/` native folders (no changes)
+
+### 4.2 Files that will be MODIFIED (existing files that need edits)
+
+| File | Change |
+|------|--------|
+| `app/_layout.tsx` | Replace the current root layout (which likely includes the Tab navigator) with a simple wrapper that renders a Stack navigator from `app/(stack)/_layout.tsx`. Keep OTA overlay and global providers. |
+| `app.config.ts` | Bump `version` to `1.265.0`, `versionCode` to `7`. No other changes. |
+| `package.json` | Bump `version` to `1.265.0`. Possibly add new dependencies for glassmorphism (nothing new yet, but we'll add as needed). |
+| `src/config/theme.ts` | Add glass/pastel colour tokens and new style presets (see §6). |
+| `src/i18n/locales/en.json`, `af.json`, `zu.json` | Add new keys for the home screen, section labels, live hub, podcasts, etc. |
+| `src/components/opportunities/OpportunityDetailModal.tsx` | Fix premium lock condition to `category === 'tender' && !isSubscribed` and hide toggle on non‑tender tabs (if not already done). |
+
+### 4.3 Files that become OBSOLETE (to be deleted)
+These files were part of the bottom‑tab navigation and will be replaced by the new stack screens.
+
+| File | Reason |
+|------|--------|
+| `app/(tabs)/_layout.tsx` | No longer needed; bottom tabs removed. |
+| `app/(tabs)/index.tsx` (News tab) | Replaced by `app/(stack)/news.tsx`. |
+| `app/(tabs)/opportunities.tsx` | Replaced by `app/(stack)/opportunities.tsx`. |
+| `app/(tabs)/map.tsx` | Replaced by `app/(stack)/map.tsx`. |
+| `app/(tabs)/alerts.tsx` (Safety Hub) | Replaced by `app/(stack)/safety.tsx`. |
+| `app/(tabs)/settings.tsx` | Replaced by `app/(stack)/settings.tsx`. |
+| `app/(tabs)/tip.tsx` (if still present) | Consolidated into Safety Hub or Incidents; not needed as separate tab. |
+
+### 4.4 NEW files to create
+
+#### Navigation
+| File | Purpose |
+|------|---------|
+| `app/(stack)/_layout.tsx` | Defines the Stack navigator with `index` as the initial route and all section screens as pushable routes. |
+| `app/(stack)/index.tsx` | **Home screen** — the single landing page with top bar, section navigator, breaking news carousel, and personalised feed. |
+| `app/(stack)/news.tsx` | Full news feed (adapted from old News tab). |
+| `app/(stack)/opportunities.tsx` | Opportunities screen (adapted). |
+| `app/(stack)/map.tsx` | Full‑screen map (adapted). |
+| `app/(stack)/safety.tsx` | Safety Hub (adapted from Alerts). |
+| `app/(stack)/settings.tsx` | Settings (adapted). |
+| `app/(stack)/live.tsx` | Live Hub – YouTube streams/podcasts. |
+| `app/(stack)/incidents.tsx` | Local incidents feed (could reuse hazard components). |
+| `app/(stack)/article/[id].tsx` | Article detail (already exists in `app/news/[id].tsx`, move/rename). |
+| `app/(stack)/opportunity/[id].tsx` | Opportunity detail (if not modal). |
+
+#### Components (new)
+| File | Purpose |
+|------|---------|
+| `src/components/home/SectionNavigator.tsx` | Row/grid of rounded glass cards linking to each section. |
+| `src/components/home/PersonalisedFeed.tsx` | Vertical scroll of personalised alerts and recommendations. |
+| `src/components/home/BreakingNewsCarousel.tsx` | Auto‑sliding breaking news cards (could reuse existing `BreakingNewsCarousel` if present, else new). |
+| `src/components/ui/GlassCard.tsx` | Reusable glassmorphism card wrapper. |
+| `src/components/ui/GlassButton.tsx` | Reusable glass button. |
+| `src/components/live/LivePlayer.tsx` | In‑app WebView YouTube player with mini‑player bar. |
+| `src/components/live/StreamCard.tsx` | Card for a live stream or podcast. |
+| `src/components/live/CreatorBadge.tsx` | Badge for verified creators. |
+
+#### Services / Hooks (new)
+| File | Purpose |
+|------|---------|
+| `src/services/live/liveService.ts` | Fetch live streams from YouTube Data API via Supabase Edge Function. |
+| `src/hooks/useLiveStreams.ts` | Hook to manage live stream data. |
+| `src/hooks/usePersonalisedFeed.ts` | Hook to aggregate personalised content. |
+
+---
+
+## 5. NAVIGATION ARCHITECTURE (how routing works)
+
+- Root `app/_layout.tsx` provides global providers (Theme, i18n, OTA overlay) and renders `<Stack />` from Expo Router.
+- The `<Stack>` navigator uses `app/(stack)/_layout.tsx` as its configuration.
+- The home screen is `app/(stack)/index.tsx`.
+- All other screens are defined in `app/(stack)/_layout.tsx` as named routes.
+- No tabs, no drawer — pure stack navigation with swipe‑back and optional modal presentations.
+
+---
+
+## 6. DESIGN SYSTEM EXTENSION (GLASS + PASTEL)
+
+New entries in `src/config/theme.ts`:
+
+```ts
+// Glassmorphism
+glassBg: {
+  light: 'rgba(255,255,255,0.7)',
+  dark: 'rgba(20,20,20,0.7)',
+},
+glassBorder: {
+  light: 'rgba(255,255,255,0.3)',
+  dark: 'rgba(255,255,255,0.1)',
+},
+// Matt pastel palette (6 colours)
+pastel: {
+  blue: { light: '#D0E4F5', dark: '#2C3E50' },
+  green: { light: '#D4EDDA', dark: '#2D4A3E' },
+  peach: { light: '#FDE2D3', dark: '#5D4037' },
+  lavender: { light: '#E8D5F5', dark: '#4A3B5C' },
+  mint: { light: '#D5F5E3', dark: '#1E4D3A' },
+  rose: { light: '#F5D5E0', dark: '#5C3B4A' },
+},
+```
+
+All components will use these tokens via the theme context.
+
+---
+
+## 7. MONETISATION, LIVE, PODCASTS, JOURNALIST PIPELINE (STRATEGY)
+
+(This section remains exactly as defined in our previous strategy — the full monetisation table, behavioral drivers, and operational checklist. It will not be repeated here for brevity, but it is part of this handover.)
+
+---
+
+## 8. IMPLEMENTATION ORDER (PHASES)
+
+1. **Home screen shell** – create `app/(stack)/_layout.tsx`, `app/(stack)/index.tsx`, and new components (`SectionNavigator`, `GlassCard`, `BreakingNewsCarousel`, `PersonalisedFeed` placeholder). Remove bottom tabs.
+2. **Migrate existing screens** – copy/adapt old tab screens into `app/(stack)/` as full‑screen stack views. Test navigation.
+3. **Live Hub & podcasts** – build `liveService`, `useLiveStreams`, `LiveHub` screen, `LivePlayer` component.
+4. **Personalisation & monetisation** – implement `PersonalisedFeed` with real data, sponsored content logic, payment integration.
+5. **Polish & release** – glassmorphism pass on all screens, accessibility, Play Store closed testing.
+
+---
+
+## 9. ENVIRONMENT VARIABLES (unchanged, with new version)
+
+```
+EXPO_PUBLIC_APP_VERSION=1.265.0   (bump)
+... (all other vars same as Beta 3)
+```
+
+---
+
+## 10. QUICK REFERENCE CARD
+
+| Item | Value |
+|------|-------|
+| App Name | CSHAD iSentinel News |
+| Package | `cshad.isentinel.news` |
+| Version (Beta 4) | `1.265.0` |
+| Version code | `7` |
+| Branch | `beta4` |
+| EAS Project | `ce9ad511-1168-4d71-941d-35a5f4214892` (cshadnews, shaunatg-2) |
+| Supabase | `https://vitkuegjjopikdovklcb.supabase.co` |
+
+---
+
+**This is the complete Beta 4 handover. We are ready to start Phase 1.**  
+Say “roll” and I’ll begin with the full‑file replacements for the root layout and the new home screen.

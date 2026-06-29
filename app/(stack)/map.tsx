@@ -1,4 +1,6 @@
-﻿// app/(tabs)/map.tsx
+// app/(stack)/map.tsx
+// Beta 4 - Phase 1: Map stack screen
+
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
   View,
@@ -9,31 +11,30 @@ import {
   TouchableOpacity,
 } from "react-native";
 import MapView, { Marker, Callout, Circle } from "react-native-maps";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { useTheme } from "@/contexts/ThemeContext";
-import { useLocation } from "@/hooks/useLocation";
-import { Typography, Spacing, BorderRadius, Shadows } from "@/config/theme";
-import { APP } from "@/config/constants";
-import { useMapData } from "@/hooks/useMapData";
-import { METRO_QUICK_ACCESS } from "@/services/location/saCities";
-import { HazardReportModal } from "@/components/hub/HazardReportModal";
+import { useTheme } from "../../src/contexts/ThemeContext";
+import { useLocation } from "../../src/hooks/useLocation";
+import { Typography, Spacing, BorderRadius, Shadows } from "../../src/config/theme";
+import { APP } from "../../src/config/constants";
+import { useMapData } from "../../src/hooks/useMapData";
+import { METRO_QUICK_ACCESS } from "../../src/services/location/saCities";
+import { HazardReportModal } from "../../src/components/hub/HazardReportModal";
 import {
   fetchHazards,
   voteHazardCleared,
   voteHazardStillThere,
-} from "@/services/map/mapService";
-import type { MapMarker } from "@/services/map";
+} from "../../src/services/map/mapService";
+import type { MapMarker } from "../../src/services/map";
 
 // Hazard SVG icons
-import PotholeIcon from '@assets/hazard-icons/pothole.svg';
-import BurstPipeIcon from '@assets/hazard-icons/burst-pipe.svg';
-import PowerLineIcon from '@assets/hazard-icons/power-line.svg';
-import RoadClosureIcon from '@assets/hazard-icons/road-closure.svg';
-import AccidentIcon from '@assets/hazard-icons/accident.svg';
-import OtherIcon from '@assets/hazard-icons/other.svg';
+import PotholeIcon from '../../assets/hazard-icons/pothole.svg';
+import BurstPipeIcon from '../../assets/hazard-icons/burst-pipe.svg';
+import PowerLineIcon from '../../assets/hazard-icons/power-line.svg';
+import RoadClosureIcon from '../../assets/hazard-icons/road-closure.svg';
+import AccidentIcon from '../../assets/hazard-icons/accident.svg';
+import OtherIcon from '../../assets/hazard-icons/other.svg';
 
 const HAZARD_ICONS: Record<string, React.FC<{ width: number; height: number }>> = {
   pothole: PotholeIcon,
@@ -295,7 +296,6 @@ export default function MapScreen() {
   }, [showTips, newsTipMarkers]);
   const handleMapReady = useCallback(() => setMapReady(true), []);
 
-  // Updated voting handlers with modal feedback
   const handleVoteCleared = useCallback(async (hazardId: string) => {
     await voteHazardCleared(hazardId);
     setVoteModalType('cleared');
@@ -423,7 +423,6 @@ export default function MapScreen() {
                       {formatTimestamp(marker.timestamp)}
                     </Text>
                   </View>
-                  {/* Voting buttons */}
                   <View style={styles.voteRow}>
                     <TouchableOpacity
                       style={styles.voteButton}
@@ -500,27 +499,7 @@ export default function MapScreen() {
 
       <VoteModal type={voteModalType} visible={voteModalVisible} onHide={() => { setVoteModalVisible(false); setVoteModalType(null); }} />
 
-      <SafeAreaView style={[styles.topBar, { backgroundColor: colors.surface + 'F0' }]} edges={['top']}>
-        <View style={styles.topBarContent}>
-          <View style={styles.topBarLeft}>
-            <Text style={[styles.title, { color: colors.text }]}>{t('map.title')}</Text>
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              {locationDisplayText}
-              {viewMode === 'myArea' && cityName && ` • ${currentRadiusKm}km`}
-            </Text>
-          </View>
-          <View style={styles.topBarRight}>
-            <Text style={[styles.statText, { color: colors.primary }]}>
-              {visibleMarkers.length} {t('map.markers')}
-            </Text>
-            {viewMode === 'myArea' && allMarkers.length !== visibleMarkers.length && (
-              <Text style={[styles.statSubtext, { color: colors.textSecondary }]}>
-                of {allMarkers.length} total
-              </Text>
-            )}
-          </View>
-        </View>
-      </SafeAreaView>
+      {/* Top bar removed — title shown in stack header */}
 
       <View style={[styles.viewModeBar, { backgroundColor: colors.surface + 'F0' }]}>
         <Pressable onPress={handleMyAreaPress} style={[styles.viewModeButton, viewMode === 'myArea' && { backgroundColor: colors.primary + '20' }]}>
@@ -640,14 +619,6 @@ const styles = StyleSheet.create({
   errorBanner: { position: 'absolute', top: 100, left: Spacing.md, right: Spacing.md, padding: Spacing.md, borderRadius: BorderRadius.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 15 },
   errorText: { color: '#FFFFFF', fontSize: Typography.sizes.caption, flex: 1 },
   retryText: { color: '#FFFFFF', fontFamily: Typography.fonts.bold, marginLeft: Spacing.md },
-  topBar: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm, zIndex: 10 },
-  topBarContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
-  topBarLeft: { flex: 1 },
-  topBarRight: { alignItems: 'flex-end' },
-  title: { fontSize: Typography.sizes.heading, fontFamily: Typography.fonts.bold },
-  subtitle: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.regular, marginTop: 2 },
-  statText: { fontSize: Typography.sizes.caption, fontFamily: Typography.fonts.bold },
-  statSubtext: { fontSize: Typography.sizes.tiny, fontFamily: Typography.fonts.regular },
   viewModeBar: { position: 'absolute', top: 95, left: Spacing.md, flexDirection: 'row', alignItems: 'center', padding: Spacing.xs, borderRadius: BorderRadius.md, zIndex: 10, gap: Spacing.xs },
   viewModeButton: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, borderRadius: BorderRadius.sm, gap: 4 },
   viewModeText: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.medium },

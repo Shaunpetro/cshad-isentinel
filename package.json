@@ -1,8 +1,9 @@
 {
-  "name": "pshad-isentinel",
-  "version": "1.263.4",
+  "name": "cshad-isentinel-news",
+  "version": "2.2606.01",
+  "main": "expo-router/entry",
   "description": "South Africa's Privacy-First Community Safety Intelligence App",
-  "author": "ATG Development",
+  "author": "Petro@ATG",
   "license": "UNLICENSED",
   "private": true,
   "main": "expo-router/entry",

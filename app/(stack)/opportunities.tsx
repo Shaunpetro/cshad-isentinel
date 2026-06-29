@@ -1,4 +1,6 @@
-// app/(tabs)/opportunities.tsx
+// app/(stack)/opportunities.tsx
+// Beta 4 - Phase 1: Opportunities stack screen
+
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
@@ -55,14 +57,12 @@ export default function OpportunitiesScreen() {
     if (!isSubscribed) {
       setSubscriptionModalVisible(true);
     } else {
-      // optional: allow toggling off for demo
       setIsSubscribed(false);
       AsyncStorage.setItem(PREMIUM_KEY, 'false');
     }
   }, [isSubscribed]);
 
   const handleSelectPlan = useCallback((plan: any) => {
-    // demo: any plan activates premium immediately
     setIsSubscribed(true);
     AsyncStorage.setItem(PREMIUM_KEY, 'true');
     setSubscriptionModalVisible(false);
@@ -91,14 +91,12 @@ export default function OpportunitiesScreen() {
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [selectedSubmissionType, setSelectedSubmissionType] = useState<string | null>(null);
 
-  // Clear filters when category changes
   useEffect(() => {
     setSelectedProvince(null);
     setSelectedSubcategory(null);
     setSelectedSubmissionType(null);
   }, [activeCategory]);
 
-  // Active filter count for badge
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (selectedProvince) count++;
@@ -190,7 +188,7 @@ export default function OpportunitiesScreen() {
         </Pressable>
       </View>
 
-      {/* Premium toggle (now opens subscription modal on free) */}
+      {/* Premium toggle */}
       <Pressable
         style={[styles.toggleButton, { backgroundColor: isSubscribed ? colors.success : colors.warning }]}
         onPress={handleTogglePress}
@@ -247,7 +245,7 @@ export default function OpportunitiesScreen() {
         onClose={() => setFilterSheetVisible(false)}
       />
 
-      {/* Subscription Modal (triggered from main toggle) */}
+      {/* Subscription Modal */}
       <SubscriptionModal
         visible={subscriptionModalVisible}
         onClose={() => setSubscriptionModalVisible(false)}
@@ -262,7 +260,7 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 60,
+    paddingTop: 0,
     paddingBottom: Spacing.xs,
     borderBottomWidth: 0.5,
   },

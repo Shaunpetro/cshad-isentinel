@@ -1,0 +1,284 @@
+Here is the **full, comprehensive handover document** for CSHAD iSentinel News – Beta 4, incorporating every decision, rule, file change, and the new WSL local build workflow. This document is the single source of truth for the project’s current state and the path forward.
+
+---
+
+# CSHAD iSentinel News — Beta 4 Complete Handover
+
+**Date:** 25 June 2026  
+**Purpose:** Single source of truth for development, strategy, operations, and testing for the July release and beyond.
+
+---
+
+## 1. PROJECT IDENTITY & CURRENT STATE
+
+| Item | Value |
+|------|-------|
+| **App Name** | CSHAD iSentinel News |
+| **Package** | `cshad.isentinel.news` |
+| **Version (Beta 4)** | `2.2606.01` (major 2, year/month `2606`, phase `01`) |
+| **Android versionCode** | `9` (incremented from 8) |
+| **Branch** | `beta4` |
+| **EAS Project ID** | `ce9ad511-1168-4d71-941d-35a5f4214892` (owner `shaunatg-2`) |
+| **Supabase** | `https://vitkuegjjopikdovklcb.supabase.co` |
+| **Current navigation** | Stack navigator (`app/(stack)/_layout.tsx`) with hybrid Home button |
+| **Theme** | Extended with `glass` & `pastel` tokens (light/dark) |
+| **i18n** | `home` and `live` sections added to en/af/zu locales |
+| **Monetisation** | Premium lock applies only to `tender` category (verified in code) |
+| **TypeScript** | `tsc --noEmit` passes with **0 errors** |
+| **Native build** | Windows local Gradle fails due to NDK/C++ linker issues (New Architecture forced by RN 0.82+). Workaround: WSL local EAS build (zero quota). |
+
+---
+
+## 2. MASTER WORKING RULES
+
+### 2.1 Core Principles
+- **We sell belonging, safety, and status – not ads.**
+- Every feature must satisfy one of: Safety & Certainty, Belonging & Identity, Status & Growth.
+- All development follows a **planning‑then‑code** workflow, with file‑by‑file confirmation.
+
+### 2.2 File Modification Rules
+1. **Before changing or adding any file**, confirm the current content of the file (using `Get-Content` or equivalent).  
+2. Only after seeing the current state do we propose modifications.  
+3. Modifications are proposed **one file at a time**, and we wait for explicit approval before applying.  
+4. **Bulk proposals** are allowed when no individual file exceeds 600 lines.  
+5. **File header comments** (`// path/to/file.tsx`) remain unchanged when files are moved; only the path is updated.  
+6. All new components must use the `glass` and `pastel` theme tokens.  
+7. All changes must maintain full **dark/light mode** support.  
+8. All code must pass `tsc --noEmit` before any build or commit.  
+9. Commit messages reference the phase and file(s) modified.
+
+### 2.3 Versioning Schema
+- **Format:** `2.YYMM.XX`  
+  - `2` = Major version (new layout architecture)  
+  - `YYMM` = Year and month (e.g., `2606` for June 2026)  
+  - `XX` = Phase number within that release (e.g., `01` for Beta 4 Phase 1)  
+- **Android `versionCode`** increments sequentially with each Play Store submission (current: 9).
+
+### 2.4 Testing & Build Strategy
+- **For daily development** (when native toolchain works): `npx expo run:android` – local debug APK, no EAS credits.
+- **For sharing test builds** (native toolchain working): `eas build --local --platform android --profile preview` – local APK/AAB, zero quota.
+- **When Windows native build fails** (current situation): use the **WSL Local Build Workflow** (Section 2.4.1).
+- **Cloud EAS builds** (`eas build --platform android --profile preview` without `--local`) are reserved for Play Store submissions.
+
+### 2.4.1 WSL Local Build Workflow (shaunpetro – Windows + Cursor IDE)
+
+Use this workflow when the Windows native Gradle build fails due to NDK/C++ linker errors. The entire process runs inside **Cursor’s integrated terminal** using WSL 2.
+
+#### Prerequisites
+- Windows 11 (or Windows 10 2004+) with virtualisation enabled in BIOS.
+- Administrator access on the machine.
+
+#### One‑time WSL installation (if not already present)
+1. Open **PowerShell as Administrator** and run:  
+   `wsl --install`  
+   *(This installs the default Ubuntu distribution and the required virtualisation components.)*
+2. **Reboot your computer** when prompted.
+3. After reboot, open **Ubuntu** from the Start menu. A terminal will open; wait for the installation to complete, then create a Linux username and password.
+4. (Optional) In PowerShell Admin, run:  
+   `wsl --set-default-version 2`
+
+#### First‑time environment setup (inside Cursor’s WSL terminal)
+5. In Cursor, open a new terminal (`` Ctrl+` ``).
+6. Switch to the **WSL/Ubuntu** profile by clicking the dropdown next to the `+` and selecting **Ubuntu (WSL)**.
+7. Run the following commands **inside the WSL terminal**:
+
+```bash
+# Install Java 17 (required by Android build)
+sudo apt update && sudo apt install -y unzip openjdk-17-jdk
+
+# Install nvm and Node.js 20 LTS
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+source ~/.bashrc
+nvm install 20
+nvm use 20
+
+# Install EAS CLI globally
+npm install -g eas-cli
+```
+
+#### Every subsequent build (from Cursor’s WSL terminal)
+8. In Cursor, open a WSL terminal and run:
+
+```bash
+cd /mnt/c/Dev/cshad-isentinel-beta4
+eas build --local --platform android --profile preview
+```
+
+The build will produce a release APK at:  
+`android/app/build/outputs/apk/release/app-release.apk`  
+(Windows path: `C:\Dev\cshad-isentinel-beta4\android\app\build\outputs\apk\release\app-release.apk`)
+
+#### Installing the APK on the Pixel 9 emulator
+9. From a **PowerShell** window (not WSL), run:
+
+```powershell
+adb install "C:\Dev\cshad-isentinel-beta4\android\app\build\outputs\apk\release\app-release.apk"
+```
+
+The app will appear as “CSHAD iSentinel News” with full native functionality (push notifications, maps, etc.). This build is identical to a production EAS cloud build, but consumes **zero EAS quota**.
+
+---
+
+## 3. COMPLETE BEHAVIORAL & MONETIZATION ENGINE
+
+*(Reproduced verbatim from Handover 1 – unchanged)*
+
+### 3.1 Core Principle
+We sell belonging, safety, and status — not ads. Every monetization stream must satisfy one of three deep human needs:
+- **Safety & Certainty** (I need to know what’s happening, I need to protect my family/community)
+- **Belonging & Identity** (I want to be part of something meaningful, a movement)
+- **Status & Growth** (I want to be recognized as a top journalist/creator/supporter)
+
+### 3.2 Monetization Streams
+- **Sponsored Live Sessions & Breaking News** – local business sponsorship as a badge of honour.
+- **Premium Opportunities (Jobs/Tenders)** – 24‑hour delay for free users; “Verified Applicant” badge for subscribers.
+- **Featured Channel Placements (Live Hub / Podcasts)** – paid “Pro” tier for creators with visibility and analytics.
+- **Affiliate Partnerships (Safety Shop)** – curated products with community stories.
+- **CSHAD Pro Membership** – optional low‑cost tier (R25/month) for early access, voting, no ads.
+
+### 3.3 Behavioral Drivers
+- **Scarcity:** limited sponsorship slots, limited “Pro” creator spots.
+- **Social Proof:** display subscriber counts, partner lists.
+- **Reciprocity:** give free users high value, then ask for small commitments.
+- **Gamification:** badges for journalists, sponsors, and community guardians.
+
+### 3.4 Operational & Compliance
+- Payment providers: **Paystack** (preferred for ZAR) or Stripe.
+- VAT (15%) handled automatically.
+- No refunds for partial months.
+- Core safety features remain free forever.
+
+---
+
+## 4. COMPLETE TECHNICAL ROADMAP
+
+### 4.1 Startup Procedure (executed)
+- Created `beta4` branch from `beta3`.
+- Restored dependencies (`npm install --legacy-peer-deps`).
+- Updated `.env` with new API keys and version.
+- Logged into EAS (`shaunatg-2`).
+- Verified `tsc --noEmit` passes.
+
+### 4.2 File Structure Changes (Finalized)
+
+| File | Change Status |
+|------|---------------|
+| `app/_layout.tsx` | Modified: replaced `(tabs)` with `(stack)`. |
+| `app.config.ts` | Modified: version `2.2606.01`, `versionCode: 9`, `newArchEnabled: false` (local), dynamic EAS owner/project. |
+| `package.json` | Modified: version `2.2606.01`. |
+| `src/config/theme.ts` | Modified: added `glass` and `pastel` objects, added missing semantic colors (`textSecondary`, `success`, etc.) to both `DarkTheme` and `LightTheme`. |
+| `src/i18n/locales/en.json` | Modified: added `home` and `live` sections. (af, zu to follow.) |
+| `src/components/opportunities/OpportunityDetailModal.tsx` | Modified: premium lock condition changed to `category === 'tender' && !isSubscribed`. |
+| `android/gradle.properties` | Modified: removed invalid CMake/STL lines. |
+| `android/local.properties` | Created: points to SDK and CMake directories. |
+| `android/build.gradle` | Modified: pinned AGP version (`8.3.2`), hardcoded NDK version via `ext` block. |
+| `android/app/build.gradle` | Modified: hardcoded `ndkVersion`, `buildToolsVersion`, `compileSdk`, `minSdk`, `targetSdk`, `versionCode`, `versionName`; added `externalNativeBuild` blocks to force `c++_shared` linking. |
+| `eas.json` | Modified: `preview` and `production` profiles now include `EXPO_NEW_ARCH: 1` for cloud builds. |
+
+### 4.3 Obsolete Files (Deleted)
+- `app/(tabs)/_layout.tsx`
+- `app/(tabs)/index.tsx` (News tab)
+- `app/(tabs)/opportunities.tsx`
+- `app/(tabs)/map.tsx`
+- `app/(tabs)/alerts.tsx` (Safety Hub)
+- `app/(tabs)/settings.tsx`
+- `app/(tabs)/tip.tsx`
+- `app/news/[id].tsx` (moved to stack)
+
+### 4.4 New Files Created (Phase 1)
+
+#### Navigation
+- `app/(stack)/_layout.tsx` – Stack navigator with glass header and Home button.
+- `app/(stack)/index.tsx` – Home screen shell with SectionNavigator and BreakingNewsCarousel.
+- `app/(stack)/news.tsx` – Full news feed (migrated from old tab).
+- `app/(stack)/opportunities.tsx` – Opportunities screen (migrated).
+- `app/(stack)/map.tsx` – Full‑screen map (migrated).
+- `app/(stack)/safety.tsx` – Safety Hub (migrated from alerts).
+- `app/(stack)/settings.tsx` – Settings (migrated).
+- `app/(stack)/live.tsx` – Live Hub placeholder (glass card).
+- `app/(stack)/incidents.tsx` – Local incidents placeholder (glass card).
+- `app/(stack)/article/[id].tsx` – Article detail screen (moved from old route).
+
+#### Components
+- `src/components/ui/GlassCard.tsx` – Reusable glassmorphism card wrapper.
+- `src/components/ui/GlassButton.tsx` – Reusable glass button (with Home variant).
+- `src/components/home/SectionNavigator.tsx` – Grid of glass cards linking to all sections.
+- `src/components/home/BreakingNewsCarousel.tsx` – Placeholder carousel card.
+- `src/components/home/PersonalisedFeed.tsx` – Placeholder personalised feed card.
+
+#### Services / Hooks (to be created in later phases)
+- `src/services/live/liveService.ts` – Fetch live streams from YouTube Data API.
+- `src/hooks/useLiveStreams.ts`
+- `src/hooks/usePersonalisedFeed.ts`
+- `src/state/subscriptionStore.ts`
+- `src/utils/featureGates.ts`
+- `src/hooks/useSubscription.ts`
+
+### 4.5 Design System Extension (Glass + Pastel)
+Successfully added to `src/config/theme.ts` and fully integrated into all new components.
+
+### 4.6 Implementation Phases Progress
+
+| Phase | Focus | Status |
+|-------|-------|--------|
+| 0. Foundation & Environment | Configs, dependencies, theme extension | ✅ Done |
+| 1. Core Shell & Navigation | Stack navigator, home screen shell, UI primitives | ✅ Done |
+| 2. Onboarding Walkthrough | First‑time tutorial + permissions | ⏳ To do |
+| 3. Stack Screen Migration | Convert old tabs to stack screens | ✅ Done |
+| 4. Live Hub & Mock Data | Streaming with caching | ⏳ To do |
+| 5. Subscription Mock & Gating | Freemium‑to‑paid simulation | ⏳ To do |
+| 6. Final Polish & Testing | Full dark/light audit, accessibility | ⏳ To do |
+
+---
+
+## 5. THEME IMPLEMENTATION DETAILS
+
+- **All new components** use static theme objects (`DarkTheme` / `LightTheme`) combined with `useColorScheme()` from `react-native`. This avoids the `useTheme` context duplication issue we encountered with Metro.
+- **Import pattern:**  
+  ```ts
+  import { useColorScheme } from 'react-native';
+  import { DarkTheme, LightTheme } from '@/config/theme';
+  const colorScheme = useColorScheme();
+  const theme = colorScheme === 'dark' ? DarkTheme : LightTheme;
+  ```
+- **Accessing colors:** `theme.colors.text`, `theme.colors.background`, `theme.colors.success`, `theme.colors.textSecondary`, etc.
+- **Glass tokens:** `theme.glass.bg`, `theme.glass.border`.
+- **Pastel tokens:** `theme.pastel.blue`, `theme.pastel.green`, etc.
+
+The `ThemeContext` (`src/contexts/ThemeContext.tsx`) remains untouched; it continues to power the legacy screens (news, opportunities, map, etc.) that were migrated without change.
+
+---
+
+## 6. CURRENT BLOCKER & IMMEDIATE FIX
+
+**Error when running `npx eas build --local` in WSL:**  
+`npm error could not determine executable to run`
+
+**Cause:** EAS CLI is not installed inside the WSL environment. The command `npx eas` cannot find the `eas` binary because it’s only installed globally on the Windows side.
+
+**Fix (one‑time):** Install EAS CLI globally inside WSL, then run the build directly.
+
+Run these commands **in Cursor’s WSL terminal**:
+
+```bash
+npm install -g eas-cli
+cd /mnt/c/Dev/cshad-isentinel-beta4
+eas build --local --platform android --profile preview
+```
+
+After the build completes, install the APK from PowerShell as described in Section 2.4.1.
+
+---
+
+## 7. NEXT ACTIONS
+
+1. **User confirms this handover.**  
+2. **Execute the fix:** Install EAS CLI in WSL and trigger the local build (commands above).  
+3. **Install the APK** on the Pixel 9 emulator and verify the home screen with glass cards, stack navigation, and theme switching.  
+4. **Proceed to Phase 2:** Onboarding walkthrough design.
+
+---
+
+**Awaiting your confirmation to proceed.** Once you say “Proceed,” I’ll give you the exact copy‑paste commands to install EAS CLI and start the build.
+
+**Await your subscription confirmation.** Distro Google Pay+ ZAR

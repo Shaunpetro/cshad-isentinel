@@ -1,8 +1,8 @@
 // src/contexts/ThemeContext.tsx
 /**
  * Theme Context
- * Provides app-wide theme state and switching functionality
- * Supports Dark, Light, and System modes
+ * Provides app-wide theme state, colors, glass/pastel tokens, and switching.
+ * Supports Dark, Light, and System modes.
  */
 
 import React, {
@@ -51,6 +51,20 @@ export interface ThemeColors {
   success: string;
 }
 
+export interface GlassTokens {
+  bg: string;
+  border: string;
+}
+
+export interface PastelTokens {
+  blue: string;
+  green: string;
+  peach: string;
+  lavender: string;
+  mint: string;
+  rose: string;
+}
+
 export interface ThemeContextValue {
   // Current theme mode
   mode: AppearanceMode;
@@ -60,6 +74,10 @@ export interface ThemeContextValue {
 
   // Theme colors
   colors: ThemeColors;
+
+  // Glassmorphism and pastel tokens (dynamic)
+  glass: GlassTokens;
+  pastel: PastelTokens;
 
   // Change theme
   setMode: (mode: AppearanceMode) => Promise<void>;
@@ -93,8 +111,8 @@ const lightColors: ThemeColors = {
   surface: Colors.carbon.white,
   card: Colors.carbon.white,
   text: Colors.carbon.black,
-  textSecondary: '#3A3A3A',          // darken slightly for better contrast
-  textDisabled: '#8A8A8A',           // keep silver for disabled
+  textSecondary: '#3A3A3A',
+  textDisabled: '#8A8A8A',
   textInverse: Colors.carbon.white,
   border: '#E0E0E0',
   divider: '#E8E8E8',
@@ -172,6 +190,15 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     return isDark ? darkColors : lightColors;
   }, [isDark]);
 
+  // Get glass and pastel tokens based on mode
+  const glass = useMemo(() => {
+    return isDark ? DarkTheme.glass : LightTheme.glass;
+  }, [isDark]);
+
+  const pastel = useMemo(() => {
+    return isDark ? DarkTheme.pastel : LightTheme.pastel;
+  }, [isDark]);
+
   // Set mode and persist
   const setMode = useCallback(async (newMode: AppearanceMode) => {
     setModeState(newMode);
@@ -183,6 +210,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     mode,
     isDark,
     colors,
+    glass,
+    pastel,
     setMode,
     isLoading,
   };

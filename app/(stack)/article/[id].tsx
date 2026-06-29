@@ -1,4 +1,6 @@
-// app/news/[id].tsx
+// app/(stack)/article/[id].tsx
+// Beta 4 - Phase 1: Article detail stack screen
+
 import React from "react";
 import {
   View,
@@ -15,11 +17,11 @@ import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
 import MapView, { Marker } from "react-native-maps";
 import { useTranslation } from "react-i18next";
-import { Typography, Spacing, BorderRadius } from "@/config/theme";
-import { SeverityBadge, SourceBadge, VerifiedBadge } from "@/components/news";
-import { timeAgo, formatDate } from "@/utils/formatters";
-import { useNewsArticle } from "@/hooks/useNews";
-import { useTheme } from "@/contexts";
+import { Typography, Spacing, BorderRadius } from "../../../src/config/theme";
+import { SeverityBadge, SourceBadge, VerifiedBadge } from "../../../src/components/news";
+import { timeAgo, formatDate } from "../../../src/utils/formatters";
+import { useNewsArticle } from "../../../src/hooks/useNews";
+import { useTheme } from "../../../src/contexts";
 
 export default function NewsDetailScreen() {
   const router = useRouter();

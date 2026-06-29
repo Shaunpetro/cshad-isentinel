@@ -1,4 +1,6 @@
-// app/(tabs)/settings.tsx
+// app/(stack)/settings.tsx
+// Beta 4 - Phase 1: Settings stack screen
+
 import React, { useState } from "react";
 import {
   View,
@@ -12,8 +14,8 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useTranslation } from "react-i18next";
-import { Typography, Spacing } from "@/config/theme";
-import { APP } from "@/config/constants";
+import { Typography, Spacing } from "../../src/config/theme";
+import { APP } from "../../src/config/constants";
 import {
   LegalModal,
   DeveloperCredits,
@@ -23,20 +25,20 @@ import {
   OptionPickerModal,
   PickerOption,
   FeedbackModal,
-} from "@/components/settings";
-import { PrivacyModal } from "@/components/privacy";
-import { CityPickerModal } from "@/components/news";
-import { PRIVACY_POLICY, TERMS_OF_SERVICE } from "@/content/legal";
-import { usePreferences } from "@/hooks/usePreferences";
-import { useLanguage, LanguageCode } from "@/hooks/useLanguage";
-import { useTheme } from "@/contexts";
+} from "../../src/components/settings";
+import { PrivacyModal } from "../../src/components/privacy";
+import { CityPickerModal } from "../../src/components/news";
+import { PRIVACY_POLICY, TERMS_OF_SERVICE } from "../../src/content/legal";
+import { usePreferences } from "../../src/hooks/usePreferences";
+import { useLanguage, LanguageCode } from "../../src/hooks/useLanguage";
+import { useTheme } from "../../src/contexts";
 import {
   AppearanceMode,
   NewsScope,
   NewsRadius,
   HomeLocation,
-} from "@/services/preferences";
-import { SACity } from "@/services/location";
+} from "../../src/services/preferences";
+import { SACity } from "../../src/services/location";
 import * as StoreReview from "expo-store-review";
 
 export default function SettingsScreen() {
@@ -194,10 +196,6 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
-      <View style={[styles.header, { backgroundColor: colors.surface }]}>
-        <Text style={[styles.title, { color: colors.text }]}>{t('settings.title')}</Text>
-      </View>
-
       {/* Permissions */}
       <View style={[styles.section, { backgroundColor: colors.surface }]}>
         <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>PERMISSIONS</Text>
@@ -313,8 +311,6 @@ const styles = StyleSheet.create({
   content: { paddingBottom: Spacing.xxl },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { fontSize: Typography.sizes.body, fontFamily: Typography.fonts.regular, marginTop: Spacing.md },
-  header: { paddingTop: 60, paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md },
-  title: { fontSize: Typography.sizes.title, fontFamily: Typography.fonts.bold },
   section: { marginTop: Spacing.lg, marginHorizontal: Spacing.md, borderRadius: 12, overflow: "hidden" },
   sectionHeader: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.medium, letterSpacing: 1, paddingHorizontal: Spacing.md, paddingTop: Spacing.md, paddingBottom: Spacing.xs },
   itemDivider: { height: 1, marginLeft: 60 },
