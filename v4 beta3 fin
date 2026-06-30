@@ -1,0 +1,218 @@
+# CSHAD iSentinel News — Complete Consolidated Handover (Beta 3 Final)
+
+**Date:** 22 June 2026  
+**Purpose:** One document to understand the entire project, the journey, how we work, and the current state — ready for Beta 4.
+
+---
+
+## 1. PROJECT IDENTITY & CURRENT STATE
+
+| Item | Detail |
+|------|--------|
+| App Name | CSHAD iSentinel News |
+| Package name | `cshad.isentinel.news` |
+| Current version | `1.264.0` |
+| Current version code | `6` |
+| Active branch | `beta3` |
+| Repository | `https://github.com/Shaunpetro/cshad-isentinel` |
+| **Active EAS project** | `ce9ad511-1168-4d71-941d-35a5f4214892` (slug: `cshadnews`) |
+| EAS account active | `shaunatg-2` (petrographics.adm@gmail.com) – Owner of new project |
+| **Original EAS project** | `41d9d284-b014-48ab-9238-fe2c0724fd98` (slug: `cshad-isentinel-news`) – Owner `shaunpetro` – **quota exhausted** |
+| Supabase URL | `https://vitkuegjjopikdovklcb.supabase.co` |
+| Firebase project | CSHAD-news (Spark plan) – exposed key revoked, new key to be configured |
+| Google Play Console | Paid, app exists (package `cshad.isentinel.news`), closed testing pending. Original keystore transferred to new EAS project – signature matches. |
+| OpenWeatherMap key | Rotated after exposure; new key in `.env` & EAS secrets |
+| NewsAPI key | Unchanged (still valid) |
+
+---
+
+## 2. HOW WE WORK — THE DEVELOPMENT WORKFLOW
+
+We follow a **phased beta structure** with a strict “plan first, then code” rule.
+
+### For every change (feature/bug):
+1. **Discuss & Design** – Developer describes the need; AI asks clarifying questions, stress‑tests the idea, proposes a concrete plan (files to touch, exact changes).
+2. **Confirm** – Developer approves before any code is written.
+3. **Implement** – AI provides full‑file replacements (never partial edits unless 1–2 lines). Every file has `// path/to/file` as its first line.
+4. **Test Locally** – `npx tsc --noEmit` must pass. Optionally test with dev client (`npx expo start --dev-client`).
+5. **Commit & Push** – Every logical change is committed with a descriptive message.
+6. **Ship** – Build APK/AAB via `eas build` on the active project. For JavaScript‑only patches, publish OTA (`npx eas update`).
+
+### Moving between beta versions:
+1. Copy the previous beta directory to a new directory (e.g., `beta3` → `beta4`).
+2. Create a new branch (`beta4`).
+3. Verify stable base (TypeScript clean, APK build succeeds).
+4. Add new features one by one.
+5. The previous beta directory remains untouched as a fallback.
+
+---
+
+## 3. FULL DEVELOPMENT JOURNEY
+
+### Beta 1 — Foundation
+- 5-tab navigation, Supabase backend, RSS news, map, tips, theme, multi‑language.
+- Original package `com.atg.pshad.sentinel` → later renamed.
+
+### Beta 2 — Feature Explosion & Stabilisation
+- Hazard reporting/voting, load shedding, weather alerts, IP location fallback.
+- CI/CD (GitHub Actions + EAS Build), OTA updates, push notifications.
+- Rebranded to CSHAD iSentinel News, new package `cshad.isentinel.news`.
+- Many UI/performance fixes.
+
+### Beta 3 (Current) — Opportunities, Infrastructure & Bug Fixes
+
+#### What we built:
+- **Opportunities tab** with three sub‑tabs: Tenders, Jobs, Bursaries.
+- Glass‑morphism detail modal with premium/free tier demo.
+- Subscription toggle (test) with AsyncStorage persistence.
+- Document download (expo-file-system + sharing).
+- Filter sheet (province, industry, submission type).
+- **Persistent feedback button** with breadcrumbs, captcha, Supabase insert.
+- **Backend scrapers**: eTenders, Adzuna jobs, bursaries (scripts ready, not yet executed).
+
+#### Major infrastructure challenges (and solutions):
+- **EAS build quota exhausted** → Created new EAS project under `shaunatg-2`. Transferred original keystore to keep Play Store compatibility. Updated `app.config.ts` (slug, owner, project ID, updates URL). Set environment variables on the new project.
+- **Dependency lockfile issues** → Multiple times `npm ci` failed on EAS due to missing packages (jest, react-test-renderer, @expo/vector-icons, babel-preset-expo). Root cause: `npm install --legacy-peer-deps` sometimes drops dev dependencies. Final fix: cleaned `package.json` (added missing devDeps), deleted lock file, ran `npm install --legacy-peer-deps`, verified with `Select-String`.
+- **Babel preset version conflict** → Accidental upgrade to `babel-preset-expo@56` (SDK 56) caused Hermes bundling errors (private fields/methods, TypeScript declare). Fixed by reverting to `~55.0.22` and removing manually added Babel plugins.
+- **Secrets exposure** → Firebase service account key and OpenWeather API key pushed to public repo. Purged from Git history with `git filter-branch`. Rotated keys. GitHub push protection unblocked.
+- **TypeScript errors from expo‑notifications** → New version changed return types of permission methods. Added temporary type assertions (`as any`) to pass build.
+
+#### Current state of the 7 planned bug fixes:
+| Bug | Status |
+|-----|--------|
+| 1. Document download & premium tier | Implemented but premium logic incomplete – only blurs/locks tenders when not subscribed, but uses `is_premium` field (always false). **Needs rework for Beta 4** (to use category check). |
+| 2. Opportunities re‑seeding (GH Actions, date parsing) | Code provided, not yet applied to repo. |
+| 3. Jobs filter (province mapping) | Code provided, not yet applied. |
+| 4. Persist feedback to Supabase | Done (service, button, RLS policy). |
+| 5. Subject auto‑prefix | Done (part of Bug 4). |
+| 6. Breadcrumb trail | Done (part of Bug 4). |
+| 7. Remove push notifications | Partially done – plugin removed from config, type assertions added. Full removal pending. |
+
+#### Feed limits increased:
+- News: **250** (service and hook)
+- Opportunities: **200** (service)
+
+---
+
+## 4. DIRECTORY STRUCTURE (updated for Beta 3)
+
+```
+C:\Dev\cshad-isentinel-beta3\          (current active project)
+├── app/
+│   ├── (tabs)/
+│   │   ├── _layout.tsx                (tab bar)
+│   │   ├── index.tsx                  (News)
+│   │   ├── map.tsx
+│   │   ├── opportunities.tsx          (NEW: Tenders/Jobs/Bursaries)
+│   │   ├── alerts.tsx                 (Safety Hub)
+│   │   └── settings.tsx
+│   └── ...
+├── src/
+│   ├── components/
+│   │   ├── opportunities/             (NEW)
+│   │   │   ├── OpportunityCard.tsx
+│   │   │   ├── OpportunityDetailModal.tsx
+│   │   │   ├── SubscriptionModal.tsx
+│   │   │   └── FilterSheet.tsx
+│   │   ├── feedback/                  (NEW: PersistentFeedbackButton)
+│   │   └── ...
+│   ├── services/
+│   │   ├── opportunities/             (NEW: opportunityService.ts)
+│   │   ├── tickets/                   (NEW: submitTicket.ts)
+│   │   ├── news/newsService.ts
+│   │   └── ...
+│   ├── hooks/
+│   │   ├── useOpportunities.ts        (NEW)
+│   │   └── ...
+│   └── ...
+├── scripts/                           (scrapers, backfill)
+├── eas.json
+├── app.config.ts                      (UPDATED with new EAS project)
+├── package.json
+├── babel.config.js                    (restored to simple preset)
+├── metro.config.js                    (SVG transformer only)
+└── .env.example
+```
+
+---
+
+## 5. MASTER RULES (15 — Always in Effect)
+
+1. Never delete or create files without confirmation.
+2. Always check existing file content before modifying.
+3. Commit after every logical change.
+4. Atomic package updates.
+5. All tools/services must be free and work from South Africa.
+6. Pre‑verify commands before file‑modifying operations.
+7. Stop and fix the entire step on failure.
+8. Full‑file replacements unless only 1–2 lines change.
+9. Tokens/keys are ephemeral – never paste real secrets.
+10. Never use the old package name `com.atg.pshad.sentinel`.
+11. Setup instructions must be step‑by‑step.
+12. Every file must have its project‑relative path as a first‑line comment.
+13. If the first‑line comment doesn’t match the file path, fix it immediately.
+14. Dependencies must be reproducible from scratch.
+15. All environment variables and secrets must be in `.env.example`.
+
+---
+
+## 6. KNOWN ISSUES & PENDING FOR BETA 4
+
+| Issue | Detail |
+|-------|--------|
+| Subscription (premium) | Toggle appears on all tabs; blur/lock doesn’t work because condition uses `is_premium` (always false). **Fix:** change to `category === 'tender' && !isSubscribed` and hide toggle on non‑tender tabs. |
+| Push notifications | Type assertions are temporary; full removal (Bug 7) still needed. |
+| Feedback (Bug 4) | RLS policy must be run in Supabase SQL Editor. |
+| GitHub Actions (Bug 2) | Schedule and scraper fixes not yet committed to repo. |
+| Jobs filter (Bug 3) | Province mapping not yet applied. |
+| OTA updates channel | Not configured in `eas.json`; OTA will fail until a channel is set. |
+| Old EAS project slug | Changed to `cshadnews` to match new project, but old slug `cshad-isentinel-news` may be preferred for consistency. |
+
+---
+
+## 7. ENVIRONMENT VARIABLES (updated)
+
+The following must be set in `.env`, EAS environments, and GitHub secrets.
+
+```
+EXPO_PUBLIC_SUPABASE_URL=https://vitkuegjjopikdovklcb.supabase.co
+EXPO_PUBLIC_SUPABASE_KEY=sb_publishable_3U3qzc6G-_boPVYTSXwBFg_qeZhPJCU
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyBhOSPYnYnoraCNu44xqtTw6C-_8KZF4ew
+EXPO_PUBLIC_OPENWEATHERMAP_API_KEY=<new rotated key>
+EXPO_PUBLIC_NEWS_API_KEY=93b5c1c881e141a4afd3e26f6657a87d
+EXPO_PUBLIC_FIREBASE_API_KEY=AIzaSyBCs_EmnXFv1wKV6hfupmd-uZGNhVoNk7I
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=pshad-sentinel-ihub.firebaseapp.com
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=pshad-sentinel-ihub
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=pshad-sentinel-ihub.firebasestorage.app
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=993330483619
+EXPO_PUBLIC_FIREBASE_APP_ID=1:993330483619:android:5d2c36fc9bd2b939754a16
+EXPO_PUBLIC_MAP_TILE_URL=https://tile.openstreetmap.org/{z}/{x}/{y}.png
+EXPO_PUBLIC_APP_ENV=development
+EXPO_PUBLIC_APP_VERSION=1.264.0
+```
+
+---
+
+## 8. BUILD & DEPLOY COMMANDS
+
+```powershell
+# TypeScript check
+npx tsc --noEmit
+
+# Preview APK (test)
+npx eas-cli build --platform android --profile preview --non-interactive
+
+# Production AAB (Play Store)
+npx eas-cli build --platform android --profile production --non-interactive
+
+# Check active account & project
+eas whoami
+eas project:info
+
+# OTA update (JS only, after channel is set)
+npx eas update --branch preview --platform android --message "description"
+```
+
+---
+
+**This document replaces all previous handovers. It tells the complete story, defines the rules, and gives the exact state as of Beta 3. The next developer or AI only needs this one file to continue.**
