@@ -1,0 +1,26 @@
+name: Production Release (AAB + Play Store)
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'   # e.g., v2.0.0
+
+jobs:
+  build-and-submit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+
+      - name: Build AAB and submit to Play Store
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN_2 }}
+        run: |
+          npx eas-cli build \
+            --platform android \
+            --profile production \
+            --non-interactive \
+            --auto-submit
