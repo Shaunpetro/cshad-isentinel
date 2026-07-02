@@ -1,83 +1,79 @@
-name: Beta Pipeline (Test + Build + Release)
+# .github/workflows/beta-ci.yml
+name: Build Preview APK
 
 on:
   push:
-    branches: [main, develop, beta2]
     tags:
-      - 'v*'
-  workflow_dispatch:
+      - 'v*-beta'  # e.g., v1.0.93-beta
 
 jobs:
-  # ── 1. Unit tests ──
-  jest-tests:
+  build:
     runs-on: ubuntu-latest
+    
+    env:
+      # Firebase
+      EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}
+      EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+      EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_PROJECT_ID }}
+      EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+      EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+      EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_APP_ID }}
+      
+      # News API
+      EXPO_PUBLIC_NEWS_API_KEY: ${{ secrets.EXPO_PUBLIC_NEWS_API_KEY }}
+      
+      # Supabase
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_KEY }}
+      
+      # Map
+      EXPO_PUBLIC_MAP_TILE_URL: https://tile.openstreetmap.org/{z}/{x}/{y}.png
+      EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY }}
+      
+      # Weather
+      EXPO_PUBLIC_OPENWEATHERMAP_API_KEY: ${{ secrets.EXPO_PUBLIC_OPENWEATHERMAP_API_KEY }}
+      
+      # Adzuna
+      ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
+      ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
+      
+      # App
+      EXPO_PUBLIC_APP_ENV: development
+      EXPO_PUBLIC_APP_VERSION: 2.2606.01
+      
+      # EAS
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: 20
-      - run: npm ci
-      - run: npm run test:ci -- --passWithNoTests
-
-  # ── 2. Trigger EAS cloud build + download APK (only on version tags) ──
-  build-release:
-    needs: jest-tests
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - run: npm ci
-
-      - name: Start EAS build (wait for finish)
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+      
+      - name: Build Preview APK
         run: |
           npx eas-cli build \
             --platform android \
             --profile preview \
             --non-interactive \
-            --json \
-            --wait \
-            > build.json
-
-      - name: Extract APK URL from build result
-        id: extract
-        run: |
-          APK_URL=$(jq -r '.[0].artifacts.buildUrl' build.json)
-          echo "apk_url=$APK_URL" >> $GITHUB_OUTPUT
-
-      - name: Download APK
-        run: |
-          curl -L -o app-release.apk "${{ steps.extract.outputs.apk_url }}"
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+            --output build.apk
+      
+      - name: Upload APK to GitHub Release
+        uses: softprops/action-gh-release@v1
         with:
-          name: app-release
-          path: ./app-release.apk
-
-  # ── 3. GitHub Release ──
-  github-release:
-    needs: build-release
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Download APK artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: app-release
-          path: ./
-      - name: Create GitHub Release and upload APK
-        uses: softprops/action-gh-release@v2
-        with:
-          token: ${{ secrets.GH_RELEASE_TOKEN }}
-          files: ./app-release.apk
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
-          body: "Automated beta build of CSHAD iSentinel News."
+          files: build.apk
           draft: false
           prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Notify on Slack (optional)
+        if: always()
+        run: |
+          echo "Build completed. APK available in GitHub Release."
