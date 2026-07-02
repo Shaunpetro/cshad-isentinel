@@ -4,7 +4,7 @@ import { ExpoConfig, ConfigContext } from "expo/config";
 export default ({ config }: ConfigContext): ExpoConfig => {
   const expoConfig: ExpoConfig = {
     name: "CSHAD iSentinel News",
-    slug: "cshadnews",
+    slug: "cshad-isentinel-news",
     owner: process.env.EAS_OWNER || "shaunpetro",   // ← changed to shaunpetro
     version: "2.2606.01",
     runtimeVersion: {
