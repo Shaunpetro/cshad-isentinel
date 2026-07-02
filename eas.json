@@ -12,7 +12,6 @@
       }
     },
     "preview": {
-      "projectId": "41d9d284-b014-48ab-9238-fe2c0724fd98",
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease",
@@ -27,7 +26,6 @@
       }
     },
     "production": {
-      "projectId": "ce9ad511-1168-4d71-941d-35a5f4214892",
       "android": {
         "buildType": "app-bundle",
         "env": {

@@ -27,3 +27,6 @@ Thumbs.db
 *.log
 npm-debug.log*
 .env
+
+# Dependencies
+node_modules/
