@@ -1,8 +1,4 @@
-# .gitignore
-# (existing entries above)
-
 # Environment & Secrets
-.env
 .env.local
 .env.local.example
 
@@ -30,7 +26,3 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
-node_modules
-
-# Dependencies
-node_modules/
