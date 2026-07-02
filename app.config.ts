@@ -5,8 +5,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const expoConfig: ExpoConfig = {
     name: "CSHAD iSentinel News",
     slug: "cshadnews",
-    owner: process.env.EAS_OWNER || "shaunpetro", // fallback to shaunpetro (test account)
-    version: "2.2606.01", // Updated to June 2026, Phase 01
+    owner: process.env.EAS_OWNER || "shaunpetro",   // ← changed to shaunpetro
+    version: "2.2606.01",
     runtimeVersion: {
       policy: "appVersion",
     },
@@ -40,7 +40,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         backgroundColor: "#1C1C1C",
       },
       package: "cshad.isentinel.news",
-      versionCode: 9, // Kept at 9 to match last AAB
+      versionCode: 9,
       googleServicesFile: "./google-services.json",
       config: {
         googleMaps: {
@@ -87,7 +87,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
   };
 
-  // @ts-ignore - newArchEnabled is valid but not in the installed type definitions
+  // @ts-ignore
   expoConfig.newArchEnabled = false;
 
   return expoConfig;
