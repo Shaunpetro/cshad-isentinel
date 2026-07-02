@@ -1,70 +1,36 @@
 # .github/workflows/beta-ci.yml
-name: Build Preview APK
+name: Preview Build
 
 on:
   push:
     tags:
-      - 'v*-beta'  # e.g., v1.0.93-beta
+      - 'v*-beta'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
-    env:
-      # Firebase
-      EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}
-      EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-      EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_PROJECT_ID }}
-      EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET }}
-      EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
-      EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_APP_ID }}
-      
-      # News API
-      EXPO_PUBLIC_NEWS_API_KEY: ${{ secrets.EXPO_PUBLIC_NEWS_API_KEY }}
-      
-      # Supabase
-      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
-      EXPO_PUBLIC_SUPABASE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_KEY }}
-      
-      # Map
-      EXPO_PUBLIC_MAP_TILE_URL: https://tile.openstreetmap.org/{z}/{x}/{y}.png
-      EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY }}
-      
-      # Weather
-      EXPO_PUBLIC_OPENWEATHERMAP_API_KEY: ${{ secrets.EXPO_PUBLIC_OPENWEATHERMAP_API_KEY }}
-      
-      # Adzuna
-      ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
-      ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
-      
-      # App
-      EXPO_PUBLIC_APP_ENV: development
-      EXPO_PUBLIC_APP_VERSION: 2.2606.01
-      
-      # EAS
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Setup Node.js
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-      
+
       - name: Install dependencies
         run: npm install --legacy-peer-deps
-      
+
       - name: Build Preview APK
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           npx eas-cli build \
             --platform android \
             --profile preview \
             --non-interactive \
             --output build.apk
-      
-      - name: Upload APK to GitHub Release
+
+      - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           files: build.apk
@@ -72,8 +38,3 @@ jobs:
           prerelease: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Notify on Slack (optional)
-        if: always()
-        run: |
-          echo "Build completed. APK available in GitHub Release."
