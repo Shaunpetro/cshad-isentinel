@@ -6,37 +6,40 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import GlassCard from '../ui/GlassCard';
-import { useColorScheme } from 'react-native';
-import { DarkTheme, LightTheme } from '@/config/theme';
+import { useTheme } from '../../contexts';
+import { useTranslation } from 'react-i18next';
 
 const sections = [
-  { key: 'news', icon: 'newspaper-outline', labelKey: 'home:sections:news' },
-  { key: 'opportunities', icon: 'briefcase-outline', labelKey: 'home:sections:opportunities' },
-  { key: 'live', icon: 'radio-outline', labelKey: 'home:sections:live' },
-  { key: 'map', icon: 'map-outline', labelKey: 'home:sections:map' },
-  { key: 'safety', icon: 'shield-checkmark-outline', labelKey: 'home:sections:safety' },
-  { key: 'incidents', icon: 'warning-outline', labelKey: 'home:sections:incidents' },
-  { key: 'settings', icon: 'settings-outline', labelKey: 'home:sections:settings' },
+  { key: 'news', icon: 'newspaper-outline', labelKey: 'home.sectionNavigator.news' },
+  { key: 'opportunities', icon: 'briefcase-outline', labelKey: 'home.sectionNavigator.opportunities' },
+  { key: 'live', icon: 'radio-outline', labelKey: 'home.sectionNavigator.live' },
+  { key: 'map', icon: 'map-outline', labelKey: 'home.sectionNavigator.map' },
+  { key: 'safety', icon: 'shield-checkmark-outline', labelKey: 'home.sectionNavigator.safety' },
+  { key: 'incidents', icon: 'warning-outline', labelKey: 'home.sectionNavigator.incidents' },
+  { key: 'settings', icon: 'settings-outline', labelKey: 'home.sectionNavigator.settings' },
 ];
 
 export default function SectionNavigator() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? DarkTheme : LightTheme;
+  const theme = useTheme();
+  const { t } = useTranslation();
 
   return (
     <View style={styles.grid}>
       {sections.map((section) => (
         <GlassCard
           key={section.key}
-          onPress={() => router.push(section.key as any)} // relative route
+          onPress={() => router.push(section.key as any)}
           tint={theme.pastel.blue}
           style={styles.card}
+          noPadding
         >
-          <Ionicons name={section.icon as any} size={28} color={theme.colors.text} />
-          <Text style={[styles.label, { color: theme.colors.text }]}>
-            {section.labelKey}
-          </Text>
+          <View style={styles.cardInner}>
+            <View style={[styles.iconBox, { backgroundColor: theme.pastel.blue }]}>
+              <Ionicons name={section.icon as any} size={24} color={theme.colors.text} />
+            </View>
+            <Text style={[styles.label, { color: theme.colors.text }]}>{t(section.labelKey)}</Text>
+          </View>
         </GlassCard>
       ))}
     </View>
@@ -46,5 +49,7 @@ export default function SectionNavigator() {
 const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' },
   card: { width: '30%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
-  label: { marginTop: 8, fontSize: 12, fontWeight: '500', textAlign: 'center' },
+  cardInner: { alignItems: 'center', justifyContent: 'center', flex: 1, width: '100%' },
+  iconBox: { borderRadius: 12, width: 48, height: 48, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  label: { fontSize: 12, fontWeight: '500', textAlign: 'center' },
 });

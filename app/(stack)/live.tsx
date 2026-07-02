@@ -4,12 +4,10 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import GlassCard from '../../src/components/ui/GlassCard';
-import { useColorScheme } from 'react-native';
-import { DarkTheme, LightTheme } from '@/config/theme';
+import { useTheme } from '@/contexts';
 
 export default function LiveScreen() {
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? DarkTheme : LightTheme;
+  const theme = useTheme();
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>

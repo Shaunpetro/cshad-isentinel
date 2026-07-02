@@ -4,8 +4,7 @@
 import React from 'react';
 import { TouchableOpacity, Text, ViewStyle, StyleProp, TextStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useColorScheme } from 'react-native';
-import { DarkTheme, LightTheme } from '@/config/theme';
+import { useTheme } from '../../contexts';
 
 interface GlassButtonProps {
   title?: string;
@@ -18,8 +17,7 @@ interface GlassButtonProps {
 }
 
 export default function GlassButton({ title, icon, onPress, variant = 'primary', style, textStyle, disabled }: GlassButtonProps) {
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? DarkTheme : LightTheme;
+  const theme = useTheme();
 
   const isHome = variant === 'home';
 

@@ -36,18 +36,19 @@
     "opportunities": "Opportunities"
   },
   "home": {
-    "brand": "CSHAD iSentinel",
-    "breakingNews": "Breaking News",
-    "sectionNavigator": {
-      "news": "News",
-      "safety": "Safety Hub",
-      "live": "Live Hub",
-      "opportunities": "Opportunities",
-      "map": "Map",
-      "settings": "Settings"
-    },
-    "personalisedFeed": "Your Personalised Feed"
+  "brand": "CSHAD iSentinel",
+  "breakingNews": "Breaking News",
+  "sectionNavigator": {
+    "news": "News",
+    "safety": "Safety Hub",
+    "live": "Live Hub",
+    "opportunities": "Opportunities",
+    "map": "Map",
+    "settings": "Settings",
+    "incidents": "Incidents"
   },
+  "personalisedFeed": "Your Personalised Feed"
+},
   "live": {
     "title": "Live Hub",
     "podcasts": "Podcasts",
