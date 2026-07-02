@@ -8,7 +8,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     owner: process.env.EAS_OWNER || "shaunpetro",   // ← changed to shaunpetro
     version: "2.2606.01",
     runtimeVersion: {
-      policy: "appVersion",
+      runtimeVersion: "2.2606.01",
     },
     orientation: "portrait",
     icon: "./assets/brand/cshad-isentinel-logo-icon.png",
