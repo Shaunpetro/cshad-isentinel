@@ -5,11 +5,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const expoConfig: ExpoConfig = {
     name: "CSHAD iSentinel News",
     slug: "cshad-isentinel-news",
-    owner: process.env.EAS_OWNER || "shaunpetro",   // ← changed to shaunpetro
+    owner: process.env.EAS_OWNER || "shaunpetro",
     version: "2.2606.01",
-    runtimeVersion: {
-      runtimeVersion: "2.2606.01",
-    },
+    runtimeVersion: "2.2606.01",                    // ← fixed
     orientation: "portrait",
     icon: "./assets/brand/cshad-isentinel-logo-icon.png",
     scheme: "cshad-isentinel",
