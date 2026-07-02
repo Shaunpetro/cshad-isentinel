@@ -1,10 +1,11 @@
+// app.config.ts
 import { ExpoConfig, ConfigContext } from "expo/config";
 
 export default ({ config }: ConfigContext): ExpoConfig => {
   const expoConfig: ExpoConfig = {
     name: "CSHAD iSentinel News",
     slug: "cshadnews",
-    owner: process.env.EAS_OWNER || "shaunatg", // fallback to shaunatg
+    owner: process.env.EAS_OWNER || "shaunpetro", // fallback to shaunpetro (test account)
     version: "2.2606.01", // Updated to June 2026, Phase 01
     runtimeVersion: {
       policy: "appVersion",

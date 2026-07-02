@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "993330483619",
+    "project_id": "pshad-sentinel-ihub",
+    "storage_bucket": "pshad-sentinel-ihub.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:993330483619:android:5d2c36fc9bd2b939754a16",
+        "android_client_info": {
+          "package_name": "com.atgdev.pshadsentinel"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBCs_EmnXFv1wKV6hfupmd-uZGNhVoNk7I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:993330483619:android:e8129a76b0283f2c754a16",
+        "android_client_info": {
+          "package_name": "cshad.isentinel.news"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBCs_EmnXFv1wKV6hfupmd-uZGNhVoNk7I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
