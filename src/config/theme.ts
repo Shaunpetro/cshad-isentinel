@@ -160,9 +160,10 @@ export const LightTheme = {
     disabled: Colors.carbon.silver,
     inverse: Colors.carbon.white,
   },
+  // dark
   glass: {
-    bg: 'rgba(255,255,255,0.7)',
-    border: 'rgba(255,255,255,0.3)',
+    bg: 'rgba(20,20,20,0.3)',   // was 0.7
+    border: 'rgba(255,255,255,0.1)',
   },
   pastel: {
     blue: '#D0E4F5',

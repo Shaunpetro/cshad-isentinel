@@ -18,18 +18,29 @@ export default function GlassCard({ children, onPress, style, tint, noPadding }:
   const theme = useTheme();
 
   const cardStyle: ViewStyle = {
+    // Reduced alpha for better blur visibility
     backgroundColor: tint || theme.glass.bg,
     borderColor: theme.glass.border,
     borderWidth: 1,
     borderRadius: 16,
     padding: noPadding ? 0 : 16,
-    overflow: 'hidden', // needed for BlurView containment
+    overflow: 'hidden',
+    // Add subtle shadow for depth
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
     ...(style as object),
   };
 
   const content = (
     <>
-      <BlurView intensity={theme.isDark ? 30 : 50} style={StyleSheet.absoluteFill} tint={theme.isDark ? 'dark' : 'light'} />
+      <BlurView
+        intensity={theme.isDark ? 40 : 60}
+        style={StyleSheet.absoluteFill}
+        tint={theme.isDark ? 'dark' : 'light'}
+      />
       <View style={{ padding: noPadding ? 0 : 16 }}>{children}</View>
     </>
   );
