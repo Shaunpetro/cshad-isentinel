@@ -4,26 +4,20 @@
 import React from 'react';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import { TouchableOpacity, Platform, View, StyleSheet, Image, Text } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/contexts';
-import { StatusBar } from 'expo-status-bar';
 
 export default function StackLayout() {
   const theme = useTheme();
   const router = useRouter();
   const pathname = usePathname();
 
-  const statusBarStyle = theme.colors.statusBar === 'light' ? 'light' : 'dark';
-
-  // Same logo for both modes; header background is solid white in light mode
   const logoSrc = require('../../assets/brand/cshad-isentinel-logo-main.png');
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.isDark ? theme.colors.background : '#FFFFFF' }} edges={['top']}>
-      <StatusBar style={statusBarStyle} backgroundColor={theme.isDark ? theme.colors.background : '#FFFFFF'} />
+    <>
       <Stack
-        screenOptions={{
+        screenOptions={({ route, navigation }) => ({
           headerStyle: {
             backgroundColor: theme.isDark ? theme.colors.background : '#FFFFFF',
             borderBottomColor: theme.glass.border,
@@ -32,7 +26,11 @@ export default function StackLayout() {
           headerTintColor: theme.colors.text,
           headerTitleStyle: { fontWeight: 'bold' },
           headerTitle: ({ children }) => (
-            <View style={styles.headerTitleContainer}>
+            <View style={[
+              styles.headerTitleContainer,
+              // Add left margin when back button is present
+              navigation?.canGoBack?.() && { marginLeft: 8 }
+            ]}>
               <Image source={logoSrc} style={styles.headerLogo} resizeMode="contain" />
               <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{children}</Text>
             </View>
@@ -48,13 +46,18 @@ export default function StackLayout() {
               </TouchableOpacity>
             );
           },
-          headerRight: () => (
-            <TouchableOpacity onPress={() => router.push('settings' as any)} style={{ marginRight: 8 }}>
-              <Ionicons name="settings-outline" size={24} color={theme.colors.text} />
-            </TouchableOpacity>
-          ),
-        }}
+          // Global settings icon on every screen except Home (where we have notification only)
+          headerRight: () => {
+            // For Home screen, we override headerRight, so this won't apply there
+            return (
+              <TouchableOpacity onPress={() => router.push('settings' as any)} style={{ marginRight: 8 }}>
+                <Ionicons name="settings-outline" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+            );
+          },
+        })}
       >
+        {/* Home screen: only notification bell, no settings icon (it's already in the nav grid) */}
         <Stack.Screen
           name="index"
           options={{
@@ -64,9 +67,6 @@ export default function StackLayout() {
               <View style={{ flexDirection: 'row', gap: 16, marginRight: 8 }}>
                 <TouchableOpacity onPress={() => {}}>
                   <Ionicons name="notifications-outline" size={24} color={theme.colors.text} />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => router.push('settings' as any)}>
-                  <Ionicons name="settings-outline" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
               </View>
             ),
@@ -85,14 +85,14 @@ export default function StackLayout() {
       {/* Centered Floating Home Button – hidden on the home screen itself */}
       {pathname !== '/' && !pathname.endsWith('index') && (
         <TouchableOpacity
-          onPress={() => router.push('/(stack)')}
+          onPress={() => router.navigate('/')}
           style={[styles.fab, { backgroundColor: theme.glass.bg, borderColor: theme.glass.border }]}
           activeOpacity={0.8}
         >
           <Ionicons name="home" size={24} color={theme.colors.text} />
         </TouchableOpacity>
       )}
-    </SafeAreaView>
+    </>
   );
 }
 
@@ -103,8 +103,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerLogo: {
-    width: 38,   // 120% of original 32
-    height: 38,
+    width: 46,
+    height: 46,
   },
   headerTitle: {
     fontSize: 18,

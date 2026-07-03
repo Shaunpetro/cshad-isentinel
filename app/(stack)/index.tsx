@@ -2,7 +2,7 @@
 // Beta 4 - Phase 1: Home screen with carousel, favourites, section navigator
 
 import React from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 import { useTheme } from '@/contexts';
 import SectionNavigator from '../../src/components/home/SectionNavigator';
 import BreakingNewsCarousel from '../../src/components/home/BreakingNewsCarousel';
@@ -25,5 +25,5 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 16, gap: 24, alignItems: 'center' },
+  content: { padding: 16, gap: 24, alignItems: 'center', paddingBottom: 100 },
 });
