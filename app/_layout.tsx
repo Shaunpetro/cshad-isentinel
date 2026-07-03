@@ -65,7 +65,6 @@ function RootLayoutInner() {
         <Stack.Screen name="(stack)" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />
       </Stack>
-      <PersistentFeedbackButton />
       {showCustomSplash && <CustomSplashScreen onComplete={onSplashComplete} />}
     </View>
   );

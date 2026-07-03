@@ -4,6 +4,7 @@
 import React from 'react';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import { TouchableOpacity, Platform, View, StyleSheet, Image, Text } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/contexts';
 import { StatusBar } from 'expo-status-bar';
@@ -15,18 +16,16 @@ export default function StackLayout() {
 
   const statusBarStyle = theme.colors.statusBar === 'light' ? 'light' : 'dark';
 
-  // Choose logo based on theme
-  const logoSrc = theme.isDark
-    ? require('../../assets/brand/cshad-isentinel-logo-main.png')
-    : require('../../assets/brand/main-logo-light.png');
+  // Same logo for both modes; header background is solid white in light mode
+  const logoSrc = require('../../assets/brand/cshad-isentinel-logo-main.png');
 
   return (
-    <>
-      <StatusBar style={statusBarStyle} translucent backgroundColor="transparent" />
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.isDark ? theme.colors.background : '#FFFFFF' }} edges={['top']}>
+      <StatusBar style={statusBarStyle} backgroundColor={theme.isDark ? theme.colors.background : '#FFFFFF'} />
       <Stack
         screenOptions={{
           headerStyle: {
-            backgroundColor: theme.glass.bg,
+            backgroundColor: theme.isDark ? theme.colors.background : '#FFFFFF',
             borderBottomColor: theme.glass.border,
             borderBottomWidth: 1,
           } as any,
@@ -56,7 +55,6 @@ export default function StackLayout() {
           ),
         }}
       >
-        {/* Home screen: custom right icons (notification + settings) */}
         <Stack.Screen
           name="index"
           options={{
@@ -84,17 +82,17 @@ export default function StackLayout() {
         <Stack.Screen name="article/[id]" options={{ title: 'Article' }} />
       </Stack>
 
-      {/* Floating Home Button – hidden on the home screen itself */}
+      {/* Centered Floating Home Button – hidden on the home screen itself */}
       {pathname !== '/' && !pathname.endsWith('index') && (
         <TouchableOpacity
-          onPress={() => router.navigate('index' as any)}
+          onPress={() => router.push('/(stack)')}
           style={[styles.fab, { backgroundColor: theme.glass.bg, borderColor: theme.glass.border }]}
           activeOpacity={0.8}
         >
           <Ionicons name="home" size={24} color={theme.colors.text} />
         </TouchableOpacity>
       )}
-    </>
+    </SafeAreaView>
   );
 }
 
@@ -105,8 +103,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerLogo: {
-    width: 32,
-    height: 32,
+    width: 38,   // 120% of original 32
+    height: 38,
   },
   headerTitle: {
     fontSize: 18,
@@ -115,7 +113,7 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     bottom: 24,
-    right: 24,
+    alignSelf: 'center',
     width: 56,
     height: 56,
     borderRadius: 28,

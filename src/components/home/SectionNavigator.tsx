@@ -9,11 +9,12 @@ import GlassCard from '../ui/GlassCard';
 import { useTheme } from '../../contexts';
 import { useTranslation } from 'react-i18next';
 
+// Live now uses a unique play-circle icon, placed in the center of the grid
 const sections = [
   { key: 'news', icon: 'newspaper-outline', labelKey: 'home.sectionNavigator.news' },
   { key: 'opportunities', icon: 'briefcase-outline', labelKey: 'home.sectionNavigator.opportunities' },
-  { key: 'live', icon: 'radio-outline', labelKey: 'home.sectionNavigator.live' },
   { key: 'map', icon: 'map-outline', labelKey: 'home.sectionNavigator.map' },
+  { key: 'live', icon: 'play-circle-outline', labelKey: 'home.sectionNavigator.live' },
   { key: 'safety', icon: 'shield-checkmark-outline', labelKey: 'home.sectionNavigator.safety' },
   { key: 'incidents', icon: 'warning-outline', labelKey: 'home.sectionNavigator.incidents' },
   { key: 'settings', icon: 'settings-outline', labelKey: 'home.sectionNavigator.settings' },

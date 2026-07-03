@@ -1,11 +1,12 @@
 // app/(stack)/index.tsx
-// Beta 4 - Phase 1: Home screen with carousel and section navigator
+// Beta 4 - Phase 1: Home screen with carousel, favourites, section navigator
 
 import React from 'react';
 import { View, ScrollView, StyleSheet } from 'react-native';
 import { useTheme } from '@/contexts';
 import SectionNavigator from '../../src/components/home/SectionNavigator';
 import BreakingNewsCarousel from '../../src/components/home/BreakingNewsCarousel';
+import FavoritesFeed from '../../src/components/home/FavoritesFeed';
 
 export default function HomeScreen() {
   const theme = useTheme();
@@ -16,6 +17,7 @@ export default function HomeScreen() {
       contentContainerStyle={styles.content}
     >
       <BreakingNewsCarousel />
+      <FavoritesFeed />
       <SectionNavigator />
     </ScrollView>
   );
