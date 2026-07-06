@@ -1,5 +1,5 @@
 // app/(stack)/news.tsx
-// Beta 4 - Phase 1: News feed stack screen
+// Phase 3C – News feed with weather widget at the top
 
 import React, { useState, useCallback, useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
@@ -18,19 +18,18 @@ import {
   LocationBanner,
   LocationPermissionModal,
 } from "../../src/components/news";
+import WeatherCard from "../../src/components/news/WeatherCard";
 import { useLocation } from "../../src/hooks/useLocation";
+import { useCurrentWeather } from "../../src/hooks/useCurrentWeather";
 import { useNews } from "../../src/hooks/useNews";
 import { usePreferences } from "../../src/hooks/usePreferences";
-import { useColorScheme } from 'react-native';
-import { DarkTheme, LightTheme } from '@/config/theme'; // fixed
+import { useTheme } from "../../src/contexts";
 import type { NewsItem, NewsCategory } from "../../src/types";
 import type { TimeFilter } from "../../src/services/news";
 
 export default function NewsScreen() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const theme = colorScheme === 'dark' ? DarkTheme : LightTheme;
-  const colors = theme.colors;
+  const { colors } = useTheme();
   const { t } = useTranslation();
   const { preferences } = usePreferences();
 
@@ -48,23 +47,21 @@ export default function NewsScreen() {
     requestPermission,
   } = useLocation();
 
+  // Weather hook
+  const { weather: currentWeather, isLoading: weatherLoading } = useCurrentWeather();
+
   // Filter states
   const [activeCategory, setActiveCategory] = useState<NewsCategory | "all">("all");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("today");
 
-  // Map NewsScope to useNews scope
   const newsScope = useMemo(() => {
     if (scope === "local") return "local";
     if (scope === "national") return "national";
     return "national";
   }, [scope]);
 
-  // Get radius from user preferences
-  const radiusKm = useMemo(() => {
-    return preferences.newsRadius || 25;
-  }, [preferences.newsRadius]);
+  const radiusKm = useMemo(() => preferences.newsRadius || 25, [preferences.newsRadius]);
 
-  // Fetch ALL news first (without category filter) to get available categories
   const {
     news: allNews,
     breakingNews,
@@ -84,26 +81,22 @@ export default function NewsScreen() {
     autoRefresh: true,
   });
 
-  // Filter news by selected category client-side
   const news = useMemo(() => {
     if (activeCategory === "all") return allNews;
     return allNews.filter((article: NewsItem) => article.category === activeCategory);
   }, [allNews, activeCategory]);
 
-  // Handle article press - Navigate to detail screen (updated path)
   const handleArticlePress = useCallback(
     (article: NewsItem) => {
-      router.push({ pathname: "/article/[id]", params: { id: article.id } });
+      router.push({ pathname: "/(stack)/article/[id]", params: { id: article.id } });
     },
     [router]
   );
 
-  // Handle location banner press
   const handleEnableLocation = useCallback(() => {
     setPermissionModalVisible(true);
   }, []);
 
-  // Handle permission request from modal
   const handleRequestPermission = useCallback(async () => {
     const granted = await requestPermission();
     if (granted) {
@@ -111,7 +104,6 @@ export default function NewsScreen() {
     }
   }, [requestPermission]);
 
-  // Get translated category name
   const getCategoryName = useCallback(
     (category: string) => {
       const key = `news.categories.${category}`;
@@ -121,36 +113,34 @@ export default function NewsScreen() {
     [t]
   );
 
-  // Get translated time filter name
   const getTimeFilterName = useCallback(
     (filter: TimeFilter) => {
       switch (filter) {
-        case "today":
-          return t("news.today");
-        case "week":
-          return t("news.week");
-        case "month":
-          return t("news.month");
-        case "all":
-          return t("news.all");
-        default:
-          return filter;
+        case "today": return t("news.today");
+        case "week": return t("news.week");
+        case "month": return t("news.month");
+        case "all": return t("news.all");
+        default: return filter;
       }
     },
     [t]
   );
 
-  // Header component with all filters
   const ListHeader = useMemo(
     () => (
       <View>
+        {/* Weather Widget */}
+        {currentWeather && currentCity && (
+          <WeatherCard
+            cityName={currentCity.name}
+            temperature={currentWeather.temp}
+            description={currentWeather.description}
+            icon={currentWeather.icon}
+          />
+        )}
+
         {/* Location Header */}
-        <View
-          style={[
-            styles.locationHeaderWrapper,
-            { backgroundColor: theme.colors.surface },
-          ]}
-        >
+        <View style={[styles.locationHeaderWrapper, { backgroundColor: colors.surface }]}>
           <LocationHeader
             city={currentCity}
             onChangeCity={() => setCityPickerVisible(true)}
@@ -158,7 +148,7 @@ export default function NewsScreen() {
           />
         </View>
 
-        {/* Location Banner - shows when location is not granted */}
+        {/* Location Banner */}
         {scope === "local" && permissionStatus !== "granted" && (
           <LocationBanner
             status={permissionStatus}
@@ -175,68 +165,32 @@ export default function NewsScreen() {
           />
         )}
 
-        {/* Scope Selector */}
         <ScopeSelector activeScope={scope} onScopeChange={setScope} />
-
-        {/* Time Filter Bar */}
-        <TimeFilterBar
-          activeFilter={timeFilter}
-          onFilterChange={setTimeFilter}
-          lastUpdated={lastUpdated}
-        />
-
-        {/* News Stats - Collapsible (uses all news for accurate counts) */}
+        <TimeFilterBar activeFilter={timeFilter} onFilterChange={setTimeFilter} lastUpdated={lastUpdated} />
         <NewsStats articles={allNews} />
+        <CategoryFilter activeCategory={activeCategory} onSelect={setActiveCategory} articles={allNews} />
 
-        {/* Category Filter - Dynamic based on available categories */}
-        <CategoryFilter
-          activeCategory={activeCategory}
-          onSelect={setActiveCategory}
-          articles={allNews}
-        />
-
-        {/* Results count */}
         <View style={styles.resultsBar}>
-          <Text style={[styles.resultsText, { color: theme.colors.textSecondary }]}>
-            {news.length}{" "}
-            {news.length === 1 ? t("news.article") : t("news.articles")}
-            {activeCategory !== "all" &&
-              ` ${t("common.in")} ${getCategoryName(activeCategory)}`}
-            {scope === "local" &&
-              currentCity &&
-              ` ${t("news.within")} ${radiusKm}km ${t("news.of")} ${currentCity.name}`}
+          <Text style={[styles.resultsText, { color: colors.textSecondary }]}>
+            {news.length} {news.length === 1 ? t("news.article") : t("news.articles")}
+            {activeCategory !== "all" && ` ${t("common.in")} ${getCategoryName(activeCategory)}`}
+            {scope === "local" && currentCity && ` ${t("news.within")} ${radiusKm}km ${t("news.of")} ${currentCity.name}`}
             {scope === "national" && ` ${t("news.inSouthAfrica")}`}
-            {timeFilter !== "all" &&
-              timeFilter !== "today" &&
-              ` • ${getTimeFilterName(timeFilter)}`}
+            {timeFilter !== "all" && timeFilter !== "today" && ` • ${getTimeFilterName(timeFilter)}`}
           </Text>
         </View>
       </View>
     ),
     [
-      activeCategory,
-      news.length,
-      allNews,
-      currentCity,
-      isDetecting,
-      scope,
-      setScope,
-      breakingNews,
-      handleArticlePress,
-      colors,
-      timeFilter,
-      lastUpdated,
-      radiusKm,
-      permissionStatus,
-      handleEnableLocation,
-      t,
-      getCategoryName,
-      getTimeFilterName,
+      activeCategory, news.length, allNews, currentCity, isDetecting,
+      scope, setScope, breakingNews, handleArticlePress, colors, timeFilter,
+      lastUpdated, radiusKm, permissionStatus, handleEnableLocation, t,
+      getCategoryName, getTimeFilterName, currentWeather,
     ]
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <NewsList
         articles={news}
         isLoading={isLoading}
@@ -248,7 +202,6 @@ export default function NewsScreen() {
         ListHeaderComponent={ListHeader}
       />
 
-      {/* City Picker Modal */}
       <CityPickerModal
         visible={cityPickerVisible}
         currentCityId={currentCity?.id || ""}
@@ -261,7 +214,6 @@ export default function NewsScreen() {
         isDetecting={isDetecting}
       />
 
-      {/* Location Permission Modal */}
       <LocationPermissionModal
         visible={permissionModalVisible}
         onClose={() => setPermissionModalVisible(false)}
@@ -273,11 +225,9 @@ export default function NewsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   locationHeaderWrapper: {
-    paddingTop: 0, // stack header provides spacing
+    paddingTop: 0,
     paddingHorizontal: Spacing.lg,
     paddingBottom: Spacing.md,
   },

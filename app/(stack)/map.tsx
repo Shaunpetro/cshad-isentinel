@@ -1,5 +1,5 @@
 // app/(stack)/map.tsx
-// Beta 4 - Phase 1: Map stack screen
+// Phase 3D – Map with Near Me toggle for local reports
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
@@ -19,6 +19,8 @@ import { useLocation } from "../../src/hooks/useLocation";
 import { Typography, Spacing, BorderRadius, Shadows } from "../../src/config/theme";
 import { APP } from "../../src/config/constants";
 import { useMapData } from "../../src/hooks/useMapData";
+import { useLocalAlerts } from "../../src/hooks/useLocalAlerts";
+import { voteReport } from "../../src/services/localReports";
 import { METRO_QUICK_ACCESS } from "../../src/services/location/saCities";
 import { HazardReportModal } from "../../src/components/hub/HazardReportModal";
 import {
@@ -27,6 +29,7 @@ import {
   voteHazardStillThere,
 } from "../../src/services/map/mapService";
 import type { MapMarker } from "../../src/services/map";
+import type { LocalReport } from "../../src/types/news";
 
 // Hazard SVG icons
 import PotholeIcon from '../../assets/hazard-icons/pothole.svg';
@@ -63,6 +66,7 @@ const MAJOR_CITIES = METRO_QUICK_ACCESS.map((loc) => ({
 const getMarkerColor = (marker: MapMarker): string => {
   if (marker.type === 'tip') return '#9C27B0';
   if (marker.type === 'hazard') return '#FF6D00';
+  if (marker.type === 'nearme') return '#00D4AA';  // teal for Near Me reports
   switch (marker.severity) {
     case 'critical': return '#FF1744';
     case 'high': return '#FF5722';
@@ -82,6 +86,10 @@ const getCategoryIcon = (category: string): keyof typeof Ionicons.glyphMap => {
     traffic: 'car-sport',
     politics: 'megaphone',
     health: 'medkit',
+    road: 'car',
+    water: 'water',
+    electricity: 'flash',
+    community: 'people',
   };
   return icons[category] || 'alert-circle';
 };
@@ -118,7 +126,6 @@ const findMatchingMajorCity = (
   return null;
 };
 
-// Voting confirmation modal
 function VoteModal({ type, visible, onHide }: { type: 'cleared' | 'still-there' | null; visible: boolean; onHide: () => void }) {
   if (!visible || !type) return null;
   const isCleared = type === 'cleared';
@@ -150,6 +157,7 @@ export default function MapScreen() {
   const [showNews, setShowNews] = useState(true);
   const [showTips, setShowTips] = useState(true);
   const [showRadius, setShowRadius] = useState(true);
+  const [showNearMe, setShowNearMe] = useState(false);   // Near Me toggle
   const [viewMode, setViewMode] = useState<'myArea' | 'national'>('myArea');
   const [hazardModalVisible, setHazardModalVisible] = useState(false);
   const [hazardMarkers, setHazardMarkers] = useState<MapMarker[]>([]);
@@ -166,11 +174,15 @@ export default function MapScreen() {
     refresh: refreshLocation,
   } = useLocation();
 
+  // Near Me reports
+  const { alerts: nearMeReports, refresh: refreshNearMe } = useLocalAlerts();
+
   useFocusEffect(
     useCallback(() => {
       refreshLocation();
       loadHazards();
-    }, [refreshLocation])
+      if (showNearMe) refreshNearMe();
+    }, [refreshLocation, showNearMe])
   );
 
   const loadHazards = () => {
@@ -209,7 +221,28 @@ export default function MapScreen() {
     refresh,
   } = useMapData({ includeNews: showNews, includeTips: showTips, realtime: true });
 
-  const allMarkers = useMemo(() => [...newsTipMarkers, ...hazardMarkers], [newsTipMarkers, hazardMarkers]);
+  // Convert Near Me reports to MapMarker format
+  const nearMeMarkers: MapMarker[] = useMemo(() => {
+    if (!showNearMe) return [];
+    return nearMeReports.map((report: LocalReport) => ({
+      id: report.id,
+      type: 'nearme' as any,
+      title: report.category.toUpperCase(),
+      description: report.description,
+      latitude: report.latitude,
+      longitude: report.longitude,
+      category: report.category,
+      severity: 'medium' as MapMarker['severity'], // default
+      timestamp: report.createdAt,
+      matchedLocation: report.locationName,
+      confidence: 'city' as const,
+    }));
+  }, [showNearMe, nearMeReports]);
+
+  const allMarkers = useMemo(
+    () => [...newsTipMarkers, ...hazardMarkers, ...nearMeMarkers],
+    [newsTipMarkers, hazardMarkers, nearMeMarkers]
+  );
 
   const initialRegion = useMemo(() => {
     if (userLat && userLng) {
@@ -244,6 +277,7 @@ export default function MapScreen() {
   const visibleNewsCount = visibleMarkers.filter(m => m.type === 'news').length;
   const visibleTipsCount = visibleMarkers.filter(m => m.type === 'tip').length;
   const visibleHazardCount = visibleMarkers.filter(m => m.type === 'hazard').length;
+  const visibleNearMeCount = visibleMarkers.filter(m => m.type === 'nearme').length;
 
   const handleMarkerPress = useCallback((marker: MapMarker) => setSelectedId(marker.id), []);
   const handleMyAreaPress = useCallback(() => {
@@ -317,6 +351,12 @@ export default function MapScreen() {
     }, 10000);
     loadHazards();
   }, []);
+
+  // Voting for Near Me reports
+  const handleNearMeVote = useCallback(async (reportId: string, type: 'confirm' | 'deny') => {
+    await voteReport(reportId, type);
+    refreshNearMe();
+  }, [refreshNearMe]);
 
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -443,6 +483,48 @@ export default function MapScreen() {
                   </View>
                 </View>
               </Callout>
+            ) : marker.type === 'nearme' ? (
+              <Callout tooltip>
+                <View style={[styles.callout, { backgroundColor: colors.surface }]}>
+                  <View style={[styles.typeBadge, { backgroundColor: '#00D4AA' }]}>
+                    <Text style={styles.typeBadgeText}>📍 Near Me</Text>
+                  </View>
+                  <Text style={[styles.calloutTitle, { color: colors.text }]} numberOfLines={2}>
+                    {marker.title}
+                  </Text>
+                  {marker.description && (
+                    <Text style={[styles.calloutDescription, { color: colors.textSecondary }]} numberOfLines={2}>
+                      {marker.description}
+                    </Text>
+                  )}
+                  <View style={styles.calloutMeta}>
+                    <Text style={[styles.calloutLocation, { color: colors.primary }]}>
+                      📍 {marker.matchedLocation}
+                    </Text>
+                    <Text style={[styles.calloutTime, { color: colors.textSecondary }]}>
+                      {formatTimestamp(marker.timestamp)}
+                    </Text>
+                  </View>
+                  <View style={styles.voteRow}>
+                    <TouchableOpacity
+                      style={styles.voteButton}
+                      onPress={() => handleNearMeVote(marker.id, 'confirm')}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
+                      <Text style={[styles.voteText, { color: '#4CAF50' }]}>Still there</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.voteButton}
+                      onPress={() => handleNearMeVote(marker.id, 'deny')}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="close-circle" size={18} color="#FF1744" />
+                      <Text style={[styles.voteText, { color: '#FF1744' }]}>Fixed</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </Callout>
             ) : (
               <Callout tooltip>
                 <View style={[styles.callout, { backgroundColor: colors.surface }]}>
@@ -499,8 +581,6 @@ export default function MapScreen() {
 
       <VoteModal type={voteModalType} visible={voteModalVisible} onHide={() => { setVoteModalVisible(false); setVoteModalType(null); }} />
 
-      {/* Top bar removed — title shown in stack header */}
-
       <View style={[styles.viewModeBar, { backgroundColor: colors.surface + 'F0' }]}>
         <Pressable onPress={handleMyAreaPress} style={[styles.viewModeButton, viewMode === 'myArea' && { backgroundColor: colors.primary + '20' }]}>
           <Ionicons name="locate" size={18} color={viewMode === 'myArea' ? colors.primary : colors.textSecondary} />
@@ -540,6 +620,14 @@ export default function MapScreen() {
         <Pressable onPress={() => {}} style={[styles.filterButton, { backgroundColor: '#FF6D00' + '20' }]}>
           <Text style={[styles.filterButtonText, { color: '#FF6D00' }]}>
             ⚠️ Hazards ({visibleHazardCount})
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setShowNearMe(!showNearMe)}
+          style={[styles.filterButton, showNearMe && { backgroundColor: '#00D4AA' + '20' }]}
+        >
+          <Text style={[styles.filterButtonText, { color: showNearMe ? '#00D4AA' : colors.textSecondary }]}>
+            📍 Near Me ({visibleNearMeCount})
           </Text>
         </Pressable>
       </View>
@@ -594,6 +682,10 @@ export default function MapScreen() {
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#FF6D00' }]} />
             <Text style={[styles.legendText, { color: colors.textSecondary }]}>Hazard</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: '#00D4AA' }]} />
+            <Text style={[styles.legendText, { color: colors.textSecondary }]}>Near Me</Text>
           </View>
         </View>
       </View>
