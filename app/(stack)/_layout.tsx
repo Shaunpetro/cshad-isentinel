@@ -1,7 +1,7 @@
 // app/(stack)/_layout.tsx
 // Beta 4 - Phase 1: Stack navigator with glass header, logo, floating home button, global settings icon
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import { TouchableOpacity, Platform, View, StyleSheet, Image, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,13 +11,25 @@ export default function StackLayout() {
   const theme = useTheme();
   const router = useRouter();
   const pathname = usePathname();
+  const [blink, setBlink] = useState(false);
+
+  // Blink effect for home screen Live icon
+  useEffect(() => {
+    if (pathname === '/' || pathname.endsWith('index')) {
+      const interval = setInterval(() => {
+        setBlink((prev) => !prev);
+      }, 800);
+      return () => clearInterval(interval);
+    }
+  }, [pathname]);
 
   const logoSrc = require('../../assets/brand/cshad-isentinel-logo-main.png');
+  const liveIconColor = blink ? '#FBC4C4' : theme.colors.text; // pastel matt light red
 
   return (
     <>
       <Stack
-        screenOptions={({ route, navigation }) => ({
+        screenOptions={({ navigation }) => ({
           headerStyle: {
             backgroundColor: theme.isDark ? theme.colors.background : '#FFFFFF',
             borderBottomColor: theme.glass.border,
@@ -25,16 +37,25 @@ export default function StackLayout() {
           } as any,
           headerTintColor: theme.colors.text,
           headerTitleStyle: { fontWeight: 'bold' },
-          headerTitle: ({ children }) => (
-            <View style={[
-              styles.headerTitleContainer,
-              // Add left margin when back button is present
-              navigation?.canGoBack?.() && { marginLeft: 8 }
-            ]}>
-              <Image source={logoSrc} style={styles.headerLogo} resizeMode="contain" />
-              <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{children}</Text>
-            </View>
-          ),
+          headerTitle: ({ children }) => {
+            if (children === 'Live') {
+              return (
+                <View style={styles.homeTitleContainer}>
+                  <Ionicons name="play-circle-outline" size={22} color={liveIconColor} />
+                  <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Live</Text>
+                </View>
+              );
+            }
+            return (
+              <View style={[
+                styles.headerTitleContainer,
+                navigation?.canGoBack?.() && { marginLeft: 8 }
+              ]}>
+                <Image source={logoSrc} style={styles.headerLogo} resizeMode="contain" />
+                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{children}</Text>
+              </View>
+            );
+          },
           headerLeft: ({ canGoBack }) => {
             if (!canGoBack) return null;
             return (
@@ -46,18 +67,13 @@ export default function StackLayout() {
               </TouchableOpacity>
             );
           },
-          // Global settings icon on every screen except Home (where we have notification only)
-          headerRight: () => {
-            // For Home screen, we override headerRight, so this won't apply there
-            return (
-              <TouchableOpacity onPress={() => router.push('settings' as any)} style={{ marginRight: 8 }}>
-                <Ionicons name="settings-outline" size={24} color={theme.colors.text} />
-              </TouchableOpacity>
-            );
-          },
+          headerRight: () => (
+            <TouchableOpacity onPress={() => router.push('settings' as any)} style={{ marginRight: 8 }}>
+              <Ionicons name="settings-outline" size={24} color={theme.colors.text} />
+            </TouchableOpacity>
+          ),
         })}
       >
-        {/* Home screen: only notification bell, no settings icon (it's already in the nav grid) */}
         <Stack.Screen
           name="index"
           options={{
@@ -67,6 +83,9 @@ export default function StackLayout() {
               <View style={{ flexDirection: 'row', gap: 16, marginRight: 8 }}>
                 <TouchableOpacity onPress={() => {}}>
                   <Ionicons name="notifications-outline" size={24} color={theme.colors.text} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => router.push('settings' as any)}>
+                  <Ionicons name="settings-outline" size={24} color={theme.colors.text} />
                 </TouchableOpacity>
               </View>
             ),
@@ -82,7 +101,6 @@ export default function StackLayout() {
         <Stack.Screen name="article/[id]" options={{ title: 'Article' }} />
       </Stack>
 
-      {/* Centered Floating Home Button – hidden on the home screen itself */}
       {pathname !== '/' && !pathname.endsWith('index') && (
         <TouchableOpacity
           onPress={() => router.navigate('/')}
@@ -97,6 +115,12 @@ export default function StackLayout() {
 }
 
 const styles = StyleSheet.create({
+  homeTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
   headerTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',

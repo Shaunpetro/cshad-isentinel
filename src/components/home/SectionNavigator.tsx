@@ -1,5 +1,5 @@
 // src/components/home/SectionNavigator.tsx
-// Beta 4 - Phase 1: Grid of glass cards linking to app sections
+// Beta 4 - Phase 1: Grid of glass cards linking to app sections (Settings removed from home grid)
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -9,7 +9,7 @@ import GlassCard from '../ui/GlassCard';
 import { useTheme } from '../../contexts';
 import { useTranslation } from 'react-i18next';
 
-// Reorder so Live appears in the center of the grid (index 4, second row middle)
+// Settings removed from this list (now in header)
 const sections = [
   { key: 'news', icon: 'newspaper-outline', labelKey: 'home.sectionNavigator.news' },
   { key: 'opportunities', icon: 'briefcase-outline', labelKey: 'home.sectionNavigator.opportunities' },
@@ -17,7 +17,6 @@ const sections = [
   { key: 'safety', icon: 'shield-checkmark-outline', labelKey: 'home.sectionNavigator.safety' },
   { key: 'live', icon: 'play-circle-outline', labelKey: 'home.sectionNavigator.live' },
   { key: 'incidents', icon: 'warning-outline', labelKey: 'home.sectionNavigator.incidents' },
-  { key: 'settings', icon: 'settings-outline', labelKey: 'home.sectionNavigator.settings' },
 ];
 
 export default function SectionNavigator() {
