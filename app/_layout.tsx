@@ -10,7 +10,6 @@ import { useAppReady } from "@/hooks/useAppReady";
 import { CustomSplashScreen } from "@/components/core/SplashScreen";
 import { useNotifications } from "@/hooks/useNotifications";
 import { ThemeProvider, useTheme } from "@/contexts";
-import { PersistentFeedbackButton } from "@/components/feedback/PersistentFeedbackButton";
 import { UpdateBanner } from "@/components/common/UpdateBanner";
 
 class ErrorBoundary extends React.Component<
@@ -39,17 +38,17 @@ class ErrorBoundary extends React.Component<
 const errorStyles = StyleSheet.create({
   container: { flex: 1, justifyContent: "center", alignItems: "center", padding: 32 },
   title: { fontSize: 20, fontFamily: "DMSans-Bold", color: "#FF4757", marginBottom: 16 },
-  message: { fontSize: 14, fontFamily: "DMSans-Regular", color: "#FF4757", textAlign: "center" },    
+  message: { fontSize: 14, fontFamily: "DMSans-Regular", color: "#FF4757", textAlign: "center" },
 });
 
 function RootLayoutInner() {
   const { isReady, showCustomSplash, onLayoutReady, onSplashComplete } = useAppReady();
   const { colors } = useTheme();
-  const { isInitialized: notificationsReady, error: notificationError } = useNotifications();        
+  const { isInitialized: notificationsReady, error: notificationError } = useNotifications();
 
   useEffect(() => {
     if (notificationsReady) {
-      if (notificationError) console.log("[RootLayout] Notifications note:", notificationError);     
+      if (notificationError) console.log("[RootLayout] Notifications note:", notificationError);
       else console.log("[RootLayout] Notifications initialized");
     }
   }, [notificationsReady, notificationError]);
@@ -57,11 +56,10 @@ function RootLayoutInner() {
   if (!isReady) return null;
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]} onLayout={onLayoutReady}>    
+    <View style={[styles.root, { backgroundColor: colors.background }]} onLayout={onLayoutReady}>
       <StatusBar style={colors.statusBar === 'light' ? 'light' : 'dark'} />
       <UpdateBanner />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background} }}>
-        {/* CHANGED: (tabs) → (stack) */}
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
         <Stack.Screen name="(stack)" options={{ headerShown: false }} />
         <Stack.Screen name="+not-found" />
       </Stack>

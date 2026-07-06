@@ -1,4 +1,6 @@
 // src/hooks/useNews.ts
+// Phase 3E – fixed duplicate realtime subscription
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   fetchNews,
@@ -66,6 +68,7 @@ export function useNews(options: UseNewsOptions = {}): UseNewsResult {
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
+  const channelNameRef = useRef<string | null>(null);   // guard duplicate channels
 
   const buildParams = useCallback(
     (customOffset?: number): NewsQueryParams => ({
@@ -91,10 +94,7 @@ export function useNews(options: UseNewsOptions = {}): UseNewsResult {
         } else if (offset === 0 && !isBackground) {
           setIsLoading(true);
         }
-
-        if (!isBackground) {
-          setError(null);
-        }
+        if (!isBackground) setError(null);
 
         const params = buildParams(isRefresh ? 0 : undefined);
         const result = await fetchNews(params);
@@ -102,9 +102,7 @@ export function useNews(options: UseNewsOptions = {}): UseNewsResult {
         if (!isMountedRef.current) return;
 
         if (result.error) {
-          if (!isBackground) {
-            setError(result.error);
-          }
+          if (!isBackground) setError(result.error);
           return;
         }
 
@@ -127,9 +125,7 @@ export function useNews(options: UseNewsOptions = {}): UseNewsResult {
       } catch (err) {
         if (!isMountedRef.current) return;
         const message = err instanceof Error ? err.message : 'Failed to fetch news';
-        if (!isBackground) {
-          setError(message);
-        }
+        if (!isBackground) setError(message);
         console.error('[useNews] Error:', message);
       } finally {
         if (isMountedRef.current) {
@@ -160,30 +156,24 @@ export function useNews(options: UseNewsOptions = {}): UseNewsResult {
   }, [category, scope, latitude, longitude, cityName, radiusKm, timeFilter]);
 
   useEffect(() => {
-    if (offset > 0) {
-      fetchNewsData(false);
-    }
+    if (offset > 0) fetchNewsData(false);
   }, [offset]);
 
   useEffect(() => {
     if (!autoRefresh) return;
-
     const interval = REFRESH_INTERVALS[timeFilter] || REFRESH_INTERVALS.all;
-    console.log(`[useNews] Auto-refresh set to ${interval / 1000}s for timeFilter: ${timeFilter}`);
-
-    refreshIntervalRef.current = setInterval(() => {
-      backgroundRefresh();
-    }, interval);
-
+    refreshIntervalRef.current = setInterval(backgroundRefresh, interval);
     return () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
-      }
+      if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
     };
   }, [autoRefresh, timeFilter, backgroundRefresh]);
 
+  // Realtime subscription – guarded against duplicates
   useEffect(() => {
     if (!realtime) return;
+    const name = `news-realtime-${cityName || 'all'}`;
+    if (channelNameRef.current === name) return;   // already subscribed
+    channelNameRef.current = name;
 
     unsubscribeRef.current = subscribeToNews(
       (record: any) => {
@@ -209,15 +199,15 @@ export function useNews(options: UseNewsOptions = {}): UseNewsResult {
     return () => {
       if (unsubscribeRef.current) {
         unsubscribeRef.current();
+        unsubscribeRef.current = null;
       }
+      channelNameRef.current = null;
     };
   }, [realtime, scope, cityName]);
 
   useEffect(() => {
     isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
+    return () => { isMountedRef.current = false; };
   }, []);
 
   return {
@@ -240,17 +230,11 @@ export function useNewsArticle(id: string | undefined) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!id) {
-      setIsLoading(false);
-      return;
-    }
-
+    if (!id) { setIsLoading(false); return; }
     async function fetchArticle() {
       setIsLoading(true);
       setError(null);
-
       const result = await fetchNewsById(id as string);
-
       if (result.error) {
         setError(result.error);
         setArticle(null);
@@ -260,10 +244,8 @@ export function useNewsArticle(id: string | undefined) {
         setError('Article not found');
         setArticle(null);
       }
-
       setIsLoading(false);
     }
-
     fetchArticle();
   }, [id]);
 

@@ -1,5 +1,5 @@
 // app/(stack)/map.tsx
-// Phase 3D – Map with Near Me toggle for local reports
+// Phase 3D – Map with Near Me toggle, scrolling filter bar, smart city bar
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
@@ -9,6 +9,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
+  ScrollView,
 } from "react-native";
 import MapView, { Marker, Callout, Circle } from "react-native-maps";
 import { Ionicons } from "@expo/vector-icons";
@@ -54,6 +55,8 @@ const ZOOM_LEVELS = {
   country: { latitudeDelta: 12, longitudeDelta: 12 },
 };
 
+const MAJOR_KEYS = ['johannesburg', 'pretoria', 'durban', 'capetown'];
+
 const MAJOR_CITIES = METRO_QUICK_ACCESS.map((loc) => ({
   key: loc.key,
   label: loc.label,
@@ -66,7 +69,7 @@ const MAJOR_CITIES = METRO_QUICK_ACCESS.map((loc) => ({
 const getMarkerColor = (marker: MapMarker): string => {
   if (marker.type === 'tip') return '#9C27B0';
   if (marker.type === 'hazard') return '#FF6D00';
-  if (marker.type === 'nearme') return '#00D4AA';  // teal for Near Me reports
+  if (marker.type === 'nearme') return '#00D4AA';
   switch (marker.severity) {
     case 'critical': return '#FF1744';
     case 'high': return '#FF5722';
@@ -132,17 +135,9 @@ function VoteModal({ type, visible, onHide }: { type: 'cleared' | 'still-there' 
   return (
     <View style={styles.voteModalContainer}>
       <View style={[styles.voteModal, { backgroundColor: isCleared ? '#4CAF50' : '#2196F3' }]}>
-        <Ionicons
-          name={isCleared ? 'checkmark-circle' : 'shield-checkmark'}
-          size={48}
-          color="#fff"
-        />
-        <Text style={styles.voteModalText}>
-          {isCleared ? 'Hazard reported cleared' : 'Hazard still there'}
-        </Text>
-        <Text style={styles.voteModalSubtext}>
-          Thank you for your vote!
-        </Text>
+        <Ionicons name={isCleared ? 'checkmark-circle' : 'shield-checkmark'} size={48} color="#fff" />
+        <Text style={styles.voteModalText}>{isCleared ? 'Hazard reported cleared' : 'Hazard still there'}</Text>
+        <Text style={styles.voteModalSubtext}>Thank you for your vote!</Text>
       </View>
     </View>
   );
@@ -157,7 +152,7 @@ export default function MapScreen() {
   const [showNews, setShowNews] = useState(true);
   const [showTips, setShowTips] = useState(true);
   const [showRadius, setShowRadius] = useState(true);
-  const [showNearMe, setShowNearMe] = useState(false);   // Near Me toggle
+  const [showNearMe, setShowNearMe] = useState(false);
   const [viewMode, setViewMode] = useState<'myArea' | 'national'>('myArea');
   const [hazardModalVisible, setHazardModalVisible] = useState(false);
   const [hazardMarkers, setHazardMarkers] = useState<MapMarker[]>([]);
@@ -174,7 +169,6 @@ export default function MapScreen() {
     refresh: refreshLocation,
   } = useLocation();
 
-  // Near Me reports
   const { alerts: nearMeReports, refresh: refreshNearMe } = useLocalAlerts();
 
   useFocusEffect(
@@ -182,7 +176,7 @@ export default function MapScreen() {
       refreshLocation();
       loadHazards();
       if (showNearMe) refreshNearMe();
-    }, [refreshLocation, showNearMe])
+    }, [refreshLocation, showNearMe, refreshNearMe])
   );
 
   const loadHazards = () => {
@@ -221,7 +215,6 @@ export default function MapScreen() {
     refresh,
   } = useMapData({ includeNews: showNews, includeTips: showTips, realtime: true });
 
-  // Convert Near Me reports to MapMarker format
   const nearMeMarkers: MapMarker[] = useMemo(() => {
     if (!showNearMe) return [];
     return nearMeReports.map((report: LocalReport) => ({
@@ -232,22 +225,17 @@ export default function MapScreen() {
       latitude: report.latitude,
       longitude: report.longitude,
       category: report.category,
-      severity: 'medium' as MapMarker['severity'], // default
+      severity: 'medium' as MapMarker['severity'],
       timestamp: report.createdAt,
       matchedLocation: report.locationName,
       confidence: 'city' as const,
     }));
   }, [showNearMe, nearMeReports]);
 
-  const allMarkers = useMemo(
-    () => [...newsTipMarkers, ...hazardMarkers, ...nearMeMarkers],
-    [newsTipMarkers, hazardMarkers, nearMeMarkers]
-  );
+  const allMarkers = useMemo(() => [...newsTipMarkers, ...hazardMarkers, ...nearMeMarkers], [newsTipMarkers, hazardMarkers, nearMeMarkers]);
 
   const initialRegion = useMemo(() => {
-    if (userLat && userLng) {
-      return { latitude: userLat, longitude: userLng, ...ZOOM_LEVELS.city };
-    }
+    if (userLat && userLng) return { latitude: userLat, longitude: userLng, ...ZOOM_LEVELS.city };
     return { latitude: APP.defaultRegion.latitude, longitude: APP.defaultRegion.longitude, ...ZOOM_LEVELS.country };
   }, [userLat, userLng]);
 
@@ -267,9 +255,7 @@ export default function MapScreen() {
     if (viewMode === 'national' || !userLat || !userLng) return allMarkers;
     const radiusInDegrees = (radiusKm || 25) / 111;
     return allMarkers.filter(marker => {
-      const distance = Math.sqrt(
-        Math.pow(marker.latitude - userLat, 2) + Math.pow(marker.longitude - userLng, 2)
-      );
+      const distance = Math.sqrt(Math.pow(marker.latitude - userLat, 2) + Math.pow(marker.longitude - userLng, 2));
       return distance <= radiusInDegrees;
     });
   }, [allMarkers, viewMode, userLat, userLng, radiusKm]);
@@ -282,17 +268,12 @@ export default function MapScreen() {
   const handleMarkerPress = useCallback((marker: MapMarker) => setSelectedId(marker.id), []);
   const handleMyAreaPress = useCallback(() => {
     setViewMode('myArea');
-    if (mapRef.current && userLat && userLng) {
-      mapRef.current.animateToRegion({ latitude: userLat, longitude: userLng, ...ZOOM_LEVELS.city }, 800);
-    }
+    if (mapRef.current && userLat && userLng) mapRef.current.animateToRegion({ latitude: userLat, longitude: userLng, ...ZOOM_LEVELS.city }, 800);
   }, [userLat, userLng]);
   const handleNationalPress = useCallback(() => {
     setViewMode('national');
     if (mapRef.current) {
-      mapRef.current.animateToRegion(
-        { latitude: APP.defaultRegion.latitude, longitude: APP.defaultRegion.longitude, ...ZOOM_LEVELS.country },
-        800
-      );
+      mapRef.current.animateToRegion({ latitude: APP.defaultRegion.latitude, longitude: APP.defaultRegion.longitude, ...ZOOM_LEVELS.country }, 800);
       setSelectedId(null);
     }
   }, []);
@@ -334,10 +315,7 @@ export default function MapScreen() {
     await voteHazardCleared(hazardId);
     setVoteModalType('cleared');
     setVoteModalVisible(true);
-    setTimeout(() => {
-      setVoteModalVisible(false);
-      setVoteModalType(null);
-    }, 10000);
+    setTimeout(() => { setVoteModalVisible(false); setVoteModalType(null); }, 10000);
     loadHazards();
   }, []);
 
@@ -345,14 +323,10 @@ export default function MapScreen() {
     await voteHazardStillThere(hazardId);
     setVoteModalType('still-there');
     setVoteModalVisible(true);
-    setTimeout(() => {
-      setVoteModalVisible(false);
-      setVoteModalType(null);
-    }, 10000);
+    setTimeout(() => { setVoteModalVisible(false); setVoteModalType(null); }, 10000);
     loadHazards();
   }, []);
 
-  // Voting for Near Me reports
   const handleNearMeVote = useCallback(async (reportId: string, type: 'confirm' | 'deny') => {
     await voteReport(reportId, type);
     refreshNearMe();
@@ -379,18 +353,20 @@ export default function MapScreen() {
 
   const isLoading = locationLoading || dataLoading;
   const currentRadiusKm = radiusKm || 25;
-  const locationDisplayText = useMemo(() => {
-    if (viewMode === 'national') return '🇿🇦 South Africa';
-    if (cityName) {
-      const province = currentCity?.province;
-      if (province && !cityName.includes(province)) {
-        return `📍 ${cityName}, ${currentCity?.provinceCode || province}`;
-      }
-      return `📍 ${cityName}`;
-    }
-    if (permissionStatus === 'denied') return `📍 ${t('location.permissionDenied')}`;
-    return `📍 ${t('location.detecting')}`;
-  }, [viewMode, cityName, currentCity, permissionStatus, t]);
+
+  const nearbyCities = useMemo(() => {
+    if (!activeCity) return MAJOR_CITIES.filter(c => MAJOR_KEYS.includes(c.key)).slice(0, 4);
+    const first = MAJOR_CITIES.find(c => c.key === activeCity) || {
+      key: activeCity,
+      label: currentCity?.name || 'You',
+      latitude: userLat!,
+      longitude: userLng!,
+      fullName: currentCity?.name || 'You',
+      aliases: [],
+    };
+    const rest = MAJOR_CITIES.filter(c => c.key !== activeCity && MAJOR_KEYS.includes(c.key)).slice(0, 3);
+    return [first, ...rest];
+  }, [activeCity, currentCity, userLat, userLng]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -428,57 +404,28 @@ export default function MapScreen() {
           >
             <View style={[styles.markerContainer, { backgroundColor: getMarkerColor(marker) }]}>
               {marker.type === 'hazard' ? (
-                React.createElement(HAZARD_ICONS[marker.category] || HAZARD_ICONS.other, {
-                  width: 20,
-                  height: 20,
-                })
+                React.createElement(HAZARD_ICONS[marker.category] || HAZARD_ICONS.other, { width: 20, height: 20 })
               ) : (
-                <Ionicons
-                  name={marker.type === 'tip' ? 'chatbubble' : getCategoryIcon(marker.category)}
-                  size={16}
-                  color="#FFFFFF"
-                />
+                <Ionicons name={marker.type === 'tip' ? 'chatbubble' : getCategoryIcon(marker.category)} size={16} color="#FFFFFF" />
               )}
             </View>
 
             {marker.type === 'hazard' ? (
               <Callout tooltip onPress={() => {}}>
                 <View style={[styles.callout, { backgroundColor: colors.surface }]}>
-                  <View style={[styles.typeBadge, { backgroundColor: '#FF6D00' }]}>
-                    <Text style={styles.typeBadgeText}>⚠️ Hazard</Text>
-                  </View>
-                  <Text style={[styles.calloutTitle, { color: colors.text }]} numberOfLines={2}>
-                    {marker.title}
-                  </Text>
-                  {marker.description && (
-                    <Text style={[styles.calloutDescription, { color: colors.textSecondary }]} numberOfLines={2}>
-                      {marker.description}
-                    </Text>
-                  )}
+                  <View style={[styles.typeBadge, { backgroundColor: '#FF6D00' }]}><Text style={styles.typeBadgeText}>⚠️ Hazard</Text></View>
+                  <Text style={[styles.calloutTitle, { color: colors.text }]} numberOfLines={2}>{marker.title}</Text>
+                  {marker.description && <Text style={[styles.calloutDescription, { color: colors.textSecondary }]} numberOfLines={2}>{marker.description}</Text>}
                   <View style={styles.calloutMeta}>
-                    <Text style={[styles.calloutLocation, { color: colors.primary }]}>
-                      📍 {marker.matchedLocation}
-                    </Text>
-                    <Text style={[styles.calloutTime, { color: colors.textSecondary }]}>
-                      {formatTimestamp(marker.timestamp)}
-                    </Text>
+                    <Text style={[styles.calloutLocation, { color: colors.primary }]}>📍 {marker.matchedLocation}</Text>
+                    <Text style={[styles.calloutTime, { color: colors.textSecondary }]}>{formatTimestamp(marker.timestamp)}</Text>
                   </View>
                   <View style={styles.voteRow}>
-                    <TouchableOpacity
-                      style={styles.voteButton}
-                      onPress={() => handleVoteCleared(marker.id)}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="close-circle" size={18} color="#FF1744" />
-                      <Text style={[styles.voteText, { color: '#FF1744' }]}>Cleared</Text>
+                    <TouchableOpacity style={styles.voteButton} onPress={() => handleVoteCleared(marker.id)} activeOpacity={0.7}>
+                      <Ionicons name="close-circle" size={18} color="#FF1744" /><Text style={[styles.voteText, { color: '#FF1744' }]}>Cleared</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.voteButton}
-                      onPress={() => handleVoteStillThere(marker.id)}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
-                      <Text style={[styles.voteText, { color: '#4CAF50' }]}>Still there</Text>
+                    <TouchableOpacity style={styles.voteButton} onPress={() => handleVoteStillThere(marker.id)} activeOpacity={0.7}>
+                      <Ionicons name="checkmark-circle" size={18} color="#4CAF50" /><Text style={[styles.voteText, { color: '#4CAF50' }]}>Still there</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -486,41 +433,19 @@ export default function MapScreen() {
             ) : marker.type === 'nearme' ? (
               <Callout tooltip>
                 <View style={[styles.callout, { backgroundColor: colors.surface }]}>
-                  <View style={[styles.typeBadge, { backgroundColor: '#00D4AA' }]}>
-                    <Text style={styles.typeBadgeText}>📍 Near Me</Text>
-                  </View>
-                  <Text style={[styles.calloutTitle, { color: colors.text }]} numberOfLines={2}>
-                    {marker.title}
-                  </Text>
-                  {marker.description && (
-                    <Text style={[styles.calloutDescription, { color: colors.textSecondary }]} numberOfLines={2}>
-                      {marker.description}
-                    </Text>
-                  )}
+                  <View style={[styles.typeBadge, { backgroundColor: '#00D4AA' }]}><Text style={styles.typeBadgeText}>📍 Near Me</Text></View>
+                  <Text style={[styles.calloutTitle, { color: colors.text }]} numberOfLines={2}>{marker.title}</Text>
+                  {marker.description && <Text style={[styles.calloutDescription, { color: colors.textSecondary }]} numberOfLines={2}>{marker.description}</Text>}
                   <View style={styles.calloutMeta}>
-                    <Text style={[styles.calloutLocation, { color: colors.primary }]}>
-                      📍 {marker.matchedLocation}
-                    </Text>
-                    <Text style={[styles.calloutTime, { color: colors.textSecondary }]}>
-                      {formatTimestamp(marker.timestamp)}
-                    </Text>
+                    <Text style={[styles.calloutLocation, { color: colors.primary }]}>📍 {marker.matchedLocation}</Text>
+                    <Text style={[styles.calloutTime, { color: colors.textSecondary }]}>{formatTimestamp(marker.timestamp)}</Text>
                   </View>
                   <View style={styles.voteRow}>
-                    <TouchableOpacity
-                      style={styles.voteButton}
-                      onPress={() => handleNearMeVote(marker.id, 'confirm')}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
-                      <Text style={[styles.voteText, { color: '#4CAF50' }]}>Still there</Text>
+                    <TouchableOpacity style={styles.voteButton} onPress={() => handleNearMeVote(marker.id, 'confirm')} activeOpacity={0.7}>
+                      <Ionicons name="checkmark-circle" size={18} color="#4CAF50" /><Text style={[styles.voteText, { color: '#4CAF50' }]}>Still there</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.voteButton}
-                      onPress={() => handleNearMeVote(marker.id, 'deny')}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="close-circle" size={18} color="#FF1744" />
-                      <Text style={[styles.voteText, { color: '#FF1744' }]}>Fixed</Text>
+                    <TouchableOpacity style={styles.voteButton} onPress={() => handleNearMeVote(marker.id, 'deny')} activeOpacity={0.7}>
+                      <Ionicons name="close-circle" size={18} color="#FF1744" /><Text style={[styles.voteText, { color: '#FF1744' }]}>Fixed</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -529,31 +454,15 @@ export default function MapScreen() {
               <Callout tooltip>
                 <View style={[styles.callout, { backgroundColor: colors.surface }]}>
                   <View style={[styles.typeBadge, { backgroundColor: marker.type === 'tip' ? '#9C27B0' : colors.primary }]}>
-                    <Text style={styles.typeBadgeText}>
-                      {marker.type === 'tip' ? `🟣 ${t('map.showTips')}` : `📰 ${t('map.showNews')}`}
-                    </Text>
+                    <Text style={styles.typeBadgeText}>{marker.type === 'tip' ? `🟣 ${t('map.showTips')}` : `📰 ${t('map.showNews')}`}</Text>
                   </View>
-                  <Text style={[styles.calloutTitle, { color: colors.text }]} numberOfLines={2}>
-                    {marker.title}
-                  </Text>
-                  {marker.description && (
-                    <Text style={[styles.calloutDescription, { color: colors.textSecondary }]} numberOfLines={2}>
-                      {marker.description}
-                    </Text>
-                  )}
+                  <Text style={[styles.calloutTitle, { color: colors.text }]} numberOfLines={2}>{marker.title}</Text>
+                  {marker.description && <Text style={[styles.calloutDescription, { color: colors.textSecondary }]} numberOfLines={2}>{marker.description}</Text>}
                   <View style={styles.calloutMeta}>
-                    <Text style={[styles.calloutLocation, { color: colors.primary }]}>
-                      📍 {marker.matchedLocation}
-                    </Text>
-                    <Text style={[styles.calloutTime, { color: colors.textSecondary }]}>
-                      {formatTimestamp(marker.timestamp)}
-                    </Text>
+                    <Text style={[styles.calloutLocation, { color: colors.primary }]}>📍 {marker.matchedLocation}</Text>
+                    <Text style={[styles.calloutTime, { color: colors.textSecondary }]}>{formatTimestamp(marker.timestamp)}</Text>
                   </View>
-                  {marker.confidence !== 'exact' && (
-                    <Text style={[styles.confidenceText, { color: colors.textSecondary }]}>
-                      📌 {getConfidenceText(marker.confidence)}
-                    </Text>
-                  )}
+                  {marker.confidence !== 'exact' && <Text style={[styles.confidenceText, { color: colors.textSecondary }]}>📌 {getConfidenceText(marker.confidence)}</Text>}
                 </View>
               </Callout>
             )}
@@ -564,18 +473,14 @@ export default function MapScreen() {
       {(!mapReady || isLoading) && (
         <View style={[styles.loadingOverlay, { backgroundColor: colors.background }]}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-            {locationLoading ? t('location.detecting') : dataLoading ? t('common.loading') : t('common.loading')}
-          </Text>
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{locationLoading ? t('location.detecting') : t('common.loading')}</Text>
         </View>
       )}
 
       {error && (
         <View style={[styles.errorBanner, { backgroundColor: '#FF4757' }]}>
           <Text style={styles.errorText}>{error}</Text>
-          <Pressable onPress={refresh}>
-            <Text style={styles.retryText}>{t('common.retry')}</Text>
-          </Pressable>
+          <Pressable onPress={refresh}><Text style={styles.retryText}>{t('common.retry')}</Text></Pressable>
         </View>
       )}
 
@@ -584,20 +489,14 @@ export default function MapScreen() {
       <View style={[styles.viewModeBar, { backgroundColor: colors.surface + 'F0' }]}>
         <Pressable onPress={handleMyAreaPress} style={[styles.viewModeButton, viewMode === 'myArea' && { backgroundColor: colors.primary + '20' }]}>
           <Ionicons name="locate" size={18} color={viewMode === 'myArea' ? colors.primary : colors.textSecondary} />
-          <Text style={[styles.viewModeText, { color: viewMode === 'myArea' ? colors.primary : colors.textSecondary }]}>
-            {t('map.myLocation')}
-          </Text>
+          <Text style={[styles.viewModeText, { color: viewMode === 'myArea' ? colors.primary : colors.textSecondary }]}>{t('map.myLocation')}</Text>
         </Pressable>
         <Pressable onPress={handleNationalPress} style={[styles.viewModeButton, viewMode === 'national' && { backgroundColor: colors.primary + '20' }]}>
           <Text style={styles.flagEmoji}>🇿🇦</Text>
-          <Text style={[styles.viewModeText, { color: viewMode === 'national' ? colors.primary : colors.textSecondary }]}>
-            {t('map.showAll')}
-          </Text>
+          <Text style={[styles.viewModeText, { color: viewMode === 'national' ? colors.primary : colors.textSecondary }]}>{t('map.showAll')}</Text>
         </Pressable>
         <View style={styles.viewModeDivider} />
-        <Pressable onPress={refresh} style={styles.iconButton}>
-          <Ionicons name="refresh" size={20} color={colors.primary} />
-        </Pressable>
+        <Pressable onPress={refresh} style={styles.iconButton}><Ionicons name="refresh" size={20} color={colors.primary} /></Pressable>
         <Pressable onPress={() => setShowRadius(!showRadius)} style={styles.iconButton}>
           <Ionicons name={showRadius ? 'radio-button-on' : 'radio-button-off'} size={20} color={showRadius ? colors.primary : colors.textSecondary} />
         </Pressable>
@@ -606,34 +505,23 @@ export default function MapScreen() {
         </Pressable>
       </View>
 
-      <View style={[styles.filterBar, { backgroundColor: colors.surface + 'F0' }]}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.filterBar, { backgroundColor: colors.surface + 'F0' }]}>
         <Pressable onPress={() => setShowNews(!showNews)} style={[styles.filterButton, showNews && { backgroundColor: colors.primary + '20' }]}>
-          <Text style={[styles.filterButtonText, { color: showNews ? colors.primary : colors.textSecondary }]}>
-            📰 {t('map.showNews')} ({viewMode === 'myArea' ? visibleNewsCount : newsCount})
-          </Text>
+          <Text style={[styles.filterButtonText, { color: showNews ? colors.primary : colors.textSecondary }]}>📰 {t('map.showNews')} ({viewMode === 'myArea' ? visibleNewsCount : newsCount})</Text>
         </Pressable>
         <Pressable onPress={handleTipsToggle} style={[styles.filterButton, showTips && { backgroundColor: '#9C27B0' + '20' }]}>
-          <Text style={[styles.filterButtonText, { color: showTips ? '#9C27B0' : colors.textSecondary }]}>
-            🟣 {t('map.showTips')} ({viewMode === 'myArea' ? visibleTipsCount : tipsCount})
-          </Text>
+          <Text style={[styles.filterButtonText, { color: showTips ? '#9C27B0' : colors.textSecondary }]}>🟣 {t('map.showTips')} ({viewMode === 'myArea' ? visibleTipsCount : tipsCount})</Text>
         </Pressable>
         <Pressable onPress={() => {}} style={[styles.filterButton, { backgroundColor: '#FF6D00' + '20' }]}>
-          <Text style={[styles.filterButtonText, { color: '#FF6D00' }]}>
-            ⚠️ Hazards ({visibleHazardCount})
-          </Text>
+          <Text style={[styles.filterButtonText, { color: '#FF6D00' }]}>⚠️ Hazards ({visibleHazardCount})</Text>
         </Pressable>
-        <Pressable
-          onPress={() => setShowNearMe(!showNearMe)}
-          style={[styles.filterButton, showNearMe && { backgroundColor: '#00D4AA' + '20' }]}
-        >
-          <Text style={[styles.filterButtonText, { color: showNearMe ? '#00D4AA' : colors.textSecondary }]}>
-            📍 Near Me ({visibleNearMeCount})
-          </Text>
+        <Pressable onPress={() => setShowNearMe(!showNearMe)} style={[styles.filterButton, showNearMe && { backgroundColor: '#00D4AA' + '20' }]}>
+          <Text style={[styles.filterButtonText, { color: showNearMe ? '#00D4AA' : colors.textSecondary }]}>📍 Near Me ({visibleNearMeCount})</Text>
         </Pressable>
-      </View>
+      </ScrollView>
 
       <View style={styles.cityBar}>
-        {MAJOR_CITIES.slice(0, 4).map((city) => {
+        {nearbyCities.map((city) => {
           const isActive = activeCity === city.key;
           return (
             <Pressable
@@ -646,11 +534,7 @@ export default function MapScreen() {
               ]}
             >
               <Text style={[styles.cityLabel, { color: isActive ? '#FFFFFF' : colors.text }]}>{city.label}</Text>
-              {isActive && (
-                <View style={styles.activeIndicator}>
-                  <Ionicons name="location" size={10} color="#FFFFFF" />
-                </View>
-              )}
+              {isActive && <View style={styles.activeIndicator}><Ionicons name="location" size={10} color="#FFFFFF" /></View>}
             </Pressable>
           );
         })}
@@ -659,44 +543,20 @@ export default function MapScreen() {
       <View style={[styles.legend, { backgroundColor: colors.surface + 'F0' }]}>
         <Text style={[styles.legendTitle, { color: colors.text }]}>{t('map.filters')}</Text>
         <View style={styles.legendItems}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#FF1744' }]} />
-            <Text style={[styles.legendText, { color: colors.textSecondary }]}>{t('news.severity.critical')}</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#FF5722' }]} />
-            <Text style={[styles.legendText, { color: colors.textSecondary }]}>{t('news.severity.high')}</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#FFC107' }]} />
-            <Text style={[styles.legendText, { color: colors.textSecondary }]}>{t('news.severity.medium')}</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#4CAF50' }]} />
-            <Text style={[styles.legendText, { color: colors.textSecondary }]}>{t('news.severity.low')}</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#9C27B0' }]} />
-            <Text style={[styles.legendText, { color: colors.textSecondary }]}>{t('tabs.tip')}</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#FF6D00' }]} />
-            <Text style={[styles.legendText, { color: colors.textSecondary }]}>Hazard</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#00D4AA' }]} />
-            <Text style={[styles.legendText, { color: colors.textSecondary }]}>Near Me</Text>
-          </View>
+          <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#FF1744' }]} /><Text style={[styles.legendText, { color: colors.textSecondary }]}>{t('news.severity.critical')}</Text></View>
+          <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#FF5722' }]} /><Text style={[styles.legendText, { color: colors.textSecondary }]}>{t('news.severity.high')}</Text></View>
+          <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#FFC107' }]} /><Text style={[styles.legendText, { color: colors.textSecondary }]}>{t('news.severity.medium')}</Text></View>
+          <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#4CAF50' }]} /><Text style={[styles.legendText, { color: colors.textSecondary }]}>{t('news.severity.low')}</Text></View>
+          <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#9C27B0' }]} /><Text style={[styles.legendText, { color: colors.textSecondary }]}>{t('tabs.tip')}</Text></View>
+          <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#FF6D00' }]} /><Text style={[styles.legendText, { color: colors.textSecondary }]}>Hazard</Text></View>
+          <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#00D4AA' }]} /><Text style={[styles.legendText, { color: colors.textSecondary }]}>Near Me</Text></View>
         </View>
       </View>
 
       <HazardReportModal
         visible={hazardModalVisible}
         onClose={() => setHazardModalVisible(false)}
-        onReported={() => {
-          loadHazards();
-          setToast("✅ Hazard reported — thank you!");
-        }}
+        onReported={() => { loadHazards(); setToast("✅ Hazard reported — thank you!"); }}
         currentLocation={userLat && userLng ? { latitude: userLat, longitude: userLng } : undefined}
       />
     </View>
@@ -717,8 +577,8 @@ const styles = StyleSheet.create({
   flagEmoji: { fontSize: 16 },
   viewModeDivider: { width: 1, height: 20, backgroundColor: '#E0E0E0', marginHorizontal: Spacing.xs },
   iconButton: { padding: Spacing.xs },
-  filterBar: { position: 'absolute', top: 145, left: Spacing.md, flexDirection: 'row', alignItems: 'center', padding: Spacing.xs, borderRadius: BorderRadius.md, zIndex: 10, gap: Spacing.xs },
-  filterButton: { paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, borderRadius: BorderRadius.sm },
+  filterBar: { position: 'absolute', top: 145, left: Spacing.md, right: Spacing.md, flexDirection: 'row', padding: Spacing.xs, borderRadius: BorderRadius.md, zIndex: 10 },
+  filterButton: { paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, borderRadius: BorderRadius.sm, marginRight: 4 },
   filterButtonText: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.medium },
   cityBar: { position: 'absolute', top: 95, right: 12, zIndex: 10, gap: Spacing.xs },
   cityButton: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.md, borderWidth: 2, minWidth: 50, alignItems: 'center', ...Shadows.sm },
@@ -732,7 +592,6 @@ const styles = StyleSheet.create({
   legendDot: { width: 12, height: 12, borderRadius: 6 },
   legendText: { fontSize: Typography.sizes.tiny, fontFamily: Typography.fonts.regular },
   markerContainer: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#FFFFFF', ...Shadows.md },
-  markerImage: { width: 20, height: 20 },
   callout: { width: 250, padding: Spacing.md, borderRadius: BorderRadius.md, ...Shadows.lg },
   typeBadge: { alignSelf: 'flex-start', paddingHorizontal: Spacing.sm, paddingVertical: 2, borderRadius: BorderRadius.sm, marginBottom: Spacing.xs },
   typeBadgeText: { color: '#FFFFFF', fontSize: Typography.sizes.tiny, fontFamily: Typography.fonts.bold },
@@ -745,34 +604,8 @@ const styles = StyleSheet.create({
   voteRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: Spacing.sm, borderTopWidth: 1, borderTopColor: '#E0E0E0', paddingTop: Spacing.sm },
   voteButton: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 4 },
   voteText: { fontSize: Typography.sizes.tiny, fontFamily: Typography.fonts.bold },
-  voteModalContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 200,
-  },
-  voteModal: {
-    padding: Spacing.lg,
-    borderRadius: BorderRadius.lg,
-    alignItems: 'center',
-    maxWidth: '80%',
-  },
-  voteModalText: {
-    color: '#FFFFFF',
-    fontSize: Typography.sizes.body,
-    fontFamily: Typography.fonts.bold,
-    marginTop: Spacing.md,
-    textAlign: 'center',
-  },
-  voteModalSubtext: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: Typography.sizes.caption,
-    fontFamily: Typography.fonts.regular,
-    marginTop: Spacing.xs,
-    textAlign: 'center',
-  },
+  voteModalContainer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', zIndex: 200 },
+  voteModal: { padding: Spacing.lg, borderRadius: BorderRadius.lg, alignItems: 'center', maxWidth: '80%' },
+  voteModalText: { color: '#FFFFFF', fontSize: Typography.sizes.body, fontFamily: Typography.fonts.bold, marginTop: Spacing.md, textAlign: 'center' },
+  voteModalSubtext: { color: 'rgba(255,255,255,0.8)', fontSize: Typography.sizes.caption, fontFamily: Typography.fonts.regular, marginTop: Spacing.xs, textAlign: 'center' },
 });

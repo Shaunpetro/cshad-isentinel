@@ -1,5 +1,5 @@
 // src/hooks/useCurrentWeather.ts
-// Phase 3C – Lightweight hook for the weather widget in the news header
+// Phase 3E – Reads API key from environment
 
 import { useState, useEffect, useCallback } from 'react';
 import { useLocation } from './useLocation';
@@ -19,9 +19,8 @@ export function useCurrentWeather(): CurrentWeatherResult {
   const [error, setError] = useState<string | null>(null);
 
   const fetchWeather = useCallback(async () => {
-    if (!currentCity) {
+    if (!currentCity?.latitude || !currentCity?.longitude) {
       setIsLoading(false);
-      setError('Location not available');
       return;
     }
 
@@ -36,12 +35,9 @@ export function useCurrentWeather(): CurrentWeatherResult {
 
       if (data?.current) {
         setWeather(data.current);
-      } else {
-        setError('Weather data unavailable');
       }
     } catch (err) {
       console.error('[useCurrentWeather]', err);
-      setError('Failed to fetch weather');
     } finally {
       setIsLoading(false);
     }
@@ -49,7 +45,6 @@ export function useCurrentWeather(): CurrentWeatherResult {
 
   useEffect(() => {
     fetchWeather();
-    // Refresh every 30 minutes
     const interval = setInterval(fetchWeather, 30 * 60 * 1000);
     return () => clearInterval(interval);
   }, [fetchWeather]);

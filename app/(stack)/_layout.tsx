@@ -1,11 +1,12 @@
 // app/(stack)/_layout.tsx
-// Beta 4 - Phase 1: Stack navigator with glass header, logo, floating home button, global settings icon
+// Phase 3E – Redesigned header: left-aligned logo, centered Live section, fixed dark-mode status bar
 
 import React, { useEffect, useState } from 'react';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import { TouchableOpacity, Platform, View, StyleSheet, Image, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/contexts';
+import { StatusBar } from 'expo-status-bar';
 
 export default function StackLayout() {
   const theme = useTheme();
@@ -13,7 +14,6 @@ export default function StackLayout() {
   const pathname = usePathname();
   const [blink, setBlink] = useState(false);
 
-  // Blink effect for the Live icon
   useEffect(() => {
     const isHome = pathname === '/' || pathname.endsWith('index');
     if (isHome) {
@@ -23,41 +23,42 @@ export default function StackLayout() {
   }, [pathname]);
 
   const logoSrc = require('../../assets/brand/cshad-isentinel-logo-main.png');
-  const liveIconColor = blink ? '#FBC4C4' : theme.colors.text; // pastel matt light red
+  const liveIconColor = blink ? '#FBC4C4' : theme.colors.text;
+
+  // Solid background for dark-mode status bar visibility
+  const headerBg = theme.isDark ? theme.colors.background : '#FFFFFF';
+  const statusBarStyle = theme.isDark ? 'light' : 'dark';
 
   return (
     <>
+      <StatusBar style={statusBarStyle} backgroundColor={headerBg} />
       <Stack
         screenOptions={({ navigation }) => ({
           headerStyle: {
-            backgroundColor: theme.isDark ? theme.colors.background : '#FFFFFF',
+            backgroundColor: headerBg,
             borderBottomColor: theme.glass.border,
             borderBottomWidth: 1,
+            height: 56, // compact, adapts to content
           } as any,
           headerTintColor: theme.colors.text,
           headerTitleStyle: { fontWeight: 'bold' },
           headerTitle: ({ children }) => {
-            // Home screen: logo + blinking Live icon + "Live" (tappable)
-            if (children === 'Live') {
-              return (
-                <TouchableOpacity
-                onPress={() => router.push('live' as any)}
-                  style={styles.homeTitleContainer}
-                >
-                  <Image source={logoSrc} style={styles.headerLogo} resizeMode="contain" />
-                  <Ionicons name="play-circle-outline" size={22} color={liveIconColor} />
-                  <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Live</Text>
-                </TouchableOpacity>
-              );
-            }
-            // Other screens: logo + title
+            // All screens: logo left-aligned
             return (
-              <View style={[
-                styles.headerTitleContainer,
-                navigation?.canGoBack?.() && { marginLeft: 8 },
-              ]}>
+              <View style={styles.headerTitleContainer}>
                 <Image source={logoSrc} style={styles.headerLogo} resizeMode="contain" />
-                <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{children}</Text>
+                {children === 'Live' ? (
+                  // Home: centered Live icon + text
+                  <TouchableOpacity
+                    onPress={() => router.push('live' as any)}
+                    style={styles.liveSection}
+                  >
+                    <Ionicons name="play-circle-outline" size={22} color={liveIconColor} />
+                    <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Live</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{children}</Text>
+                )}
               </View>
             );
           },
@@ -106,7 +107,7 @@ export default function StackLayout() {
         <Stack.Screen name="article/[id]" options={{ title: 'Article' }} />
       </Stack>
 
-      {/* Centered Floating Home Button – hidden on home */}
+      {/* Floating Home Button */}
       {pathname !== '/' && !pathname.endsWith('index') && (
         <TouchableOpacity
           onPress={() => router.navigate('/')}
@@ -121,20 +122,22 @@ export default function StackLayout() {
 }
 
 const styles = StyleSheet.create({
-  homeTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
   headerTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    flex: 1,
   },
   headerLogo: {
-    width: 46,
-    height: 46,
+    width: 40,
+    height: 40,
+    marginRight: 10,
+  },
+  liveSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 18,

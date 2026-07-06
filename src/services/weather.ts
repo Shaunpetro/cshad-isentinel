@@ -1,9 +1,15 @@
 // src/services/weather.ts
-// Phase 3B – restored legacy exports for Hub components + new functions
+// Phase 3E – hardened API‑key reading
 
+import Constants from 'expo-constants';
 import type { LocalReport, LocationUpdateCategory } from '../types/news';
 
-const API_KEY = process.env.EXPO_PUBLIC_OPENWEATHERMAP_API_KEY ?? '';
+// Try env variable first, then fall back to extra (for Expo Go)
+const API_KEY =
+  process.env.EXPO_PUBLIC_OPENWEATHERMAP_API_KEY ??
+  (Constants.expoConfig?.extra as any)?.openWeatherApiKey ??
+  '';
+
 const BASE_URL = 'https://api.openweathermap.org/data/3.0/onecall';
 
 // ── Legacy types (used by existing Hub components) ──
