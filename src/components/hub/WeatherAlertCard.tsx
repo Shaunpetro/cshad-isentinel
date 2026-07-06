@@ -1,13 +1,8 @@
 // src/components/hub/WeatherAlertCard.tsx
+// Phase 3B – aligned with new WeatherAlert & CurrentWeather types
 
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  Image,
-} from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -37,54 +32,35 @@ export function WeatherAlertCard({
   const { colors } = useTheme();
   const { t } = useTranslation();
 
-  // If there's an active alert, show alert card
   if (alert) {
     const alertColor = getWeatherAlertColor(alert.severity);
-    const alertIcon = getWeatherAlertIcon(alert.type);
+    const alertIcon = getWeatherAlertIcon(alert.severity);
 
-    const timeUntilEnd = alert.end.getTime() - Date.now();
+    const timeUntilEnd = new Date(alert.end).getTime() - Date.now();
     const hoursLeft = Math.max(0, Math.floor(timeUntilEnd / (1000 * 60 * 60)));
     const minutesLeft = Math.max(0, Math.floor((timeUntilEnd % (1000 * 60 * 60)) / (1000 * 60)));
 
-    // Format time remaining
     const getTimeLeftText = (): string => {
-      if (hoursLeft > 0) {
-        return `${hoursLeft}h ${minutesLeft}m ${t('alerts.weather.timeLeft')}`;
-      }
-      if (minutesLeft > 0) {
-        return `${minutesLeft}m ${t('alerts.weather.timeLeft')}`;
-      }
+      if (hoursLeft > 0) return `${hoursLeft}h ${minutesLeft}m ${t('alerts.weather.timeLeft')}`;
+      if (minutesLeft > 0) return `${minutesLeft}m ${t('alerts.weather.timeLeft')}`;
       return '';
     };
 
     return (
       <Pressable
-        style={[
-          styles.alertContainer,
-          {
-            backgroundColor: colors.surface,
-            borderLeftColor: alertColor,
-          },
-        ]}
+        style={[styles.alertContainer, { backgroundColor: colors.surface, borderLeftColor: alertColor }]}
         onPress={onPress}
       >
-        {/* Dismiss button */}
         {onDismiss && (
-          <Pressable
-            style={styles.dismissButton}
-            onPress={onDismiss}
-            hitSlop={8}
-          >
+          <Pressable style={styles.dismissButton} onPress={onDismiss} hitSlop={8}>
             <Ionicons name="close" size={18} color={colors.textSecondary} />
           </Pressable>
         )}
 
-        {/* Alert icon */}
         <View style={[styles.alertIconContainer, { backgroundColor: alertColor + '20' }]}>
           <Ionicons name={alertIcon as any} size={24} color={alertColor} />
         </View>
 
-        {/* Content */}
         <View style={styles.alertContent}>
           <View style={styles.alertHeader}>
             <Text style={[styles.alertSeverity, { color: alertColor }]}>
@@ -98,10 +74,6 @@ export function WeatherAlertCard({
           </View>
 
           <Text style={[styles.alertTitle, { color: colors.text }]} numberOfLines={2}>
-            {alert.title}
-          </Text>
-
-          <Text style={[styles.alertDescription, { color: colors.textSecondary }]} numberOfLines={2}>
             {alert.description}
           </Text>
 
@@ -118,7 +90,6 @@ export function WeatherAlertCard({
     );
   }
 
-  // No alert - show current weather summary
   if (currentWeather) {
     return (
       <Pressable
@@ -126,13 +97,13 @@ export function WeatherAlertCard({
         onPress={onPress}
       >
         <Image
-          source={{ uri: getWeatherIconUrl(currentWeather.icon, '2x') }}
+          source={{ uri: getWeatherIconUrl(currentWeather.icon) }}
           style={styles.weatherIcon}
         />
 
         <View style={styles.weatherContent}>
           <Text style={[styles.weatherTemp, { color: colors.text }]}>
-            {currentWeather.temperature}°C
+            {Math.round(currentWeather.temp)}°C
           </Text>
           <Text style={[styles.weatherDesc, { color: colors.textSecondary }]}>
             {currentWeather.description}
@@ -154,7 +125,7 @@ export function WeatherAlertCard({
           <View style={styles.weatherDetailItem}>
             <Ionicons name="flag-outline" size={14} color={colors.textSecondary} />
             <Text style={[styles.weatherDetailText, { color: colors.textSecondary }]}>
-              {currentWeather.windSpeed} km/h
+              {currentWeather.wind_speed} km/h
             </Text>
           </View>
         </View>
@@ -164,7 +135,6 @@ export function WeatherAlertCard({
     );
   }
 
-  // No weather data
   return null;
 }
 
@@ -220,6 +190,7 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.caption,
     fontFamily: Typography.fonts.regular,
     lineHeight: Typography.sizes.caption * 1.4,
+    marginTop: 4,
   },
   alertLocation: {
     flexDirection: 'row',

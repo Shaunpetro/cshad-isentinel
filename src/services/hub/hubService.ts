@@ -283,17 +283,17 @@ function weatherAlertsToFeedItems(alerts: WeatherAlert[]): FeedItem[] {
   return alerts.map((alert) => ({
     id: alert.id,
     type: 'weather' as const,
-    title: alert.title,
+    title: alert.description,          // WeatherAlert no longer has 'title'
     summary: alert.description,
-    source: alert.sender,
+    source: 'Weather Service',         // no 'sender'
     sourceType: 'official' as const,
     timestamp: alert.start,
     severity: alert.severity === 'extreme' ? 'critical' :
-              alert.severity === 'severe' ? 'high' : 
+              alert.severity === 'severe' ? 'high' :
               alert.severity === 'moderate' ? 'medium' : 'low',
     category: 'weather',
     location: undefined,
-    locationName: alert.areas.join(', ') || undefined,
+    locationName: undefined,           // no 'areas'
     isVerified: true,
     isBreaking: alert.severity === 'extreme' || alert.severity === 'severe',
     imageUrl: undefined,
@@ -445,7 +445,7 @@ export async function fetchHubData(options: FetchHubDataOptions = {}): Promise<H
     fetchLiveIncidents(latitude, longitude, radiusKm, limit),
     fetchNationalAlerts(5),
     latitude && longitude
-      ? fetchWeatherData(latitude, longitude).catch((err: Error) => {
+      ? fetchWeatherData({ latitude, longitude }).catch((err: Error) => {
           console.warn(TAG, 'Weather fetch failed:', err);
           return null;
         })

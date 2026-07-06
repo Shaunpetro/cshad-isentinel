@@ -13,12 +13,11 @@ export default function StackLayout() {
   const pathname = usePathname();
   const [blink, setBlink] = useState(false);
 
-  // Blink effect for home screen Live icon
+  // Blink effect for the Live icon
   useEffect(() => {
-    if (pathname === '/' || pathname.endsWith('index')) {
-      const interval = setInterval(() => {
-        setBlink((prev) => !prev);
-      }, 800);
+    const isHome = pathname === '/' || pathname.endsWith('index');
+    if (isHome) {
+      const interval = setInterval(() => setBlink((prev) => !prev), 800);
       return () => clearInterval(interval);
     }
   }, [pathname]);
@@ -38,18 +37,24 @@ export default function StackLayout() {
           headerTintColor: theme.colors.text,
           headerTitleStyle: { fontWeight: 'bold' },
           headerTitle: ({ children }) => {
+            // Home screen: logo + blinking Live icon + "Live" (tappable)
             if (children === 'Live') {
               return (
-                <View style={styles.homeTitleContainer}>
+                <TouchableOpacity
+                onPress={() => router.push('live' as any)}
+                  style={styles.homeTitleContainer}
+                >
+                  <Image source={logoSrc} style={styles.headerLogo} resizeMode="contain" />
                   <Ionicons name="play-circle-outline" size={22} color={liveIconColor} />
                   <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Live</Text>
-                </View>
+                </TouchableOpacity>
               );
             }
+            // Other screens: logo + title
             return (
               <View style={[
                 styles.headerTitleContainer,
-                navigation?.canGoBack?.() && { marginLeft: 8 }
+                navigation?.canGoBack?.() && { marginLeft: 8 },
               ]}>
                 <Image source={logoSrc} style={styles.headerLogo} resizeMode="contain" />
                 <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{children}</Text>
@@ -101,6 +106,7 @@ export default function StackLayout() {
         <Stack.Screen name="article/[id]" options={{ title: 'Article' }} />
       </Stack>
 
+      {/* Centered Floating Home Button – hidden on home */}
       {pathname !== '/' && !pathname.endsWith('index') && (
         <TouchableOpacity
           onPress={() => router.navigate('/')}
@@ -119,7 +125,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 8,
   },
   headerTitleContainer: {
     flexDirection: 'row',
