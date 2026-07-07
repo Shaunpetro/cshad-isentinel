@@ -1,15 +1,15 @@
 // src/hooks/useLocalAlerts.ts
-// Phase 3B – added isRefreshing state
+// Beta 4 – reads city from shared LocationContext
 
 import { useState, useEffect, useCallback } from 'react';
-import { useLocation } from './useLocation';
+import { useLocationContext } from '@/contexts/LocationContext';
 import { fetchWeatherAlerts } from '../services/weather';
 import { fetchReportsByCity } from '../services/localReports';
 import { supabase } from '../services/supabase';
 import type { LocalReport } from '../types/news';
 
 export function useLocalAlerts() {
-  const { currentCity } = useLocation();
+  const { currentCity } = useLocationContext();
   const [alerts, setAlerts] = useState<LocalReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -35,14 +35,12 @@ export function useLocalAlerts() {
     }
   }, [currentCity?.name]);
 
-  // Initial fetch + 5‑minute polling
   useEffect(() => {
     fetchAlerts();
     const interval = setInterval(() => fetchAlerts(false), 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [fetchAlerts]);
 
-  // Realtime subscription for new reports
   useEffect(() => {
     if (!currentCity?.name) return;
     const channel = supabase

@@ -1,23 +1,41 @@
 // src/components/home/BreakingNewsCarousel.tsx
-// Phase 1 – Real breaking-news carousel
+// Beta 4 – Breaking news carousel with integrated location & radius picker
 
-import React, { useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import GlassCard from '../ui/GlassCard';
 import { useTheme } from '../../contexts';
 import type { NewsItem } from '../../types';
+import type { SACity } from '@/services/location';
+
+const RADIUS_OPTIONS = [5, 10, 25, 50, 100];
+const SLIDE_INTERVAL = 45000; // 45 seconds
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const CARD_HORIZONTAL_PADDING = 32;
 
 interface Props {
   articles: NewsItem[];
   isLoading?: boolean;
+  currentCity: SACity | null;
+  radiusKm: number;
+  onCityPress: () => void;
+  onRadiusChange: (radius: number) => void;
 }
 
-export default function BreakingNewsCarousel({ articles, isLoading }: Props) {
+export default function BreakingNewsCarousel({
+  articles,
+  isLoading,
+  currentCity,
+  radiusKm,
+  onCityPress,
+  onRadiusChange,
+}: Props) {
   const theme = useTheme();
   const router = useRouter();
-  const { t } = useTranslation();
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const slideAnim = useRef(new Animated.Value(1)).current;
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handlePress = useCallback(
     (article: NewsItem) => {
@@ -26,92 +44,164 @@ export default function BreakingNewsCarousel({ articles, isLoading }: Props) {
     [router]
   );
 
-  const renderItem = ({ item }: { item: NewsItem }) => (
-    <TouchableOpacity
-      onPress={() => handlePress(item)}
-      style={[styles.card, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
-      activeOpacity={0.8}
-    >
-      <Text style={[styles.cardTitle, { color: theme.colors.text }]} numberOfLines={2}>
-        {item.title}
-      </Text>
-      <Text style={[styles.cardSummary, { color: theme.colors.textSecondary }]} numberOfLines={1}>
-        {item.summary}
-      </Text>
-    </TouchableOpacity>
-  );
+  useEffect(() => {
+    if (!articles || articles.length === 0) return;
+    setCurrentIndex(0);
+    if (timerRef.current) clearInterval(timerRef.current);
 
-  if (isLoading) {
-    return (
-      <GlassCard tint={theme.pastel.peach}>
-        <Text style={[styles.placeholder, { color: theme.colors.text }]}>
-          {t('common.loading')}
-        </Text>
-      </GlassCard>
-    );
+    timerRef.current = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % articles.length);
+      Animated.sequence([
+        Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+        Animated.timing(slideAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
+      ]).start();
+    }, SLIDE_INTERVAL);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [articles]);
+
+  if (isLoading || !articles || articles.length === 0) {
+    return null;
   }
 
-  if (articles.length === 0) {
-    return (
-      <GlassCard tint={theme.pastel.peach}>
-        <Text style={[styles.placeholder, { color: theme.colors.text }]}>
-          🚨 {t('home.breakingNews')}
-        </Text>
-        <Text style={[styles.placeholderSub, { color: theme.colors.text }]}>
-          No active alerts. Carousel coming soon.
-        </Text>
-      </GlassCard>
-    );
-  }
+  const currentArticle = articles[currentIndex];
 
   return (
-    <View>
-      <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-        🚨 {t('home.breakingNews')}
-      </Text>
-      <FlatList
-        data={articles}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.list}
-      />
+    <View style={[styles.container, { backgroundColor: theme.colors.card || theme.colors.surface, borderColor: theme.colors.border }]}>
+      {/* Header: city pill + radius pills */}
+      <View style={styles.header}>
+        {/* City pill (left) */}
+        <TouchableOpacity
+          style={[styles.cityPill, { borderColor: theme.colors.border }]}
+          onPress={onCityPress}
+        >
+          <Ionicons name="location" size={14} color={theme.colors.primary} />
+          <Text style={[styles.cityText, { color: theme.colors.text }]} numberOfLines={1}>
+            {currentCity?.name || 'Select city'}
+          </Text>
+          <Ionicons name="chevron-down" size={14} color={theme.colors.textSecondary} />
+        </TouchableOpacity>
+
+        {/* Radius pills (right) */}
+        <View style={styles.radiusRow}>
+          {RADIUS_OPTIONS.map((r) => {
+            const isActive = r === (radiusKm || 25);
+            return (
+              <TouchableOpacity
+                key={r}
+                onPress={() => onRadiusChange(r)}
+                style={[
+                  styles.radiusPill,
+                  {
+                    backgroundColor: isActive ? theme.colors.primary : 'transparent',
+                    borderColor: isActive ? theme.colors.primary : theme.colors.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={[styles.radiusPillText, { color: isActive ? '#FFFFFF' : theme.colors.text }]}
+                >
+                  {r}km
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Breaking news headline */}
+      <TouchableOpacity
+        onPress={() => handlePress(currentArticle)}
+        activeOpacity={0.9}
+        style={styles.headlineArea}
+      >
+        <Animated.View style={[styles.headlineRow, { opacity: slideAnim }]}>
+          <View style={styles.badgeContainer}>
+            <View style={[styles.liveDot, { backgroundColor: theme.colors.danger }]} />
+            <Text style={[styles.breakingLabel, { color: theme.colors.danger }]}>BREAKING</Text>
+          </View>
+          <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={2}>
+            {currentArticle.title}
+          </Text>
+        </Animated.View>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    paddingHorizontal: 4,
+  container: {
+    width: SCREEN_WIDTH - CARD_HORIZONTAL_PADDING,
+    alignSelf: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
-  list: {
-    paddingHorizontal: 4,
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    gap: 8,
   },
-  card: {
-    width: 220,
-    padding: 12,
-    marginRight: 12,
+  cityPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 4,
+  },
+  cityText: {
+    fontSize: 13,
+    fontFamily: 'DMSans-Medium',
+    maxWidth: 80,
+  },
+  radiusRow: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 6,
+  },
+  radiusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 12,
     borderWidth: 1,
   },
-  cardTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 6,
-  },
-  cardSummary: {
+  radiusPillText: {
     fontSize: 12,
+    fontFamily: 'DMSans-Bold',
   },
-  placeholder: {
-    fontSize: 18,
+  headlineArea: {
+    paddingHorizontal: 12,
+    paddingBottom: 10,
+  },
+  headlineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  badgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 10,
+    gap: 4,
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  breakingLabel: {
+    fontSize: 11,
     fontWeight: 'bold',
-    marginBottom: 8,
+    letterSpacing: 0.5,
   },
-  placeholderSub: {
+  title: {
+    flex: 1,
     fontSize: 14,
+    fontWeight: '600',
   },
 });

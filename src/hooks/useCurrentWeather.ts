@@ -1,8 +1,8 @@
 // src/hooks/useCurrentWeather.ts
-// Phase 3E – Reads API key from environment
+// Beta 4 – reads city from shared LocationContext
 
 import { useState, useEffect, useCallback } from 'react';
-import { useLocation } from './useLocation';
+import { useLocationContext } from '@/contexts/LocationContext';
 import { fetchWeatherData } from '../services/weather';
 import type { CurrentWeather } from '../services/weather';
 
@@ -13,7 +13,7 @@ interface CurrentWeatherResult {
 }
 
 export function useCurrentWeather(): CurrentWeatherResult {
-  const { currentCity } = useLocation();
+  const { currentCity } = useLocationContext();
   const [weather, setWeather] = useState<CurrentWeather | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

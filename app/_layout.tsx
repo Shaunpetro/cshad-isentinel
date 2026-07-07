@@ -11,6 +11,7 @@ import { CustomSplashScreen } from "@/components/core/SplashScreen";
 import { useNotifications } from "@/hooks/useNotifications";
 import { ThemeProvider, useTheme } from "@/contexts";
 import { UpdateBanner } from "@/components/common/UpdateBanner";
+import { LocationProvider } from "@/contexts/LocationContext";
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -56,15 +57,17 @@ function RootLayoutInner() {
   if (!isReady) return null;
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]} onLayout={onLayoutReady}>
-      <StatusBar style={colors.statusBar === 'light' ? 'light' : 'dark'} />
-      <UpdateBanner />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
-        <Stack.Screen name="(stack)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      {showCustomSplash && <CustomSplashScreen onComplete={onSplashComplete} />}
-    </View>
+    <LocationProvider>
+      <View style={[styles.root, { backgroundColor: colors.background }]} onLayout={onLayoutReady}>
+        <StatusBar style={colors.statusBar === 'light' ? 'light' : 'dark'} />
+        <UpdateBanner />
+        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
+          <Stack.Screen name="(stack)" options={{ headerShown: false }} />
+          <Stack.Screen name="+not-found" />
+        </Stack>
+        {showCustomSplash && <CustomSplashScreen onComplete={onSplashComplete} />}
+      </View>
+    </LocationProvider>
   );
 }
 

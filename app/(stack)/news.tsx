@@ -1,50 +1,36 @@
 // app/(stack)/news.tsx
-// Phase 3 revised – General News & Local Alerts with location-aware weather card
+// Phase 4 – News screen with unified LocationRadiusBar, weather + infrastructure widgets on Local Alerts tab
 
 import React, { useState, useCallback, useMemo } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  RefreshControl,
-  ActivityIndicator,
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  RefreshControl, ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Typography, Spacing } from '../../src/config/theme';
 import {
   NewsList,
-  LocationHeader,
   CityPickerModal,
-  ScopeSelector,
-  BreakingNewsCarousel,
-  NewsStats,
-  TimeFilterBar,
-  LocationBanner,
   LocationPermissionModal,
+  TimeFilterBar,
 } from '../../src/components/news';
 import WeatherCard from '../../src/components/news/WeatherCard';
+import InfrastructureCard from '../../src/components/hub/InfrastructureCard';
 import LocalAlertCard from '../../src/components/local/LocalAlertCard';
-import { useLocation } from '../../src/hooks/useLocation';
+import LocationRadiusBar from '../../src/components/location/LocationRadiusBar';
+import { useLocationContext } from '@/contexts/LocationContext';
 import { useCurrentWeather } from '../../src/hooks/useCurrentWeather';
+import { useInfrastructure } from '../../src/hooks/useInfrastructure';
 import { useNews } from '../../src/hooks/useNews';
 import { useLocalAlerts } from '../../src/hooks/useLocalAlerts';
 import { usePreferences } from '../../src/hooks/usePreferences';
 import { useTheme } from '../../src/contexts';
 import type { NewsItem, NewsCategory } from '../../src/types';
 import type { TimeFilter } from '../../src/services/news';
-import type { LocalReport } from '../../src/types/news';
 
-// Categories that belong to local alerts – filtered OUT of General News
 const LOCATION_UPDATE_CATEGORIES = new Set([
-  'weather',
-  'water',
-  'electricity',
-  'infrastructure',
-  'road',
-  'community',
+  'weather', 'water', 'electricity', 'infrastructure', 'road', 'community',
 ]);
 
 type ActiveTab = 'general' | 'local';
@@ -55,40 +41,33 @@ export default function NewsScreen() {
   const { t } = useTranslation();
   const { preferences } = usePreferences();
 
-  // – Tabs –
   const [activeTab, setActiveTab] = useState<ActiveTab>('general');
-
-  // – Location state –
   const [cityPickerVisible, setCityPickerVisible] = useState(false);
   const [permissionModalVisible, setPermissionModalVisible] = useState(false);
+
   const {
     currentCity,
-    isDetecting,
     setCity,
     detectLocation,
     scope,
     setScope,
+    radiusKm,
     permissionStatus,
     requestPermission,
-  } = useLocation();
+  } = useLocationContext();
 
-  // – Weather (current only) –
   const { weather: currentWeather } = useCurrentWeather();
+  const { loadshedding } = useInfrastructure();
 
-  // – General News (time filter only – no category bar) –
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('today');
 
   const newsScope = useMemo(() => {
     if (scope === 'local') return 'local';
-    if (scope === 'national') return 'national';
     return 'national';
   }, [scope]);
 
-  const radiusKm = useMemo(() => preferences.newsRadius || 25, [preferences.newsRadius]);
-
   const {
     news: allNews,
-    breakingNews,
     isLoading: newsLoading,
     isRefreshing: newsRefreshing,
     error: newsError,
@@ -105,21 +84,17 @@ export default function NewsScreen() {
     autoRefresh: true,
   });
 
-  // Filter out location‑update articles
   const news = useMemo(
     () => allNews.filter((article: NewsItem) => !LOCATION_UPDATE_CATEGORIES.has(article.category)),
     [allNews]
   );
 
-  // – Local Alerts –
   const {
     alerts: localAlerts,
-    isLoading: alertsLoading,
     isRefreshing: alertsRefreshing,
     refresh: refreshAlerts,
   } = useLocalAlerts();
 
-  // – Handlers –
   const handleArticlePress = useCallback(
     (article: NewsItem) => {
       router.push({ pathname: '/(stack)/article/[id]', params: { id: article.id } });
@@ -146,19 +121,13 @@ export default function NewsScreen() {
     [t]
   );
 
-  // – List header (shared for both tabs) –
   const ListHeader = useMemo(
     () => (
       <View>
-        {/* Simple weather widget (visible on both tabs if data exists) */}
-        {currentWeather && currentCity && (
-          <WeatherCard
-            cityName={currentCity.name}
-            temperature={currentWeather.temp}
-            description={currentWeather.description}
-            icon={currentWeather.icon}
-          />
-        )}
+        {/* Location + radius bar */}
+        <View style={styles.locationBarWrapper}>
+          <LocationRadiusBar onCityPress={() => setCityPickerVisible(true)} />
+        </View>
 
         {/* Tab bar */}
         <View style={[styles.tabBar, { borderBottomColor: colors.divider }]}>
@@ -183,59 +152,67 @@ export default function NewsScreen() {
         {/* Controls for General tab */}
         {activeTab === 'general' && (
           <>
-            <View style={[styles.locationHeaderWrapper, { backgroundColor: colors.surface }]}>
-              <LocationHeader
-                city={currentCity}
-                onChangeCity={() => setCityPickerVisible(true)}
-                isLoading={isDetecting}
+            {/* Weather widget (current conditions) */}
+            {currentWeather && currentCity && (
+              <WeatherCard
+                cityName={currentCity.name}
+                temperature={currentWeather.temp}
+                description={currentWeather.description}
+                icon={currentWeather.icon}
               />
-            </View>
+            )}
+
             {scope === 'local' && permissionStatus !== 'granted' && (
-              <LocationBanner
-                status={permissionStatus}
-                onEnablePress={handleEnableLocation}
-                cityName={currentCity?.name}
-              />
+              <View style={{ paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm }}>
+                <LocationPermissionModal
+                  visible={permissionModalVisible}
+                  onClose={() => setPermissionModalVisible(false)}
+                  onRequestPermission={handleRequestPermission}
+                  permissionDenied={permissionStatus === 'denied'}
+                />
+              </View>
             )}
-            {breakingNews.length > 0 && (
-              <BreakingNewsCarousel
-                articles={breakingNews}
-                onArticlePress={handleArticlePress}
-              />
-            )}
-            <ScopeSelector activeScope={scope} onScopeChange={setScope} />
             <TimeFilterBar activeFilter={timeFilter} onFilterChange={setTimeFilter} lastUpdated={lastUpdated} />
-            <NewsStats articles={allNews} />
-            <View style={styles.resultsBar}>
-              <Text style={[styles.resultsText, { color: colors.textSecondary }]}>
-                {news.length} {news.length === 1 ? t('news.article') : t('news.articles')}
-                {scope === 'local' && currentCity && ` ${t('news.within')} ${radiusKm}km ${t('news.of')} ${currentCity.name}`}
-                {scope === 'national' && ` ${t('news.inSouthAfrica')}`}
-                {timeFilter !== 'all' && timeFilter !== 'today' && ` • ${getTimeFilterName(timeFilter)}`}
-              </Text>
-            </View>
           </>
         )}
 
-        {/* Local tab header (no weather forecast, just permission banner if needed) */}
+        {/* Local Alerts tab header: weather + infrastructure widgets */}
         {activeTab === 'local' && (
-          <LocationBanner
-            status={permissionStatus}
-            onEnablePress={handleEnableLocation}
-            cityName={currentCity?.name}
-          />
+          <View style={{ paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm }}>
+            {permissionStatus !== 'granted' || !currentCity ? (
+              <Text style={{ color: colors.textSecondary, marginBottom: Spacing.sm }}>
+                Location permission required for local alerts.
+              </Text>
+            ) : (
+              <>
+                {/* Weather widget */}
+                {currentWeather && (
+                  <WeatherCard
+                    cityName={currentCity.name}
+                    temperature={currentWeather.temp}
+                    description={currentWeather.description}
+                    icon={currentWeather.icon}
+                  />
+                )}
+
+                {/* Load‑shedding widget (with real data from hook) */}
+                {loadshedding && (
+                  <InfrastructureCard loadshedding={loadshedding} compact />
+                )}
+              </>
+            )}
+          </View>
         )}
       </View>
     ),
     [
-      activeTab, currentWeather, currentCity, colors, isDetecting,
-      scope, permissionStatus, breakingNews, handleArticlePress, timeFilter,
-      lastUpdated, radiusKm, handleEnableLocation, t, getTimeFilterName, news.length,
-      allNews, setScope,
+      activeTab, currentWeather, currentCity, colors, scope,
+      permissionStatus, timeFilter, lastUpdated, handleEnableLocation, t,
+      getTimeFilterName, permissionModalVisible, handleRequestPermission,
+      loadshedding,
     ]
   );
 
-  // – Render –
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {activeTab === 'general' ? (
@@ -278,13 +255,6 @@ export default function NewsScreen() {
         onSelectCity={(city) => { setCity(city); setCityPickerVisible(false); }}
         onClose={() => setCityPickerVisible(false)}
         onDetectLocation={detectLocation}
-        isDetecting={isDetecting}
-      />
-      <LocationPermissionModal
-        visible={permissionModalVisible}
-        onClose={() => setPermissionModalVisible(false)}
-        onRequestPermission={handleRequestPermission}
-        permissionDenied={permissionStatus === 'denied'}
       />
     </View>
   );
@@ -292,11 +262,17 @@ export default function NewsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  locationBarWrapper: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.sm,
+  },
   tabBar: {
     flexDirection: 'row',
     marginTop: 8,
     marginBottom: 12,
     borderBottomWidth: 1,
+    marginHorizontal: Spacing.lg,
   },
   tab: {
     flex: 1,
@@ -310,19 +286,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: 'DMSans-Bold',
     color: '#888',
-  },
-  locationHeaderWrapper: {
-    paddingTop: 0,
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.md,
-  },
-  resultsBar: {
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-  },
-  resultsText: {
-    fontSize: Typography.sizes.label,
-    fontFamily: Typography.fonts.regular,
   },
   emptyContainer: {
     padding: 32,
