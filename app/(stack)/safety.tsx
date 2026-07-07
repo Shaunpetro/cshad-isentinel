@@ -1,103 +1,255 @@
 // app/(stack)/safety.tsx
-// Phase 3B – Near Me Alerts (replaces old Safety Hub)
+// Phase 4 – Safety Hub: map-first hybrid navigator with draggable bottom sheet
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
-  RefreshControl,
-  ActivityIndicator,
   TouchableOpacity,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '@/contexts';
-import { useLocation } from '@/hooks/useLocation';
-import { useLocalAlerts } from '@/hooks/useLocalAlerts';
-import { Typography, Spacing } from '@/config/theme';
-import LocalAlertCard from '@/components/local/LocalAlertCard';
-import ReportIssueModal from '@/components/local/ReportIssueModal';
-import type { LocalReport } from '@/types/news';
+  ActivityIndicator,
+  Animated,
+  PanResponder,
+  Dimensions,
+  FlatList,
+} from "react-native";
+import MapView, { Marker, Callout } from "react-native-maps";
+import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "expo-router";
+import { useTranslation } from "react-i18next";
+import { useTheme } from "@/contexts";
+import { useLocation } from "@/hooks/useLocation";
+import { useLocalAlerts } from "@/hooks/useLocalAlerts";
+import { Typography, Spacing, BorderRadius, Shadows } from "@/config/theme";
+import { HazardReportModal } from "@/components/hub/HazardReportModal";
+import {
+  fetchHazards,
+  voteHazardCleared,
+  voteHazardStillThere,
+} from "@/services/map/mapService";
+import type { MapMarker } from "@/services/map";
+import type { LocalReport } from "@/types/news";
 
-export default function NearMeScreen() {
-  const theme = useTheme();
-  const { currentCity } = useLocation();
-  const { alerts, isLoading, isRefreshing, refresh } = useLocalAlerts();
-  const [reportModalVisible, setReportModalVisible] = useState(false);
+// --- helpers (reused from map.tsx) ---
+const getMarkerColor = (marker: MapMarker): string => {
+  if (marker.type === 'tip') return '#9C27B0';
+  if (marker.type === 'hazard') return '#FF6D00';
+  if (marker.type === 'nearme') return '#00D4AA';
+  switch (marker.severity) {
+    case 'critical': return '#FF1744';
+    case 'high': return '#FF5722';
+    case 'medium': return '#FFC107';
+    case 'low':
+    default: return '#4CAF50';
+  }
+};
 
-  const renderItem = useCallback(
-    ({ item }: { item: LocalReport }) => (
-      <LocalAlertCard report={item} />
-    ),
-    []
+const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
+const SHEET_MIN_HEIGHT = 60;
+const SHEET_MAX_HEIGHT = SCREEN_HEIGHT * 0.45;
+
+export default function SafetyHubScreen() {
+  const { colors } = useTheme();
+  const { t } = useTranslation();
+  const mapRef = useRef<MapView>(null);
+  const {
+    currentCity,
+    deviceLocation,
+    permissionStatus,
+    refresh: refreshLocation,
+  } = useLocation();
+  const { alerts: nearMeReports, refresh: refreshNearMe } = useLocalAlerts();
+  const [hazardMarkers, setHazardMarkers] = useState<MapMarker[]>([]);
+  const [hazardModalVisible, setHazardModalVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'myArea' | 'national'>('myArea');
+  const [sheetExpanded, setSheetExpanded] = useState(false);
+  const sheetAnim = useRef(new Animated.Value(0)).current;
+
+  // --- draggable sheet ---
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 10,
+      onPanResponderMove: (_, gesture) => {
+        const newHeight = (sheetExpanded ? SHEET_MAX_HEIGHT : SHEET_MIN_HEIGHT) - gesture.dy;
+        if (newHeight >= SHEET_MIN_HEIGHT && newHeight <= SHEET_MAX_HEIGHT) {
+          Animated.event([null, { dy: sheetAnim }], { useNativeDriver: false })(_, { dy: gesture.dy });
+        }
+      },
+      onPanResponderRelease: (_, gesture) => {
+        if (gesture.dy > 50 || gesture.vy > 0.5) {
+          setSheetExpanded(false);
+          Animated.spring(sheetAnim, { toValue: 0, useNativeDriver: false }).start();
+        } else if (gesture.dy < -50 || gesture.vy < -0.5) {
+          setSheetExpanded(true);
+          Animated.spring(sheetAnim, { toValue: SHEET_MAX_HEIGHT - SHEET_MIN_HEIGHT, useNativeDriver: false }).start();
+        }
+      },
+    })
+  ).current;
+
+  const toggleSheet = () => {
+    setSheetExpanded(!sheetExpanded);
+    Animated.spring(sheetAnim, {
+      toValue: sheetExpanded ? 0 : SHEET_MAX_HEIGHT - SHEET_MIN_HEIGHT,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  // --- map data ---
+  const loadHazards = useCallback(async () => {
+    const data = await fetchHazards();
+    if (data) {
+      setHazardMarkers(data.map((h: any) => ({
+        id: h.id,
+        latitude: h.latitude,
+        longitude: h.longitude,
+        title: h.category,
+        description: h.description,
+        type: 'hazard' as const,
+        severity: (h.severity as MapMarker['severity']) || 'medium',
+        timestamp: h.created_at,
+        matchedLocation: h.location_name || 'Unknown',
+        confidence: 'exact' as const,
+        category: h.category || 'other', // added category
+      })));
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshLocation();
+      loadHazards();
+      setIsLoading(false);
+    }, [refreshLocation, loadHazards])
   );
 
-  const renderHeader = useCallback(
-    () => (
-      <View style={styles.headerSection}>
-        <View style={styles.headerRow}>
-          <Text style={[styles.title, { color: theme.colors.text }]}>
-            📍 Near Me Alerts
-          </Text>
-          <TouchableOpacity
-            style={[styles.reportButton, { backgroundColor: theme.colors.primary }]}
-            onPress={() => setReportModalVisible(true)}
-          >
-            <Ionicons name="add-circle-outline" size={18} color="#FFFFFF" />
-            <Text style={styles.reportButtonText}>Report</Text>
-          </TouchableOpacity>
-        </View>
-        {currentCity && (
-          <Text style={[styles.subtitle, { color: theme.colors.textSecondary }]}>
-            {currentCity.name} · Updated every 5 minutes
-          </Text>
-        )}
-      </View>
-    ),
-    [theme, currentCity]
-  );
+  const handleVoteCleared = async (hazardId: string) => {
+    await voteHazardCleared(hazardId);
+    loadHazards();
+  };
+
+  const handleVoteStillThere = async (hazardId: string) => {
+    await voteHazardStillThere(hazardId);
+    loadHazards();
+  };
 
   if (isLoading) {
     return (
-      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <ActivityIndicator size="large" color={theme.colors.primary} style={{ flex: 1 }} />
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} style={{ flex: 1 }} />
       </View>
     );
   }
 
-  return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <FlatList
-        data={alerts}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        ListHeaderComponent={renderHeader}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="checkmark-circle-outline" size={48} color={theme.colors.success} />
-            <Text style={[styles.emptyText, { color: theme.colors.text }]}>
-              All clear in your area
-            </Text>
-            <Text style={[styles.emptySubtext, { color: theme.colors.textSecondary }]}>
-              No active alerts. Tap "Report" if you notice something.
-            </Text>
-          </View>
-        }
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={refresh}
-            colors={[theme.colors.primary]}
-          />
-        }
-        contentContainerStyle={alerts.length === 0 ? { flexGrow: 1 } : { paddingBottom: 100 }}
-        showsVerticalScrollIndicator={false}
-      />
+  const userLat = deviceLocation?.latitude;
+  const userLng = deviceLocation?.longitude;
 
-      <ReportIssueModal
-        visible={reportModalVisible}
-        onClose={() => setReportModalVisible(false)}
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Map */}
+      <MapView
+        ref={mapRef}
+        style={styles.map}
+        initialRegion={{
+          latitude: userLat || -26.2041,
+          longitude: userLng || 28.0473,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
+        }}
+        showsUserLocation={permissionStatus === 'granted'}
+        followsUserLocation={viewMode === 'myArea'}
+        showsMyLocationButton={false}
+        mapPadding={{ top: 0, right: 0, bottom: sheetExpanded ? SHEET_MAX_HEIGHT : SHEET_MIN_HEIGHT, left: 0 }}
+      >
+        {hazardMarkers.map((marker) => (
+          <Marker
+            key={marker.id}
+            coordinate={{ latitude: marker.latitude, longitude: marker.longitude }}
+            pinColor={getMarkerColor(marker)}
+            onPress={() => setSelectedId(marker.id)}
+          >
+            {selectedId === marker.id && (
+              <Callout tooltip onPress={() => setSelectedId(null)}>
+                <View style={[styles.callout, { backgroundColor: colors.surface }]}>
+                  <Text style={[styles.calloutTitle, { color: colors.text }]}>{marker.title}</Text>
+                  {marker.description && (
+                    <Text style={[styles.calloutDescription, { color: colors.textSecondary }]} numberOfLines={2}>
+                      {marker.description}
+                    </Text>
+                  )}
+                  <View style={styles.voteRow}>
+                    <TouchableOpacity style={styles.voteButton} onPress={() => handleVoteCleared(marker.id)}>
+                      <Ionicons name="close-circle" size={18} color="#FF1744" />
+                      <Text style={[styles.voteText, { color: '#FF1744' }]}>Cleared</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.voteButton} onPress={() => handleVoteStillThere(marker.id)}>
+                      <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
+                      <Text style={[styles.voteText, { color: '#4CAF50' }]}>Still there</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </Callout>
+            )}
+          </Marker>
+        ))}
+      </MapView>
+
+      {/* Report Button */}
+      <TouchableOpacity
+        style={[styles.reportFab, { backgroundColor: '#FF6D00' }]}
+        onPress={() => setHazardModalVisible(true)}
+      >
+        <Ionicons name="add" size={28} color="#FFFFFF" />
+      </TouchableOpacity>
+
+      {/* Draggable Bottom Sheet */}
+      <Animated.View
+        style={[
+          styles.bottomSheet,
+          {
+            height: Animated.add(sheetAnim, new Animated.Value(SHEET_MIN_HEIGHT)),
+            backgroundColor: colors.surface,
+          },
+        ]}
+        {...panResponder.panHandlers}
+      >
+        <TouchableOpacity onPress={toggleSheet} style={styles.sheetHandleArea}>
+          <View style={[styles.sheetHandle, { backgroundColor: colors.divider }]} />
+          <Text style={[styles.sheetTitle, { color: colors.text }]}>
+            Local Incidents ({nearMeReports.length + hazardMarkers.length})
+          </Text>
+        </TouchableOpacity>
+        <FlatList
+          data={[...nearMeReports.map(r => ({ id: r.id, title: r.description, description: r.description, type: 'nearme' })), ...hazardMarkers.map(h => ({ id: h.id, title: h.title, description: h.description || '', type: 'hazard' }))]}
+          renderItem={({ item }) => (
+            <View style={[styles.sheetItem, { borderBottomColor: colors.divider }]}>
+              <Ionicons
+                name={item.type === 'hazard' ? 'warning' : 'information-circle'}
+                size={20}
+                color={item.type === 'hazard' ? '#FF6D00' : '#00D4AA'}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.sheetItemTitle, { color: colors.text }]}>{item.title}</Text>
+                <Text style={[styles.sheetItemDesc, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {item.description}
+                </Text>
+              </View>
+            </View>
+          )}
+          keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 20 }}
+        />
+      </Animated.View>
+
+      {/* Hazard Report Modal */}
+      <HazardReportModal
+        visible={hazardModalVisible}
+        onClose={() => setHazardModalVisible(false)}
+        onReported={() => { loadHazards(); }}
+        currentLocation={userLat && userLng ? { latitude: userLat, longitude: userLng } : undefined}
       />
     </View>
   );
@@ -105,50 +257,96 @@ export default function NearMeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  headerSection: { padding: Spacing.md },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: Typography.sizes.heading,
-    fontFamily: Typography.fonts.bold,
-  },
-  subtitle: {
-    fontSize: Typography.sizes.caption,
-    fontFamily: Typography.fonts.regular,
-    marginTop: 4,
-  },
-  reportButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  reportButtonText: {
-    color: '#FFFFFF',
-    fontSize: Typography.sizes.label,
-    fontFamily: Typography.fonts.bold,
-  },
-  emptyContainer: {
-    flex: 1,
+  map: { flex: 1 },
+  reportFab: {
+    position: 'absolute',
+    bottom: 100,
+    right: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: Spacing.lg,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    zIndex: 10,
   },
-  emptyText: {
+  bottomSheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: Spacing.md,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    overflow: 'hidden',
+  },
+  sheetHandleArea: {
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+  },
+  sheetHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    marginBottom: Spacing.xs,
+  },
+  sheetTitle: {
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.bold,
-    marginTop: Spacing.md,
-    textAlign: 'center',
   },
-  emptySubtext: {
+  sheetItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  sheetItemTitle: {
     fontSize: Typography.sizes.caption,
+    fontFamily: Typography.fonts.medium,
+  },
+  sheetItemDesc: {
+    fontSize: Typography.sizes.label,
     fontFamily: Typography.fonts.regular,
-    marginTop: Spacing.xs,
-    textAlign: 'center',
+    marginTop: 2,
+  },
+  callout: {
+    padding: 12,
+    borderRadius: 12,
+    minWidth: 180,
+    ...Shadows.md,
+  },
+  calloutTitle: {
+    fontSize: Typography.sizes.caption,
+    fontFamily: Typography.fonts.bold,
+    marginBottom: 4,
+  },
+  calloutDescription: {
+    fontSize: Typography.sizes.tiny,
+    fontFamily: Typography.fonts.regular,
+    marginBottom: 8,
+  },
+  voteRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 4,
+  },
+  voteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  voteText: {
+    fontSize: Typography.sizes.tiny,
+    fontFamily: Typography.fonts.medium,
   },
 });

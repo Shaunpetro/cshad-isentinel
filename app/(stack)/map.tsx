@@ -1,5 +1,5 @@
 // app/(stack)/map.tsx
-// Phase 3D – Map with Near Me toggle, scrolling filter bar, smart city bar
+// Phase 3D – Stable map with fixed-position filter bar, smart city pills
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   ScrollView,
+  Linking,
+  Platform,
 } from "react-native";
 import MapView, { Marker, Callout, Circle } from "react-native-maps";
 import { Ionicons } from "@expo/vector-icons";
@@ -32,7 +34,7 @@ import {
 import type { MapMarker } from "../../src/services/map";
 import type { LocalReport } from "../../src/types/news";
 
-// Hazard SVG icons
+// Hazard icons (unchanged)
 import PotholeIcon from '../../assets/hazard-icons/pothole.svg';
 import BurstPipeIcon from '../../assets/hazard-icons/burst-pipe.svg';
 import PowerLineIcon from '../../assets/hazard-icons/power-line.svg';
@@ -66,6 +68,7 @@ const MAJOR_CITIES = METRO_QUICK_ACCESS.map((loc) => ({
   longitude: loc.longitude,
 }));
 
+// ── helpers ──
 const getMarkerColor = (marker: MapMarker): string => {
   if (marker.type === 'tip') return '#9C27B0';
   if (marker.type === 'hazard') return '#FF6D00';
@@ -97,34 +100,21 @@ const getCategoryIcon = (category: string): keyof typeof Ionicons.glyphMap => {
   return icons[category] || 'alert-circle';
 };
 
-const findMatchingMajorCity = (
-  cityName: string | undefined,
-  latitude: number | undefined,
-  longitude: number | undefined
-): string | null => {
-  if (!cityName && (latitude == null || longitude == null)) return null;
-  const lowerCityName = cityName?.toLowerCase() || '';
-  for (const majorCity of MAJOR_CITIES) {
-    if (majorCity.fullName.toLowerCase() === lowerCityName) return majorCity.key;
-    if (majorCity.label.toLowerCase() === lowerCityName) return majorCity.key;
-    if (majorCity.aliases.some(alias => {
-      const aliasLower = alias.toLowerCase();
-      return lowerCityName === aliasLower || (lowerCityName.includes(aliasLower) && aliasLower.length > 4);
-    })) return majorCity.key;
+const findMatchingMajorCity = (cityName?: string, lat?: number, lng?: number): string | null => {
+  if (!cityName && (lat == null || lng == null)) return null;
+  const lower = cityName?.toLowerCase() || '';
+  for (const c of MAJOR_CITIES) {
+    if (c.fullName.toLowerCase() === lower || c.label.toLowerCase() === lower) return c.key;
+    if (c.aliases.some(a => lower.includes(a.toLowerCase()))) return c.key;
   }
-  if (latitude != null && longitude != null) {
-    let closestCity: string | null = null;
-    let minDistance = Infinity;
-    for (const majorCity of MAJOR_CITIES) {
-      const dLat = majorCity.latitude - latitude;
-      const dLon = majorCity.longitude - longitude;
-      const distance = Math.sqrt(dLat * dLat + dLon * dLon);
-      if (distance < minDistance && distance < 0.5) {
-        minDistance = distance;
-        closestCity = majorCity.key;
-      }
+  if (lat != null && lng != null) {
+    let closest: string | null = null;
+    let minDist = Infinity;
+    for (const c of MAJOR_CITIES) {
+      const d = Math.sqrt((c.latitude - lat) ** 2 + (c.longitude - lng) ** 2);
+      if (d < minDist && d < 0.5) { minDist = d; closest = c.key; }
     }
-    return closestCity;
+    return closest;
   }
   return null;
 };
@@ -156,7 +146,6 @@ export default function MapScreen() {
   const [viewMode, setViewMode] = useState<'myArea' | 'national'>('myArea');
   const [hazardModalVisible, setHazardModalVisible] = useState(false);
   const [hazardMarkers, setHazardMarkers] = useState<MapMarker[]>([]);
-  const [toast, setToast] = useState<string | null>(null);
   const [voteModalType, setVoteModalType] = useState<'cleared' | 'still-there' | null>(null);
   const [voteModalVisible, setVoteModalVisible] = useState(false);
   const hasAnimatedToCity = useRef<string | null>(null);
@@ -167,19 +156,12 @@ export default function MapScreen() {
     isLoading: locationLoading,
     permissionStatus,
     refresh: refreshLocation,
+    requestPermission,
   } = useLocation();
 
   const { alerts: nearMeReports, refresh: refreshNearMe } = useLocalAlerts();
 
-  useFocusEffect(
-    useCallback(() => {
-      refreshLocation();
-      loadHazards();
-      if (showNearMe) refreshNearMe();
-    }, [refreshLocation, showNearMe, refreshNearMe])
-  );
-
-  const loadHazards = () => {
+  const loadHazards = useCallback(() => {
     fetchHazards().then((hazards) => {
       if (hazards) {
         setHazardMarkers(hazards.map((h: any) => ({
@@ -197,12 +179,19 @@ export default function MapScreen() {
         })));
       }
     });
-  };
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshLocation();
+      loadHazards();
+      if (showNearMe) refreshNearMe();
+    }, [refreshLocation, loadHazards, showNearMe, refreshNearMe])
+  );
 
   const userLat = currentCity?.latitude;
   const userLng = currentCity?.longitude;
   const cityName = currentCity?.name;
-  const cityId = currentCity?.id;
 
   const activeCity = useMemo(() => findMatchingMajorCity(cityName, userLat, userLng), [cityName, userLat, userLng]);
 
@@ -211,8 +200,8 @@ export default function MapScreen() {
     newsCount,
     tipsCount,
     isLoading: dataLoading,
-    error,
-    refresh,
+    error: mapError,
+    refresh: refreshMapData,
   } = useMapData({ includeNews: showNews, includeTips: showTips, realtime: true });
 
   const nearMeMarkers: MapMarker[] = useMemo(() => {
@@ -241,21 +230,21 @@ export default function MapScreen() {
 
   useEffect(() => {
     if (mapReady && mapRef.current && userLat && userLng && viewMode === 'myArea') {
-      if (hasAnimatedToCity.current !== cityId) {
-        hasAnimatedToCity.current = cityId || null;
+      if (hasAnimatedToCity.current !== cityName) {
+        hasAnimatedToCity.current = cityName || null;
         const timer = setTimeout(() => {
           mapRef.current?.animateToRegion({ latitude: userLat, longitude: userLng, ...ZOOM_LEVELS.city }, 800);
         }, 300);
         return () => clearTimeout(timer);
       }
     }
-  }, [mapReady, userLat, userLng, viewMode, cityId, cityName]);
+  }, [mapReady, userLat, userLng, viewMode, cityName]);
 
   const visibleMarkers = useMemo(() => {
     if (viewMode === 'national' || !userLat || !userLng) return allMarkers;
     const radiusInDegrees = (radiusKm || 25) / 111;
     return allMarkers.filter(marker => {
-      const distance = Math.sqrt(Math.pow(marker.latitude - userLat, 2) + Math.pow(marker.longitude - userLng, 2));
+      const distance = Math.sqrt((marker.latitude - userLat) ** 2 + (marker.longitude - userLng) ** 2);
       return distance <= radiusInDegrees;
     });
   }, [allMarkers, viewMode, userLat, userLng, radiusKm]);
@@ -266,10 +255,12 @@ export default function MapScreen() {
   const visibleNearMeCount = visibleMarkers.filter(m => m.type === 'nearme').length;
 
   const handleMarkerPress = useCallback((marker: MapMarker) => setSelectedId(marker.id), []);
+
   const handleMyAreaPress = useCallback(() => {
     setViewMode('myArea');
     if (mapRef.current && userLat && userLng) mapRef.current.animateToRegion({ latitude: userLat, longitude: userLng, ...ZOOM_LEVELS.city }, 800);
   }, [userLat, userLng]);
+
   const handleNationalPress = useCallback(() => {
     setViewMode('national');
     if (mapRef.current) {
@@ -277,6 +268,7 @@ export default function MapScreen() {
       setSelectedId(null);
     }
   }, []);
+
   const handleZoomToCity = useCallback((cityKey: string) => {
     const city = MAJOR_CITIES.find(c => c.key === cityKey);
     if (mapRef.current && city) {
@@ -284,31 +276,11 @@ export default function MapScreen() {
       mapRef.current.animateToRegion({ latitude: city.latitude, longitude: city.longitude, ...ZOOM_LEVELS.city }, 800);
     }
   }, []);
+
   const handleTipsToggle = useCallback(() => {
-    if (!showTips) {
-      setShowTips(true);
-      if (newsTipMarkers.some(m => m.type === 'tip') && mapRef.current) {
-        const tipMarkers = newsTipMarkers.filter(m => m.type === 'tip');
-        if (tipMarkers.length > 0) {
-          const lats = tipMarkers.map(m => m.latitude);
-          const lngs = tipMarkers.map(m => m.longitude);
-          const minLat = Math.min(...lats);
-          const maxLat = Math.max(...lats);
-          const minLng = Math.min(...lngs);
-          const maxLng = Math.max(...lngs);
-          mapRef.current.animateToRegion({
-            latitude: (minLat + maxLat) / 2,
-            longitude: (minLng + maxLng) / 2,
-            latitudeDelta: Math.max((maxLat - minLat) * 1.5, 0.1),
-            longitudeDelta: Math.max((maxLng - minLng) * 1.5, 0.1),
-          }, 800);
-          setViewMode('national');
-        }
-      }
-    } else {
-      setShowTips(false);
-    }
-  }, [showTips, newsTipMarkers]);
+    setShowTips(prev => !prev);
+  }, []);
+
   const handleMapReady = useCallback(() => setMapReady(true), []);
 
   const handleVoteCleared = useCallback(async (hazardId: string) => {
@@ -317,7 +289,7 @@ export default function MapScreen() {
     setVoteModalVisible(true);
     setTimeout(() => { setVoteModalVisible(false); setVoteModalType(null); }, 10000);
     loadHazards();
-  }, []);
+  }, [loadHazards]);
 
   const handleVoteStillThere = useCallback(async (hazardId: string) => {
     await voteHazardStillThere(hazardId);
@@ -325,7 +297,7 @@ export default function MapScreen() {
     setVoteModalVisible(true);
     setTimeout(() => { setVoteModalVisible(false); setVoteModalType(null); }, 10000);
     loadHazards();
-  }, []);
+  }, [loadHazards]);
 
   const handleNearMeVote = useCallback(async (reportId: string, type: 'confirm' | 'deny') => {
     await voteReport(reportId, type);
@@ -341,6 +313,7 @@ export default function MapScreen() {
     if (diffHours < 24) return t('time.hoursAgo', { count: diffHours });
     return date.toLocaleDateString();
   };
+
   const getConfidenceText = (confidence: string) => {
     switch (confidence) {
       case 'exact': return t('map.confidence.exact');
@@ -352,21 +325,18 @@ export default function MapScreen() {
   };
 
   const isLoading = locationLoading || dataLoading;
-  const currentRadiusKm = radiusKm || 25;
 
   const nearbyCities = useMemo(() => {
-    if (!activeCity) return MAJOR_CITIES.filter(c => MAJOR_KEYS.includes(c.key)).slice(0, 4);
-    const first = MAJOR_CITIES.find(c => c.key === activeCity) || {
-      key: activeCity,
-      label: currentCity?.name || 'You',
-      latitude: userLat!,
-      longitude: userLng!,
-      fullName: currentCity?.name || 'You',
-      aliases: [],
-    };
-    const rest = MAJOR_CITIES.filter(c => c.key !== activeCity && MAJOR_KEYS.includes(c.key)).slice(0, 3);
-    return [first, ...rest];
-  }, [activeCity, currentCity, userLat, userLng]);
+    const first = currentCity
+      ? { key: 'current', label: currentCity.name, latitude: userLat!, longitude: userLng! }
+      : null;
+    const rest = MAJOR_CITIES
+      .filter(c => c.key !== activeCity && MAJOR_KEYS.includes(c.key))
+      .slice(0, 4);
+    return first ? [first, ...rest] : rest;
+  }, [currentCity, activeCity, userLat, userLng]);
+
+  const openAppSettings = () => Linking.openSettings();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -388,7 +358,7 @@ export default function MapScreen() {
         {mapReady && showRadius && userLat && userLng && viewMode === 'myArea' && (
           <Circle
             center={{ latitude: userLat, longitude: userLng }}
-            radius={currentRadiusKm * 1000}
+            radius={(radiusKm || 25) * 1000}
             strokeWidth={2}
             strokeColor={colors.primary + '80'}
             fillColor={colors.primary + '15'}
@@ -473,19 +443,31 @@ export default function MapScreen() {
       {(!mapReady || isLoading) && (
         <View style={[styles.loadingOverlay, { backgroundColor: colors.background }]}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{locationLoading ? t('location.detecting') : t('common.loading')}</Text>
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+            {locationLoading ? t('location.detecting') : t('common.loading')}
+          </Text>
         </View>
       )}
 
-      {error && (
+      {mapError && (
         <View style={[styles.errorBanner, { backgroundColor: '#FF4757' }]}>
-          <Text style={styles.errorText}>{error}</Text>
-          <Pressable onPress={refresh}><Text style={styles.retryText}>{t('common.retry')}</Text></Pressable>
+          <Text style={styles.errorText}>{mapError}</Text>
+          <Pressable onPress={refreshMapData}><Text style={styles.retryText}>{t('common.retry')}</Text></Pressable>
+        </View>
+      )}
+
+      {permissionStatus === 'denied' && (
+        <View style={[styles.permissionBanner, { backgroundColor: colors.warning + '20' }]}>
+          <Text style={[styles.permissionText, { color: colors.warning }]}>Location permission is required for nearby alerts.</Text>
+          <TouchableOpacity onPress={openAppSettings} style={[styles.permissionButton, { backgroundColor: colors.warning }]}>
+            <Text style={styles.permissionButtonText}>Enable in Settings</Text>
+          </TouchableOpacity>
         </View>
       )}
 
       <VoteModal type={voteModalType} visible={voteModalVisible} onHide={() => { setVoteModalVisible(false); setVoteModalType(null); }} />
 
+      {/* View mode bar – anchored top left */}
       <View style={[styles.viewModeBar, { backgroundColor: colors.surface + 'F0' }]}>
         <Pressable onPress={handleMyAreaPress} style={[styles.viewModeButton, viewMode === 'myArea' && { backgroundColor: colors.primary + '20' }]}>
           <Ionicons name="locate" size={18} color={viewMode === 'myArea' ? colors.primary : colors.textSecondary} />
@@ -496,7 +478,7 @@ export default function MapScreen() {
           <Text style={[styles.viewModeText, { color: viewMode === 'national' ? colors.primary : colors.textSecondary }]}>{t('map.showAll')}</Text>
         </Pressable>
         <View style={styles.viewModeDivider} />
-        <Pressable onPress={refresh} style={styles.iconButton}><Ionicons name="refresh" size={20} color={colors.primary} /></Pressable>
+        <Pressable onPress={refreshMapData} style={styles.iconButton}><Ionicons name="refresh" size={20} color={colors.primary} /></Pressable>
         <Pressable onPress={() => setShowRadius(!showRadius)} style={styles.iconButton}>
           <Ionicons name={showRadius ? 'radio-button-on' : 'radio-button-off'} size={20} color={showRadius ? colors.primary : colors.textSecondary} />
         </Pressable>
@@ -505,28 +487,51 @@ export default function MapScreen() {
         </Pressable>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={[styles.filterBar, { backgroundColor: colors.surface + 'F0' }]}>
+      {/* Filter bar – fixed height, scrollable, always on top */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={[styles.filterBar, { backgroundColor: colors.surface + 'F0' }]}
+        contentContainerStyle={styles.filterBarContent}
+      >
         <Pressable onPress={() => setShowNews(!showNews)} style={[styles.filterButton, showNews && { backgroundColor: colors.primary + '20' }]}>
-          <Text style={[styles.filterButtonText, { color: showNews ? colors.primary : colors.textSecondary }]}>📰 {t('map.showNews')} ({viewMode === 'myArea' ? visibleNewsCount : newsCount})</Text>
+          <Text style={[styles.filterButtonText, { color: showNews ? colors.primary : colors.textSecondary }]}>
+            📰 {t('map.showNews')} ({viewMode === 'myArea' ? visibleNewsCount : newsCount})
+          </Text>
         </Pressable>
         <Pressable onPress={handleTipsToggle} style={[styles.filterButton, showTips && { backgroundColor: '#9C27B0' + '20' }]}>
-          <Text style={[styles.filterButtonText, { color: showTips ? '#9C27B0' : colors.textSecondary }]}>🟣 {t('map.showTips')} ({viewMode === 'myArea' ? visibleTipsCount : tipsCount})</Text>
+          <Text style={[styles.filterButtonText, { color: showTips ? '#9C27B0' : colors.textSecondary }]}>
+            🟣 {t('map.showTips')} ({viewMode === 'myArea' ? visibleTipsCount : tipsCount})
+          </Text>
         </Pressable>
         <Pressable onPress={() => {}} style={[styles.filterButton, { backgroundColor: '#FF6D00' + '20' }]}>
-          <Text style={[styles.filterButtonText, { color: '#FF6D00' }]}>⚠️ Hazards ({visibleHazardCount})</Text>
+          <Text style={[styles.filterButtonText, { color: '#FF6D00' }]}>
+            ⚠️ Hazards ({visibleHazardCount})
+          </Text>
         </Pressable>
         <Pressable onPress={() => setShowNearMe(!showNearMe)} style={[styles.filterButton, showNearMe && { backgroundColor: '#00D4AA' + '20' }]}>
-          <Text style={[styles.filterButtonText, { color: showNearMe ? '#00D4AA' : colors.textSecondary }]}>📍 Near Me ({visibleNearMeCount})</Text>
+          <Text style={[styles.filterButtonText, { color: showNearMe ? '#00D4AA' : colors.textSecondary }]}>
+            📍 Near Me ({visibleNearMeCount})
+          </Text>
         </Pressable>
       </ScrollView>
 
+      {/* City pills – anchored top right */}
       <View style={styles.cityBar}>
         {nearbyCities.map((city) => {
-          const isActive = activeCity === city.key;
+          const isActive = city.key === 'current' || city.key === activeCity;
           return (
             <Pressable
               key={city.key}
-              onPress={() => handleZoomToCity(city.key)}
+              onPress={() => {
+                if (city.key === 'current') {
+                  if (mapRef.current && userLat && userLng) {
+                    mapRef.current.animateToRegion({ latitude: userLat, longitude: userLng, ...ZOOM_LEVELS.city }, 800);
+                  }
+                } else {
+                  handleZoomToCity(city.key);
+                }
+              }}
               style={({ pressed }) => [
                 styles.cityButton,
                 { backgroundColor: isActive ? colors.primary : colors.surface, borderColor: isActive ? colors.primary : 'transparent' },
@@ -540,6 +545,7 @@ export default function MapScreen() {
         })}
       </View>
 
+      {/* Legend */}
       <View style={[styles.legend, { backgroundColor: colors.surface + 'F0' }]}>
         <Text style={[styles.legendTitle, { color: colors.text }]}>{t('map.filters')}</Text>
         <View style={styles.legendItems}>
@@ -556,7 +562,7 @@ export default function MapScreen() {
       <HazardReportModal
         visible={hazardModalVisible}
         onClose={() => setHazardModalVisible(false)}
-        onReported={() => { loadHazards(); setToast("✅ Hazard reported — thank you!"); }}
+        onReported={() => { loadHazards(); }}
         currentLocation={userLat && userLng ? { latitude: userLat, longitude: userLng } : undefined}
       />
     </View>
@@ -571,19 +577,50 @@ const styles = StyleSheet.create({
   errorBanner: { position: 'absolute', top: 100, left: Spacing.md, right: Spacing.md, padding: Spacing.md, borderRadius: BorderRadius.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 15 },
   errorText: { color: '#FFFFFF', fontSize: Typography.sizes.caption, flex: 1 },
   retryText: { color: '#FFFFFF', fontFamily: Typography.fonts.bold, marginLeft: Spacing.md },
-  viewModeBar: { position: 'absolute', top: 95, left: Spacing.md, flexDirection: 'row', alignItems: 'center', padding: Spacing.xs, borderRadius: BorderRadius.md, zIndex: 10, gap: Spacing.xs },
+  permissionBanner: { position: 'absolute', top: 100, left: Spacing.md, right: Spacing.md, padding: Spacing.md, borderRadius: BorderRadius.md, flexDirection: 'row', alignItems: 'center', zIndex: 15 },
+  permissionText: { flex: 1, fontSize: 13 },
+  permissionButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, marginLeft: 8 },
+  permissionButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' },
+  viewModeBar: {
+    position: 'absolute',
+    top: 10,
+    left: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.xs,
+    borderRadius: BorderRadius.md,
+    zIndex: 10,
+    gap: 4,
+  },
   viewModeButton: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, borderRadius: BorderRadius.sm, gap: 4 },
   viewModeText: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.medium },
   flagEmoji: { fontSize: 16 },
-  viewModeDivider: { width: 1, height: 20, backgroundColor: '#E0E0E0', marginHorizontal: Spacing.xs },
-  iconButton: { padding: Spacing.xs },
-  filterBar: { position: 'absolute', top: 145, left: Spacing.md, right: Spacing.md, flexDirection: 'row', padding: Spacing.xs, borderRadius: BorderRadius.md, zIndex: 10 },
-  filterButton: { paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, borderRadius: BorderRadius.sm, marginRight: 4 },
-  filterButtonText: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.medium },
-  cityBar: { position: 'absolute', top: 95, right: 12, zIndex: 10, gap: Spacing.xs },
-  cityButton: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderRadius: BorderRadius.md, borderWidth: 2, minWidth: 50, alignItems: 'center', ...Shadows.sm },
+  viewModeDivider: { width: 1, height: 20, backgroundColor: '#E0E0E0', marginHorizontal: 2 },
+  iconButton: { padding: 4 },
+  filterBar: {
+    position: 'absolute',
+    top: 55,
+    left: 0,
+    right: 0,
+    height: 40,
+    zIndex: 10,
+  },
+  filterBarContent: {
+    alignItems: 'center',
+    paddingHorizontal: Spacing.sm,
+  },
+  filterButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 6,
+    flexShrink: 0,
+  },
+  filterButtonText: { fontSize: 12, fontFamily: Typography.fonts.medium },
+  cityBar: { position: 'absolute', top: 10, right: 8, zIndex: 10, gap: 4 },
+  cityButton: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: BorderRadius.md, borderWidth: 2, minWidth: 40, alignItems: 'center', ...Shadows.sm },
   buttonPressed: { opacity: 0.7, transform: [{ scale: 0.95 }] },
-  cityLabel: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.bold, textAlign: 'center' },
+  cityLabel: { fontSize: 12, fontFamily: Typography.fonts.bold, textAlign: 'center' },
   activeIndicator: { position: 'absolute', top: -4, right: -4, backgroundColor: '#FF5722', borderRadius: 8, width: 16, height: 16, justifyContent: 'center', alignItems: 'center' },
   legend: { position: 'absolute', bottom: 20, left: Spacing.md, padding: Spacing.sm, borderRadius: BorderRadius.md, zIndex: 10 },
   legendTitle: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.bold, marginBottom: Spacing.xs },

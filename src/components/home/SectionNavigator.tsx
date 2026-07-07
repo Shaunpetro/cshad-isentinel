@@ -1,5 +1,5 @@
 // src/components/home/SectionNavigator.tsx
-// Beta 4 - Phase 1: Grid of glass cards linking to app sections (Settings removed from home grid)
+// Phase 1 – Grid of glass cards with visit tracking
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
@@ -8,8 +8,8 @@ import { Ionicons } from '@expo/vector-icons';
 import GlassCard from '../ui/GlassCard';
 import { useTheme } from '../../contexts';
 import { useTranslation } from 'react-i18next';
+import { incrementSectionVisit } from '../../utils/sectionVisits';
 
-// Settings removed from this list (now in header)
 const sections = [
   { key: 'news', icon: 'newspaper-outline', labelKey: 'home.sectionNavigator.news' },
   { key: 'opportunities', icon: 'briefcase-outline', labelKey: 'home.sectionNavigator.opportunities' },
@@ -19,17 +19,27 @@ const sections = [
   { key: 'incidents', icon: 'warning-outline', labelKey: 'home.sectionNavigator.incidents' },
 ];
 
-export default function SectionNavigator() {
+interface Props {
+  onSectionPress?: (key: string) => void;
+}
+
+export default function SectionNavigator({ onSectionPress }: Props) {
   const router = useRouter();
   const theme = useTheme();
   const { t } = useTranslation();
+
+  const handlePress = async (key: string) => {
+    await incrementSectionVisit(key);
+    onSectionPress?.(key);
+    router.push(key as any);
+  };
 
   return (
     <View style={styles.grid}>
       {sections.map((section) => (
         <GlassCard
           key={section.key}
-          onPress={() => router.push(section.key as any)}
+          onPress={() => handlePress(section.key)}
           tint={theme.pastel.blue}
           style={styles.card}
           noPadding

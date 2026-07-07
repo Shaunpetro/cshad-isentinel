@@ -1,5 +1,5 @@
 // app/(stack)/article/[id].tsx
-// Beta 4 - Phase 1: Article detail stack screen
+// Beta 4 – Article detail with full summary, source link, and rich layout
 
 import React from "react";
 import {
@@ -9,12 +9,12 @@ import {
   ScrollView,
   Pressable,
   Share,
-  Linking,
   ActivityIndicator,
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { Image } from "expo-image";
 import { Ionicons } from "@expo/vector-icons";
+import * as WebBrowser from "expo-web-browser";
 import MapView, { Marker } from "react-native-maps";
 import { useTranslation } from "react-i18next";
 import { Typography, Spacing, BorderRadius } from "../../../src/config/theme";
@@ -29,20 +29,16 @@ export default function NewsDetailScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
 
-  // Fetch article from Supabase
   const { article, isLoading, error } = useNewsArticle(id);
 
-  // Get translated category
   const getCategoryLabel = (category: string): string => {
     const key = `news.categories.${category}`;
     const translated = t(key);
     return translated !== key ? translated.toUpperCase() : category.toUpperCase();
   };
 
-  // Handle share
   const handleShare = async () => {
     if (!article) return;
-
     try {
       await Share.share({
         title: article.title,
@@ -53,16 +49,13 @@ export default function NewsDetailScreen() {
     }
   };
 
-  // Handle source link
-  const handleSourcePress = () => {
+  const handleOpenSource = async () => {
     if (article?.sourceUrl) {
-      Linking.openURL(article.sourceUrl).catch((err) =>
-        console.error("[NewsDetail] Failed to open URL:", err)
-      );
+      await WebBrowser.openBrowserAsync(article.sourceUrl);
     }
   };
 
-  // Loading state
+  // Loading
   if (isLoading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -83,7 +76,7 @@ export default function NewsDetailScreen() {
     );
   }
 
-  // Error or not found state
+  // Error / not found
   if (error || !article) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -95,11 +88,7 @@ export default function NewsDetailScreen() {
           }}
         />
         <View style={styles.errorContainer}>
-          <Ionicons
-            name="alert-circle-outline"
-            size={64}
-            color={colors.textDisabled}
-          />
+          <Ionicons name="alert-circle-outline" size={64} color={colors.textDisabled} />
           <Text style={[styles.errorTitle, { color: colors.text }]}>
             {error ? t("common.error") : t("common.noResults")}
           </Text>
@@ -127,9 +116,16 @@ export default function NewsDetailScreen() {
           headerStyle: { backgroundColor: colors.surface },
           headerTintColor: colors.text,
           headerRight: () => (
-            <Pressable onPress={handleShare} style={styles.headerButton}>
-              <Ionicons name="share-outline" size={24} color={colors.text} />
-            </Pressable>
+            <View style={{ flexDirection: "row", gap: 12 }}>
+              <Pressable onPress={handleShare} style={styles.headerButton}>
+                <Ionicons name="share-outline" size={24} color={colors.text} />
+              </Pressable>
+              {article.sourceUrl && (
+                <Pressable onPress={handleOpenSource} style={styles.headerButton}>
+                  <Ionicons name="open-outline" size={24} color={colors.text} />
+                </Pressable>
+              )}
+            </View>
           ),
         }}
       />
@@ -147,19 +143,13 @@ export default function NewsDetailScreen() {
             transition={300}
           />
         ) : (
-          <View
-            style={[styles.heroPlaceholder, { backgroundColor: colors.surface }]}
-          >
-            <Ionicons
-              name="newspaper-outline"
-              size={64}
-              color={colors.textDisabled}
-            />
+          <View style={[styles.heroPlaceholder, { backgroundColor: colors.surface }]}>
+            <Ionicons name="newspaper-outline" size={64} color={colors.textDisabled} />
           </View>
         )}
 
         <View style={styles.content}>
-          {/* Category + Severity Row */}
+          {/* Category + Severity */}
           <View style={styles.metaRow}>
             <Text style={[styles.category, { color: colors.primary }]}>
               {getCategoryLabel(article.category)}
@@ -168,11 +158,9 @@ export default function NewsDetailScreen() {
           </View>
 
           {/* Title */}
-          <Text style={[styles.title, { color: colors.text }]}>
-            {article.title}
-          </Text>
+          <Text style={[styles.title, { color: colors.text }]}>{article.title}</Text>
 
-          {/* Source + Verified Row */}
+          {/* Source + Verified */}
           <View style={styles.sourceRow}>
             <SourceBadge
               sourceType={article.sourceType}
@@ -189,22 +177,14 @@ export default function NewsDetailScreen() {
           {/* Time + Location */}
           <View style={styles.infoRow}>
             <View style={styles.infoItem}>
-              <Ionicons
-                name="time-outline"
-                size={16}
-                color={colors.textSecondary}
-              />
+              <Ionicons name="time-outline" size={16} color={colors.textSecondary} />
               <Text style={[styles.infoText, { color: colors.textSecondary }]}>
                 {timeAgo(article.publishedAt)}
               </Text>
             </View>
             {article.locationName && (
               <View style={styles.infoItem}>
-                <Ionicons
-                  name="location-outline"
-                  size={16}
-                  color={colors.textSecondary}
-                />
+                <Ionicons name="location-outline" size={16} color={colors.textSecondary} />
                 <Text
                   style={[styles.infoText, { color: colors.textSecondary }]}
                   numberOfLines={1}
@@ -215,43 +195,27 @@ export default function NewsDetailScreen() {
             )}
           </View>
 
-          {/* Divider */}
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-          {/* Summary */}
-          <Text style={[styles.summary, { color: colors.text }]}>
+          {/* Full summary as the main article body */}
+          <Text style={[styles.articleBody, { color: colors.text }]}>
             {article.summary}
           </Text>
 
-          {/* Body (if available) */}
-          {article.body ? (
-            article.body.split('\n').map((para, idx) => (
-              <Text key={idx} style={[styles.body, { color: colors.textSecondary }]}>
-                {para}
-              </Text>
-          ))
-        ) : (
-          <View style={[styles.noBodyContainer, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.noBodyText, { color: colors.textDisabled }]}>
-              {t("news.readMore")}
-            </Text>
-          </View>
-        )}
-
-          {/* Source Link */}
+          {/* Read Full Article button */}
           {article.sourceUrl && (
             <Pressable
-              style={[styles.sourceLink, { backgroundColor: colors.surface }]}
-              onPress={handleSourcePress}
+              style={[styles.readMoreButton, { backgroundColor: colors.primary }]}
+              onPress={handleOpenSource}
             >
-              <Ionicons name="open-outline" size={18} color={colors.primary} />
-              <Text style={[styles.sourceLinkText, { color: colors.primary }]}>
-                {t("news.source")}
+              <Ionicons name="document-text-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.readMoreText}>
+                {t("news.readMore") || "Read Full Article"}
               </Text>
             </Pressable>
           )}
 
-          {/* Location Map */}
+          {/* Location Map (unchanged) */}
           {article.location && (
             <View style={styles.mapSection}>
               <Text style={[styles.sectionTitle, { color: colors.text }]}>
@@ -288,17 +252,11 @@ export default function NewsDetailScreen() {
           )}
 
           {/* Published Date */}
-          <View
-            style={[styles.publishedRow, { borderTopColor: colors.border }]}
-          >
-            <Text
-              style={[styles.publishedLabel, { color: colors.textDisabled }]}
-            >
+          <View style={[styles.publishedRow, { borderTopColor: colors.border }]}>
+            <Text style={[styles.publishedLabel, { color: colors.textDisabled }]}>
               {t("news.lastUpdated")}:
             </Text>
-            <Text
-              style={[styles.publishedDate, { color: colors.textSecondary }]}
-            >
+            <Text style={[styles.publishedDate, { color: colors.textSecondary }]}>
               {formatDate(article.publishedAt)}
             </Text>
           </View>
@@ -309,38 +267,24 @@ export default function NewsDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  headerButton: {
-    padding: Spacing.sm,
-  },
+  container: { flex: 1 },
+  scrollView: { flex: 1 },
+  headerButton: { padding: Spacing.sm },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     gap: Spacing.md,
   },
-  loadingText: {
-    fontSize: Typography.sizes.body,
-    fontFamily: Typography.fonts.regular,
-  },
-  heroImage: {
-    width: "100%",
-    height: 250,
-  },
+  loadingText: { fontSize: Typography.sizes.body, fontFamily: Typography.fonts.regular },
+  heroImage: { width: "100%", height: 250 },
   heroPlaceholder: {
     width: "100%",
     height: 200,
     justifyContent: "center",
     alignItems: "center",
   },
-  content: {
-    padding: Spacing.lg,
-  },
+  content: { padding: Spacing.lg },
   metaRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -370,71 +314,37 @@ const styles = StyleSheet.create({
     gap: Spacing.lg,
     marginBottom: Spacing.md,
   },
-  infoItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.xs,
-  },
-  infoText: {
-    fontSize: Typography.sizes.caption,
-    fontFamily: Typography.fonts.regular,
-  },
-  divider: {
-    height: 1,
-    marginVertical: Spacing.lg,
-  },
-  summary: {
-    fontSize: Typography.sizes.body,
-    fontFamily: Typography.fonts.medium,
-    lineHeight: Typography.sizes.body * 1.6,
-    marginBottom: Spacing.lg,
-  },
-  body: {
+  infoItem: { flexDirection: "row", alignItems: "center", gap: Spacing.xs },
+  infoText: { fontSize: Typography.sizes.caption, fontFamily: Typography.fonts.regular },
+  divider: { height: 1, marginVertical: Spacing.lg },
+  articleBody: {
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.regular,
-    lineHeight: Typography.sizes.body * 1.6,
+    lineHeight: Typography.sizes.body * 1.8,
     marginBottom: Spacing.lg,
   },
-  noBodyContainer: {
-    padding: Spacing.md,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.lg,
-  },
-  noBodyText: {
-    fontSize: Typography.sizes.caption,
-    fontFamily: Typography.fonts.regular,
-    fontStyle: "italic",
-    textAlign: "center",
-  },
-  sourceLink: {
+  readMoreButton: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: Spacing.sm,
     paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.lg,
     borderRadius: BorderRadius.md,
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
   },
-  sourceLinkText: {
+  readMoreText: {
+    color: "#FFFFFF",
     fontSize: Typography.sizes.body,
-    fontFamily: Typography.fonts.medium,
-  },
-  mapSection: {
-    marginBottom: Spacing.xl,
+    fontFamily: Typography.fonts.bold,
   },
   sectionTitle: {
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.bold,
     marginBottom: Spacing.sm,
   },
-  mapContainer: {
-    height: 180,
-    borderRadius: BorderRadius.lg,
-    overflow: "hidden",
-  },
-  map: {
-    flex: 1,
-  },
+  mapSection: { marginBottom: Spacing.xl },
+  mapContainer: { height: 180, borderRadius: BorderRadius.lg, overflow: "hidden" },
+  map: { flex: 1 },
   mapCaption: {
     fontSize: Typography.sizes.label,
     fontFamily: Typography.fonts.regular,
@@ -448,14 +358,8 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.md,
     borderTopWidth: 1,
   },
-  publishedLabel: {
-    fontSize: Typography.sizes.label,
-    fontFamily: Typography.fonts.regular,
-  },
-  publishedDate: {
-    fontSize: Typography.sizes.label,
-    fontFamily: Typography.fonts.mono,
-  },
+  publishedLabel: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.regular },
+  publishedDate: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.mono },
   errorContainer: {
     flex: 1,
     justifyContent: "center",
