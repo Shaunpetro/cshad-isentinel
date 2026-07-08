@@ -1,5 +1,5 @@
 // app/(stack)/map.tsx
-// Phase 3D – Stable map with fixed-position filter bar, smart city pills
+// Beta 4 – Map with background refresh, wrapping filters, city pills below, inline loader, permission modal
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
@@ -9,7 +9,6 @@ import {
   StyleSheet,
   ActivityIndicator,
   TouchableOpacity,
-  ScrollView,
   Linking,
   Platform,
 } from "react-native";
@@ -18,7 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "../../src/contexts/ThemeContext";
-import { useLocation } from "../../src/hooks/useLocation";
+import { useLocationContext } from "../../src/contexts/LocationContext";
 import { Typography, Spacing, BorderRadius, Shadows } from "../../src/config/theme";
 import { APP } from "../../src/config/constants";
 import { useMapData } from "../../src/hooks/useMapData";
@@ -26,6 +25,7 @@ import { useLocalAlerts } from "../../src/hooks/useLocalAlerts";
 import { voteReport } from "../../src/services/localReports";
 import { METRO_QUICK_ACCESS } from "../../src/services/location/saCities";
 import { HazardReportModal } from "../../src/components/hub/HazardReportModal";
+import { LocationPermissionModal } from "../../src/components/news";
 import {
   fetchHazards,
   voteHazardCleared,
@@ -141,6 +141,7 @@ export default function MapScreen() {
   const [mapReady, setMapReady] = useState(false);
   const [showNews, setShowNews] = useState(true);
   const [showTips, setShowTips] = useState(true);
+  const [showHazards, setShowHazards] = useState(true);
   const [showRadius, setShowRadius] = useState(true);
   const [showNearMe, setShowNearMe] = useState(false);
   const [viewMode, setViewMode] = useState<'myArea' | 'national'>('myArea');
@@ -148,16 +149,17 @@ export default function MapScreen() {
   const [hazardMarkers, setHazardMarkers] = useState<MapMarker[]>([]);
   const [voteModalType, setVoteModalType] = useState<'cleared' | 'still-there' | null>(null);
   const [voteModalVisible, setVoteModalVisible] = useState(false);
+  const [permissionModalVisible, setPermissionModalVisible] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(true);
   const hasAnimatedToCity = useRef<string | null>(null);
 
   const {
     currentCity,
     radiusKm,
-    isLoading: locationLoading,
     permissionStatus,
     refresh: refreshLocation,
     requestPermission,
-  } = useLocation();
+  } = useLocationContext();
 
   const { alerts: nearMeReports, refresh: refreshNearMe } = useLocalAlerts();
 
@@ -186,7 +188,9 @@ export default function MapScreen() {
       refreshLocation();
       loadHazards();
       if (showNearMe) refreshNearMe();
-    }, [refreshLocation, loadHazards, showNearMe, refreshNearMe])
+      // After first load, switch to background updates
+      if (initialLoad) setInitialLoad(false);
+    }, [refreshLocation, loadHazards, showNearMe, refreshNearMe, initialLoad])
   );
 
   const userLat = currentCity?.latitude;
@@ -221,7 +225,9 @@ export default function MapScreen() {
     }));
   }, [showNearMe, nearMeReports]);
 
-  const allMarkers = useMemo(() => [...newsTipMarkers, ...hazardMarkers, ...nearMeMarkers], [newsTipMarkers, hazardMarkers, nearMeMarkers]);
+  const filteredHazardMarkers = useMemo(() => showHazards ? hazardMarkers : [], [showHazards, hazardMarkers]);
+
+  const allMarkers = useMemo(() => [...newsTipMarkers, ...filteredHazardMarkers, ...nearMeMarkers], [newsTipMarkers, filteredHazardMarkers, nearMeMarkers]);
 
   const initialRegion = useMemo(() => {
     if (userLat && userLng) return { latitude: userLat, longitude: userLng, ...ZOOM_LEVELS.city };
@@ -277,9 +283,8 @@ export default function MapScreen() {
     }
   }, []);
 
-  const handleTipsToggle = useCallback(() => {
-    setShowTips(prev => !prev);
-  }, []);
+  const handleTipsToggle = useCallback(() => setShowTips(prev => !prev), []);
+  const handleHazardsToggle = useCallback(() => setShowHazards(prev => !prev), []);
 
   const handleMapReady = useCallback(() => setMapReady(true), []);
 
@@ -324,8 +329,6 @@ export default function MapScreen() {
     }
   };
 
-  const isLoading = locationLoading || dataLoading;
-
   const nearbyCities = useMemo(() => {
     const first = currentCity
       ? { key: 'current', label: currentCity.name, latitude: userLat!, longitude: userLng! }
@@ -337,6 +340,15 @@ export default function MapScreen() {
   }, [currentCity, activeCity, userLat, userLng]);
 
   const openAppSettings = () => Linking.openSettings();
+
+  const handleEnableLocation = () => setPermissionModalVisible(true);
+  const handleRequestPermission = async () => {
+    const granted = await requestPermission();
+    if (granted) console.log('[MapScreen] Location permission granted');
+  };
+
+  const isBackgroundLoading = !initialLoad && dataLoading;
+  const showLoadingOverlay = initialLoad && !mapReady;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -440,12 +452,20 @@ export default function MapScreen() {
         ))}
       </MapView>
 
-      {(!mapReady || isLoading) && (
-        <View style={[styles.loadingOverlay, { backgroundColor: colors.background }]}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-            {locationLoading ? t('location.detecting') : t('common.loading')}
+      {/* Small inline loading indicator (shown on initial load only) */}
+      {showLoadingOverlay && (
+        <View style={[styles.inlineLoading, { backgroundColor: colors.surface + 'CC' }]}>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={[styles.inlineLoadingText, { color: colors.textSecondary }]}>
+            {t('location.detecting')}
           </Text>
+        </View>
+      )}
+
+      {/* Background refresh indicator (small, non-blocking) */}
+      {isBackgroundLoading && (
+        <View style={styles.backgroundLoading}>
+          <ActivityIndicator size="small" color={colors.primary} />
         </View>
       )}
 
@@ -463,6 +483,16 @@ export default function MapScreen() {
             <Text style={styles.permissionButtonText}>Enable in Settings</Text>
           </TouchableOpacity>
         </View>
+      )}
+
+      {permissionStatus === 'undetermined' && (
+        <TouchableOpacity
+          style={[styles.permissionBanner, { backgroundColor: colors.primary + '20' }]}
+          onPress={handleEnableLocation}
+        >
+          <Ionicons name="navigate-outline" size={18} color={colors.primary} />
+          <Text style={[styles.permissionText, { color: colors.primary, marginLeft: 8 }]}>Enable location for nearby alerts</Text>
+        </TouchableOpacity>
       )}
 
       <VoteModal type={voteModalType} visible={voteModalVisible} onHide={() => { setVoteModalVisible(false); setVoteModalType(null); }} />
@@ -487,13 +517,8 @@ export default function MapScreen() {
         </Pressable>
       </View>
 
-      {/* Filter bar – fixed height, scrollable, always on top */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={[styles.filterBar, { backgroundColor: colors.surface + 'F0' }]}
-        contentContainerStyle={styles.filterBarContent}
-      >
+      {/* Filter bar – wrapping, no horizontal scroll */}
+      <View style={[styles.filterBar, { backgroundColor: colors.surface + 'F0' }]}>
         <Pressable onPress={() => setShowNews(!showNews)} style={[styles.filterButton, showNews && { backgroundColor: colors.primary + '20' }]}>
           <Text style={[styles.filterButtonText, { color: showNews ? colors.primary : colors.textSecondary }]}>
             📰 {t('map.showNews')} ({viewMode === 'myArea' ? visibleNewsCount : newsCount})
@@ -504,8 +529,8 @@ export default function MapScreen() {
             🟣 {t('map.showTips')} ({viewMode === 'myArea' ? visibleTipsCount : tipsCount})
           </Text>
         </Pressable>
-        <Pressable onPress={() => {}} style={[styles.filterButton, { backgroundColor: '#FF6D00' + '20' }]}>
-          <Text style={[styles.filterButtonText, { color: '#FF6D00' }]}>
+        <Pressable onPress={handleHazardsToggle} style={[styles.filterButton, showHazards && { backgroundColor: '#FF6D00' + '20' }]}>
+          <Text style={[styles.filterButtonText, { color: showHazards ? '#FF6D00' : colors.textSecondary }]}>
             ⚠️ Hazards ({visibleHazardCount})
           </Text>
         </Pressable>
@@ -514,10 +539,10 @@ export default function MapScreen() {
             📍 Near Me ({visibleNearMeCount})
           </Text>
         </Pressable>
-      </ScrollView>
+      </View>
 
-      {/* City pills – anchored top right */}
-      <View style={styles.cityBar}>
+      {/* City pills – below filter bar, wrapping */}
+      <View style={[styles.cityBar, { backgroundColor: colors.surface + '00' }]}>
         {nearbyCities.map((city) => {
           const isActive = city.key === 'current' || city.key === activeCity;
           return (
@@ -565,6 +590,13 @@ export default function MapScreen() {
         onReported={() => { loadHazards(); }}
         currentLocation={userLat && userLng ? { latitude: userLat, longitude: userLng } : undefined}
       />
+
+      <LocationPermissionModal
+        visible={permissionModalVisible}
+        onClose={() => setPermissionModalVisible(false)}
+        onRequestPermission={handleRequestPermission}
+        permissionDenied={permissionStatus === 'denied'}
+      />
     </View>
   );
 }
@@ -572,8 +604,25 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { ...StyleSheet.absoluteFillObject },
-  loadingOverlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', zIndex: 20 },
-  loadingText: { fontSize: Typography.sizes.body, fontFamily: Typography.fonts.regular, marginTop: Spacing.md },
+  inlineLoading: {
+    position: 'absolute',
+    top: 60,
+    left: Spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.md,
+    zIndex: 20,
+    gap: Spacing.xs,
+  },
+  inlineLoadingText: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.regular },
+  backgroundLoading: {
+    position: 'absolute',
+    top: 60,
+    right: Spacing.sm,
+    zIndex: 20,
+  },
   errorBanner: { position: 'absolute', top: 100, left: Spacing.md, right: Spacing.md, padding: Spacing.md, borderRadius: BorderRadius.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 15 },
   errorText: { color: '#FFFFFF', fontSize: Typography.sizes.caption, flex: 1 },
   retryText: { color: '#FFFFFF', fontFamily: Typography.fonts.bold, marginLeft: Spacing.md },
@@ -600,24 +649,31 @@ const styles = StyleSheet.create({
   filterBar: {
     position: 'absolute',
     top: 55,
-    left: 0,
-    right: 0,
-    height: 40,
+    left: Spacing.sm,
+    right: Spacing.sm,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    padding: Spacing.xs,
+    borderRadius: BorderRadius.md,
     zIndex: 10,
-  },
-  filterBarContent: {
-    alignItems: 'center',
-    paddingHorizontal: Spacing.sm,
+    gap: 4,
   },
   filterButton: {
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 16,
-    marginRight: 6,
-    flexShrink: 0,
   },
   filterButtonText: { fontSize: 12, fontFamily: Typography.fonts.medium },
-  cityBar: { position: 'absolute', top: 10, right: 8, zIndex: 10, gap: 4 },
+  cityBar: {
+    position: 'absolute',
+    top: 105,
+    left: Spacing.sm,
+    right: Spacing.sm,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    zIndex: 10,
+    gap: 4,
+  },
   cityButton: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: BorderRadius.md, borderWidth: 2, minWidth: 40, alignItems: 'center', ...Shadows.sm },
   buttonPressed: { opacity: 0.7, transform: [{ scale: 0.95 }] },
   cityLabel: { fontSize: 12, fontFamily: Typography.fonts.bold, textAlign: 'center' },

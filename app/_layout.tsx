@@ -1,7 +1,7 @@
 // app/_layout.tsx
 import React, { useEffect } from "react";
 import { Stack } from "expo-router";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { I18nextProvider } from "react-i18next";
@@ -44,7 +44,7 @@ const errorStyles = StyleSheet.create({
 
 function RootLayoutInner() {
   const { isReady, showCustomSplash, onLayoutReady, onSplashComplete } = useAppReady();
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { isInitialized: notificationsReady, error: notificationError } = useNotifications();
 
   useEffect(() => {
@@ -56,10 +56,17 @@ function RootLayoutInner() {
 
   if (!isReady) return null;
 
+  // Dynamic status bar background for dark mode
+  const statusBarBg = isDark ? colors.background : '#FFFFFF';
+
   return (
     <LocationProvider>
       <View style={[styles.root, { backgroundColor: colors.background }]} onLayout={onLayoutReady}>
-        <StatusBar style={colors.statusBar === 'light' ? 'light' : 'dark'} />
+        <StatusBar
+          style={colors.statusBar === 'light' ? 'light' : 'dark'}
+          backgroundColor={Platform.OS === 'android' ? statusBarBg : undefined}
+          translucent={false}
+        />
         <UpdateBanner />
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
           <Stack.Screen name="(stack)" options={{ headerShown: false }} />

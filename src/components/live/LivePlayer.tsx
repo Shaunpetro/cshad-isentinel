@@ -1,168 +1,341 @@
 // src/components/live/LivePlayer.tsx
-// Phase 2: In-app YouTube player using WebView (mini-player & full-screen)
+// Beta 4 – TikTok‑style immersive player with 10 live comments, timestamps in seconds
 
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Dimensions } from 'react-native';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Modal,
+  Dimensions,
+  StatusBar,
+  FlatList,
+  Linking,
+} from 'react-native';
 import { WebView } from 'react-native-webview';
+import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../contexts';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// Mock live comments with seconds timestamps
+const MOCK_COMMENTS = [
+  { id: '1', user: 'Zanele M.', text: 'Stay safe everyone!', secondsAgo: 2 },
+  { id: '2', user: 'Thabo K.', text: 'This is so helpful, thank you', secondsAgo: 5 },
+  { id: '3', user: 'Priya N.', text: 'What area is this?', secondsAgo: 12 },
+  { id: '4', user: 'Mohammed S.', text: 'Great reporting!', secondsAgo: 18 },
+  { id: '5', user: 'Linda Z.', text: 'Keep up the good work', secondsAgo: 25 },
+  { id: '6', user: 'Sipho D.', text: 'I can see the crew in the background', secondsAgo: 32 },
+  { id: '7', user: 'Amahle N.', text: 'This is live from Soweto?', secondsAgo: 40 },
+  { id: '8', user: 'Kabelo T.', text: 'Love the energy', secondsAgo: 47 },
+  { id: '9', user: 'Nosipho M.', text: 'Can you wave at us?', secondsAgo: 55 },
+  { id: '10', user: 'Thandiwe P.', text: 'More angles please', secondsAgo: 62 },
+];
 
 interface LivePlayerProps {
   videoId: string;
   title: string;
   channelName: string;
   isLive: boolean;
+  visible: boolean;
+  onClose: () => void;
+  isLoggedIn: boolean;
 }
 
-export default function LivePlayer({ videoId, title, channelName, isLive }: LivePlayerProps) {
+export default function LivePlayer({
+  videoId,
+  title,
+  channelName,
+  isLive,
+  visible,
+  onClose,
+  isLoggedIn,
+}: LivePlayerProps) {
   const theme = useTheme();
-  const [fullscreen, setFullscreen] = useState(false);
+  const [embedError, setEmbedError] = useState(false);
+  const [viewerCount] = useState(Math.floor(Math.random() * 500) + 50);
+  const [comments, setComments] = useState(MOCK_COMMENTS);
+  const [liked, setLiked] = useState(false);
+  const flatListRef = useRef<FlatList>(null);
 
-  const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&playsinline=1`;
+  // Simulate new comment every 8-15 seconds
+  useEffect(() => {
+    if (!visible) return;
+    const interval = setInterval(() => {
+      const newComment = {
+        id: `c${Date.now()}`,
+        user: ['User123', 'Anonymous', 'LiveViewer'][Math.floor(Math.random() * 3)],
+        text: ['Nice!', 'Keep going', 'Wow', 'Amazing'][Math.floor(Math.random() * 4)],
+        secondsAgo: 1,
+      };
+      setComments((prev) => [newComment, ...prev.slice(0, 9)]);
+      // Update seconds every second
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [visible]);
 
-  const openFullscreen = useCallback(() => setFullscreen(true), []);
-  const closeFullscreen = useCallback(() => setFullscreen(false), []);
+  // Update timestamps every second
+  useEffect(() => {
+    if (!visible) return;
+    const tick = setInterval(() => {
+      setComments((prev) =>
+        prev.map((c) => ({ ...c, secondsAgo: c.secondsAgo + 1 }))
+      );
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [visible]);
+
+  const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&playsinline=1&modestbranding=1&rel=0&showinfo=0&controls=0&loop=1`;
+
+  const handleWebViewError = useCallback(() => setEmbedError(true), []);
+
+  const handleOpenInYouTube = useCallback(() => {
+    Linking.openURL(`https://www.youtube.com/watch?v=${videoId}`);
+  }, [videoId]);
+
+  const formatTime = (seconds: number) => {
+    if (seconds < 60) return `${seconds}s ago`;
+    const mins = Math.floor(seconds / 60);
+    return `${mins}m ago`;
+  };
 
   return (
-    <>
-      {/* Mini‑player (shown inline) */}
-      <TouchableOpacity
-        style={[styles.miniContainer, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}
-        onPress={openFullscreen}
-        activeOpacity={0.9}
-      >
-        <View style={styles.miniPlayer}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      supportedOrientations={['portrait']}
+      onRequestClose={onClose}
+    >
+      <StatusBar hidden />
+      <View style={styles.fullScreen}>
+        {/* Video layer */}
+        {!embedError ? (
           <WebView
             source={{ uri: embedUrl }}
-            style={styles.miniWebView}
+            style={styles.webView}
             javaScriptEnabled
             domStorageEnabled
             allowsInlineMediaPlayback
             mediaPlaybackRequiresUserAction={false}
+            onError={handleWebViewError}
+            allowsFullscreenVideo
           />
-        </View>
-        <View style={styles.miniInfo}>
-          <Text style={[styles.miniTitle, { color: theme.colors.text }]} numberOfLines={1}>
-            {title}
-          </Text>
-          <Text style={[styles.miniChannel, { color: theme.colors.textSecondary }]}>
-            {channelName}
-          </Text>
-        </View>
-        <TouchableOpacity style={styles.expandButton} onPress={openFullscreen}>
-          <Ionicons name="expand" size={20} color={theme.colors.text} />
-        </TouchableOpacity>
-      </TouchableOpacity>
-
-      {/* Full‑screen modal */}
-      <Modal visible={fullscreen} animationType="slide" supportedOrientations={['portrait', 'landscape']}>
-        <View style={[styles.fullscreenContainer, { backgroundColor: '#000' }]}>
-          <View style={styles.fullscreenHeader}>
-            <TouchableOpacity onPress={closeFullscreen} style={styles.closeButton}>
-              <Ionicons name="close" size={28} color="#FFFFFF" />
+        ) : (
+          <View style={styles.errorContainer}>
+            <Ionicons name="videocam-off-outline" size={64} color={theme.colors.textSecondary} />
+            <Text style={[styles.errorTitle, { color: theme.colors.text }]}>
+              Stream Unavailable
+            </Text>
+            <Text style={[styles.errorMessage, { color: theme.colors.textSecondary }]}>
+              This video cannot be played inside the app.{'\n'}You can watch it on YouTube.
+            </Text>
+            <TouchableOpacity
+              style={[styles.openYouTubeButton, { backgroundColor: theme.colors.primary }]}
+              onPress={handleOpenInYouTube}
+            >
+              <Ionicons name="logo-youtube" size={20} color="#FFFFFF" />
+              <Text style={styles.openYouTubeText}>Open in YouTube</Text>
             </TouchableOpacity>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.fullscreenTitle} numberOfLines={1}>{title}</Text>
-              <Text style={styles.fullscreenChannel}>{channelName}</Text>
-            </View>
-            {isLive && (
-              <View style={styles.fullscreenLiveBadge}>
-                <Ionicons name="radio" size={12} color="#FFFFFF" />
-                <Text style={styles.fullscreenLiveText}>LIVE</Text>
+          </View>
+        )}
+
+        {/* Glass top bar */}
+        <BlurView intensity={80} tint="dark" style={styles.glassHeader}>
+          <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+            <Ionicons name="close" size={28} color="#FFFFFF" />
+          </TouchableOpacity>
+          <View style={styles.headerInfo}>
+            <Text style={styles.channelNameText} numberOfLines={1}>{channelName}</Text>
+            <Text style={styles.titleText} numberOfLines={1}>{title}</Text>
+          </View>
+          <View style={styles.livePill}>
+            <View style={styles.liveDot} />
+            <Text style={styles.livePillText}>LIVE</Text>
+            <Text style={styles.viewerCount}>{viewerCount}</Text>
+          </View>
+        </BlurView>
+
+        {/* Comments overlay */}
+        <View style={styles.commentsContainer}>
+          <FlatList
+            ref={flatListRef}
+            data={comments}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <View style={styles.commentBubble}>
+                <View style={styles.commentHeader}>
+                  <Text style={styles.commentUser}>{item.user}</Text>
+                  <Text style={styles.commentTime}>{formatTime(item.secondsAgo)}</Text>
+                </View>
+                <Text style={styles.commentText}>{item.text}</Text>
               </View>
             )}
-          </View>
-          <WebView
-            source={{ uri: embedUrl }}
-            style={styles.fullscreenWebView}
-            javaScriptEnabled
-            domStorageEnabled
-            allowsInlineMediaPlayback={false}
-            mediaPlaybackRequiresUserAction={false}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.commentsList}
+            inverted={false}
+            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
           />
+
+          {/* Comment input bar */}
+          <BlurView intensity={60} tint="dark" style={styles.commentInputBar}>
+            {isLoggedIn ? (
+              <>
+                <Ionicons name="happy-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.commentPlaceholder}>Add a comment…</Text>
+                <TouchableOpacity onPress={() => setLiked(!liked)} style={styles.heartButton}>
+                  <Ionicons
+                    name={liked ? 'heart' : 'heart-outline'}
+                    size={22}
+                    color={liked ? '#FF1744' : '#FFFFFF'}
+                  />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Ionicons name="lock-closed" size={18} color="#999999" />
+                <Text style={styles.loginToCommentText}>Login to comment</Text>
+                <TouchableOpacity onPress={() => setLiked(!liked)} style={styles.heartButton}>
+                  <Ionicons
+                    name={liked ? 'heart' : 'heart-outline'}
+                    size={22}
+                    color={liked ? '#FF1744' : '#FFFFFF'}
+                  />
+                </TouchableOpacity>
+              </>
+            )}
+          </BlurView>
         </View>
-      </Modal>
-    </>
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  // Mini‑player
-  miniContainer: {
-    flexDirection: 'row',
+  fullScreen: { flex: 1, backgroundColor: '#000' },
+  webView: { flex: 1 },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 8,
-    marginBottom: 16,
+    padding: 32,
+    backgroundColor: '#0A0A0A',
   },
-  miniPlayer: {
-    width: 120,
-    height: 68,
-    borderRadius: 8,
-    overflow: 'hidden',
-    marginRight: 12,
-  },
-  miniWebView: {
-    flex: 1,
-  },
-  miniInfo: {
-    flex: 1,
-  },
-  miniTitle: {
+  errorTitle: { fontSize: 20, fontFamily: 'DMSans-Bold', marginTop: 16, marginBottom: 8 },
+  errorMessage: {
     fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 4,
+    fontFamily: 'DMSans-Regular',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
   },
-  miniChannel: {
-    fontSize: 12,
-  },
-  expandButton: {
-    padding: 8,
-  },
-
-  // Full‑screen
-  fullscreenContainer: {
-    flex: 1,
-  },
-  fullscreenHeader: {
+  openYouTubeButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 8,
+  },
+  openYouTubeText: { color: '#FFFFFF', fontSize: 16, fontFamily: 'DMSans-Bold' },
+
+  // Glass header
+  glassHeader: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 50,
     paddingHorizontal: 16,
-    paddingTop: 48,
     paddingBottom: 12,
-    backgroundColor: '#000',
     gap: 12,
   },
-  closeButton: {
-    padding: 4,
-  },
-  fullscreenTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  fullscreenChannel: {
-    color: '#AAAAAA',
-    fontSize: 13,
-  },
-  fullscreenLiveBadge: {
+  closeBtn: { padding: 4 },
+  headerInfo: { flex: 1 },
+  channelNameText: { color: '#FFFFFF', fontSize: 16, fontFamily: 'DMSans-Bold' },
+  titleText: { color: '#CCCCCC', fontSize: 13, fontFamily: 'DMSans-Regular' },
+  livePill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#FF4757',
+    backgroundColor: '#FF1744',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
   },
-  fullscreenLiveText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: 'bold',
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#FFFFFF' },
+  livePillText: { color: '#FFFFFF', fontSize: 12, fontFamily: 'DMSans-Bold' },
+  viewerCount: { color: '#FFFFFF', fontSize: 11, fontFamily: 'DMSans-Regular', marginLeft: 4 },
+
+  // Comments
+  commentsContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 12,
+    paddingBottom: 20,
+    maxHeight: '45%',
   },
-  fullscreenWebView: {
+  commentsList: {
+    paddingBottom: 8,
+  },
+  commentBubble: {
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 6,
+    alignSelf: 'flex-start',
+    maxWidth: SCREEN_WIDTH * 0.75,
+  },
+  commentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
+    gap: 8,
+  },
+  commentUser: {
+    color: '#CCCCCC',
+    fontSize: 12,
+    fontFamily: 'DMSans-Bold',
+  },
+  commentTime: {
+    color: '#888888',
+    fontSize: 10,
+    fontFamily: 'DMSans-Regular',
+  },
+  commentText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontFamily: 'DMSans-Regular',
+  },
+  commentInputBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    gap: 8,
+  },
+  commentPlaceholder: {
     flex: 1,
+    color: '#999999',
+    fontSize: 14,
+    fontFamily: 'DMSans-Regular',
+  },
+  loginToCommentText: {
+    flex: 1,
+    color: '#999999',
+    fontSize: 14,
+    fontFamily: 'DMSans-Regular',
+    fontStyle: 'italic',
+  },
+  heartButton: {
+    padding: 4,
   },
 });

@@ -1,7 +1,7 @@
 // app/(stack)/safety.tsx
-// Phase 4 – Safety Hub: map-first hybrid navigator with draggable bottom sheet
+// Beta 4 – Safety Hub: map-first with repositioned sheet, incident markers, tap‑to‑zoom, custom user icon
 
-import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -18,9 +18,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "@/contexts";
-import { useLocation } from "@/hooks/useLocation";
+import { useLocationContext } from "@/contexts/LocationContext";
 import { useLocalAlerts } from "@/hooks/useLocalAlerts";
-import { Typography, Spacing, BorderRadius, Shadows } from "@/config/theme";
+import { Typography, Spacing, Shadows } from "@/config/theme";
 import { HazardReportModal } from "@/components/hub/HazardReportModal";
 import {
   fetchHazards,
@@ -28,9 +28,57 @@ import {
   voteHazardStillThere,
 } from "@/services/map/mapService";
 import type { MapMarker } from "@/services/map";
-import type { LocalReport } from "@/types/news";
 
-// --- helpers (reused from map.tsx) ---
+// ---------- constants ----------
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+const SHEET_MIN_HEIGHT = 60;
+const SHEET_MAX_HEIGHT = SCREEN_HEIGHT * 0.4;
+const FAB_OFFSET = 80; // space reserved for home FAB
+const REPORT_FAB_BOTTOM = 150; // above the sheet when expanded
+
+// custom user icon component
+function UserLocationMarker() {
+  return (
+    <View style={userMarkerStyles.wrapper}>
+      <View style={userMarkerStyles.outer}>
+        <Ionicons name="shield" size={20} color="#FFFFFF" />
+      </View>
+      <View style={userMarkerStyles.arrow} />
+    </View>
+  );
+}
+
+const userMarkerStyles = StyleSheet.create({
+  wrapper: { alignItems: "center", justifyContent: "center" },
+  outer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#1E88E5",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  arrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 8,
+    borderLeftColor: "transparent",
+    borderRightColor: "transparent",
+    borderTopColor: "#1E88E5",
+    marginTop: -1,
+  },
+});
+
+// ---------- marker color helper ----------
 const getMarkerColor = (marker: MapMarker): string => {
   if (marker.type === 'tip') return '#9C27B0';
   if (marker.type === 'hazard') return '#FF6D00';
@@ -39,14 +87,9 @@ const getMarkerColor = (marker: MapMarker): string => {
     case 'critical': return '#FF1744';
     case 'high': return '#FF5722';
     case 'medium': return '#FFC107';
-    case 'low':
     default: return '#4CAF50';
   }
 };
-
-const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get("window");
-const SHEET_MIN_HEIGHT = 60;
-const SHEET_MAX_HEIGHT = SCREEN_HEIGHT * 0.45;
 
 export default function SafetyHubScreen() {
   const { colors } = useTheme();
@@ -57,17 +100,16 @@ export default function SafetyHubScreen() {
     deviceLocation,
     permissionStatus,
     refresh: refreshLocation,
-  } = useLocation();
+  } = useLocationContext();
   const { alerts: nearMeReports, refresh: refreshNearMe } = useLocalAlerts();
   const [hazardMarkers, setHazardMarkers] = useState<MapMarker[]>([]);
   const [hazardModalVisible, setHazardModalVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'myArea' | 'national'>('myArea');
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const sheetAnim = useRef(new Animated.Value(0)).current;
 
-  // --- draggable sheet ---
+  // ---------- draggable sheet ----------
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 10,
@@ -97,7 +139,7 @@ export default function SafetyHubScreen() {
     }).start();
   };
 
-  // --- map data ---
+  // ---------- load hazards ----------
   const loadHazards = useCallback(async () => {
     const data = await fetchHazards();
     if (data) {
@@ -112,7 +154,7 @@ export default function SafetyHubScreen() {
         timestamp: h.created_at,
         matchedLocation: h.location_name || 'Unknown',
         confidence: 'exact' as const,
-        category: h.category || 'other', // added category
+        category: h.category || 'other',
       })));
     }
   }, []);
@@ -121,8 +163,9 @@ export default function SafetyHubScreen() {
     useCallback(() => {
       refreshLocation();
       loadHazards();
+      refreshNearMe();
       setIsLoading(false);
-    }, [refreshLocation, loadHazards])
+    }, [refreshLocation, loadHazards, refreshNearMe])
   );
 
   const handleVoteCleared = async (hazardId: string) => {
@@ -133,6 +176,38 @@ export default function SafetyHubScreen() {
   const handleVoteStillThere = async (hazardId: string) => {
     await voteHazardStillThere(hazardId);
     loadHazards();
+  };
+
+  // ---------- incident markers from local alerts ----------
+  const incidentMarkers: MapMarker[] = nearMeReports.map((r) => ({
+    id: r.id,
+    latitude: r.latitude,
+    longitude: r.longitude,
+    title: r.description,
+    description: r.description,
+    type: 'nearme' as const,
+    severity: 'medium' as const,
+    timestamp: r.createdAt,
+    matchedLocation: r.locationName,
+    confidence: 'city' as const,
+    category: r.category,
+  }));
+
+  const allMarkers = [...hazardMarkers, ...incidentMarkers];
+
+  const handleSheetItemPress = (item: any) => {
+    if (item.latitude && item.longitude && mapRef.current) {
+      mapRef.current.animateToRegion(
+        {
+          latitude: item.latitude,
+          longitude: item.longitude,
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.005,
+        },
+        600
+      );
+      setSelectedId(item.id);
+    }
   };
 
   if (isLoading) {
@@ -148,7 +223,6 @@ export default function SafetyHubScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Map */}
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -158,12 +232,25 @@ export default function SafetyHubScreen() {
           latitudeDelta: 0.05,
           longitudeDelta: 0.05,
         }}
-        showsUserLocation={permissionStatus === 'granted'}
-        followsUserLocation={viewMode === 'myArea'}
+        showsUserLocation={false}
+        followsUserLocation={false}
         showsMyLocationButton={false}
-        mapPadding={{ top: 0, right: 0, bottom: sheetExpanded ? SHEET_MAX_HEIGHT : SHEET_MIN_HEIGHT, left: 0 }}
+        mapPadding={{
+          top: 0,
+          right: 0,
+          bottom: sheetExpanded ? SHEET_MAX_HEIGHT + FAB_OFFSET : SHEET_MIN_HEIGHT + FAB_OFFSET,
+          left: 0,
+        }}
       >
-        {hazardMarkers.map((marker) => (
+        {/* Custom user location marker */}
+        {userLat && userLng && (
+          <Marker coordinate={{ latitude: userLat, longitude: userLng }} anchor={{ x: 0.5, y: 1 }}>
+            <UserLocationMarker />
+          </Marker>
+        )}
+
+        {/* Hazard and incident markers */}
+        {allMarkers.map((marker) => (
           <Marker
             key={marker.id}
             coordinate={{ latitude: marker.latitude, longitude: marker.longitude }}
@@ -174,21 +261,23 @@ export default function SafetyHubScreen() {
               <Callout tooltip onPress={() => setSelectedId(null)}>
                 <View style={[styles.callout, { backgroundColor: colors.surface }]}>
                   <Text style={[styles.calloutTitle, { color: colors.text }]}>{marker.title}</Text>
-                  {marker.description && (
+                  {marker.description ? (
                     <Text style={[styles.calloutDescription, { color: colors.textSecondary }]} numberOfLines={2}>
                       {marker.description}
                     </Text>
+                  ) : null}
+                  {marker.type === 'hazard' && (
+                    <View style={styles.voteRow}>
+                      <TouchableOpacity style={styles.voteButton} onPress={() => handleVoteCleared(marker.id)}>
+                        <Ionicons name="close-circle" size={18} color="#FF1744" />
+                        <Text style={[styles.voteText, { color: '#FF1744' }]}>Cleared</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.voteButton} onPress={() => handleVoteStillThere(marker.id)}>
+                        <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
+                        <Text style={[styles.voteText, { color: '#4CAF50' }]}>Still there</Text>
+                      </TouchableOpacity>
+                    </View>
                   )}
-                  <View style={styles.voteRow}>
-                    <TouchableOpacity style={styles.voteButton} onPress={() => handleVoteCleared(marker.id)}>
-                      <Ionicons name="close-circle" size={18} color="#FF1744" />
-                      <Text style={[styles.voteText, { color: '#FF1744' }]}>Cleared</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.voteButton} onPress={() => handleVoteStillThere(marker.id)}>
-                      <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
-                      <Text style={[styles.voteText, { color: '#4CAF50' }]}>Still there</Text>
-                    </TouchableOpacity>
-                  </View>
                 </View>
               </Callout>
             )}
@@ -196,9 +285,9 @@ export default function SafetyHubScreen() {
         ))}
       </MapView>
 
-      {/* Report Button */}
+      {/* Report FAB */}
       <TouchableOpacity
-        style={[styles.reportFab, { backgroundColor: '#FF6D00' }]}
+        style={[styles.reportFab, { backgroundColor: '#FF6D00', bottom: REPORT_FAB_BOTTOM }]}
         onPress={() => setHazardModalVisible(true)}
       >
         <Ionicons name="add" size={28} color="#FFFFFF" />
@@ -211,6 +300,7 @@ export default function SafetyHubScreen() {
           {
             height: Animated.add(sheetAnim, new Animated.Value(SHEET_MIN_HEIGHT)),
             backgroundColor: colors.surface,
+            paddingBottom: FAB_OFFSET,
           },
         ]}
         {...panResponder.panHandlers}
@@ -222,9 +312,15 @@ export default function SafetyHubScreen() {
           </Text>
         </TouchableOpacity>
         <FlatList
-          data={[...nearMeReports.map(r => ({ id: r.id, title: r.description, description: r.description, type: 'nearme' })), ...hazardMarkers.map(h => ({ id: h.id, title: h.title, description: h.description || '', type: 'hazard' }))]}
+          data={[
+            ...nearMeReports.map(r => ({ id: r.id, title: r.description, description: r.description, type: 'nearme', latitude: r.latitude, longitude: r.longitude })),
+            ...hazardMarkers.map(h => ({ id: h.id, title: h.title, description: h.description || '', type: 'hazard', latitude: h.latitude, longitude: h.longitude }))
+          ]}
           renderItem={({ item }) => (
-            <View style={[styles.sheetItem, { borderBottomColor: colors.divider }]}>
+            <TouchableOpacity
+              style={[styles.sheetItem, { borderBottomColor: colors.divider }]}
+              onPress={() => handleSheetItemPress(item)}
+            >
               <Ionicons
                 name={item.type === 'hazard' ? 'warning' : 'information-circle'}
                 size={20}
@@ -236,7 +332,7 @@ export default function SafetyHubScreen() {
                   {item.description}
                 </Text>
               </View>
-            </View>
+            </TouchableOpacity>
           )}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
@@ -244,7 +340,6 @@ export default function SafetyHubScreen() {
         />
       </Animated.View>
 
-      {/* Hazard Report Modal */}
       <HazardReportModal
         visible={hazardModalVisible}
         onClose={() => setHazardModalVisible(false)}
@@ -260,7 +355,6 @@ const styles = StyleSheet.create({
   map: { flex: 1 },
   reportFab: {
     position: 'absolute',
-    bottom: 100,
     right: 16,
     width: 56,
     height: 56,

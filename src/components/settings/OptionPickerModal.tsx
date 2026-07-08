@@ -1,8 +1,5 @@
 // src/components/settings/OptionPickerModal.tsx
-/**
- * iOS-style option picker modal
- * Shows a list of options with checkmark on selected
- */
+// Beta 4 – iOS-style option picker modal that respects theme
 
 import React from 'react';
 import {
@@ -15,7 +12,8 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors, Typography, Spacing } from '@/config/theme';
+import { useTheme } from '@/contexts';
+import { Typography, Spacing } from '@/config/theme';
 
 export interface PickerOption<T> {
   value: T;
@@ -41,7 +39,8 @@ export function OptionPickerModal<T>({
   selectedValue,
   onSelect,
 }: OptionPickerModalProps<T>) {
-  
+  const { colors } = useTheme();
+
   const handleSelect = (value: T) => {
     onSelect(value);
     onClose();
@@ -54,13 +53,13 @@ export function OptionPickerModal<T>({
       presentationStyle="pageSheet"
       onRequestClose={onClose}
     >
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: colors.divider }]}>
           <View style={styles.headerSpacer} />
-          <Text style={styles.title}>{title}</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
           <Pressable onPress={onClose} style={styles.closeButton}>
-            <Ionicons name="close-circle" size={28} color={Colors.carbon.silver} />
+            <Ionicons name="close-circle" size={28} color={colors.textSecondary} />
           </Pressable>
         </View>
 
@@ -68,45 +67,44 @@ export function OptionPickerModal<T>({
         <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
           {options.map((option, index) => {
             const isSelected = option.value === selectedValue;
-            
+
             return (
               <Pressable
                 key={String(option.value)}
                 style={({ pressed }) => [
                   styles.option,
-                  pressed && styles.optionPressed,
+                  { backgroundColor: colors.surface, borderBottomColor: colors.divider },
+                  pressed && { backgroundColor: colors.border },
                   index < options.length - 1 && styles.optionBorder,
                 ]}
                 onPress={() => handleSelect(option.value)}
               >
                 {option.icon && (
                   <View style={styles.optionIcon}>
-                    <Ionicons 
-                      name={option.icon} 
-                      size={22} 
-                      color={isSelected ? Colors.semantic.primary : Colors.carbon.silver} 
+                    <Ionicons
+                      name={option.icon}
+                      size={22}
+                      color={isSelected ? colors.primary : colors.textSecondary}
                     />
                   </View>
                 )}
-                
+
                 <View style={styles.optionText}>
                   <Text style={[
                     styles.optionLabel,
-                    isSelected && styles.optionLabelSelected,
+                    { color: isSelected ? colors.primary : colors.text },
                   ]}>
                     {option.label}
                   </Text>
                   {option.subtitle && (
-                    <Text style={styles.optionSubtitle}>{option.subtitle}</Text>
+                    <Text style={[styles.optionSubtitle, { color: colors.textSecondary }]}>
+                      {option.subtitle}
+                    </Text>
                   )}
                 </View>
-                
+
                 {isSelected && (
-                  <Ionicons 
-                    name="checkmark-circle" 
-                    size={24} 
-                    color={Colors.semantic.primary} 
-                  />
+                  <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
                 )}
               </Pressable>
             );
@@ -118,10 +116,7 @@ export function OptionPickerModal<T>({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.carbon.black,
-  },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -129,60 +124,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.carbon.charcoal,
   },
-  headerSpacer: {
-    width: 28,
-  },
+  headerSpacer: { width: 28 },
   title: {
-    color: Colors.carbon.white,
     fontSize: Typography.sizes.heading,
     fontFamily: Typography.fonts.bold,
   },
-  closeButton: {
-    padding: Spacing.xs,
-  },
-  list: {
-    flex: 1,
-  },
-  listContent: {
-    padding: Spacing.md,
-  },
+  closeButton: { padding: Spacing.xs },
+  list: { flex: 1 },
+  listContent: { padding: Spacing.md },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.carbon.charcoal,
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.md,
     minHeight: 60,
-  },
-  optionPressed: {
-    backgroundColor: Colors.carbon.steel,
-  },
-  optionBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: Colors.carbon.steel,
   },
   optionIcon: {
     width: 36,
     marginRight: Spacing.sm,
     alignItems: 'center',
   },
-  optionText: {
-    flex: 1,
-  },
+  optionText: { flex: 1 },
   optionLabel: {
-    color: Colors.carbon.white,
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.medium,
   },
-  optionLabelSelected: {
-    color: Colors.semantic.primary,
-  },
   optionSubtitle: {
-    color: Colors.carbon.silver,
     fontSize: Typography.sizes.caption,
     fontFamily: Typography.fonts.regular,
     marginTop: 2,
   },
+  optionBorder: {},
 });

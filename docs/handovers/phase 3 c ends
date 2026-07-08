@@ -1,0 +1,252 @@
+# CSHAD iSentinel News — Beta 4 Checkpoint Handover
+
+**Date:** 08 July 2026  
+**Purpose:** Complete snapshot of the project after the Beta 4 “July Build” Phase 1–3, including what’s done, what’s pending, known issues, and the roadmap forward.
+
+---
+
+## 1. PROJECT IDENTITY & CURRENT STATE
+
+| Item | Detail |
+|------|--------|
+| App Name | CSHAD iSentinel News |
+| Package name | `cshad.isentinel.news` |
+| Current version | `1.265.0` (in `app.config.ts`, not yet built as a tag) |
+| Current version code | `7` (next preview should bump to `8`) |
+| Active branch | `beta4` |
+| Repository | `https://github.com/Shaunpetro/cshad-isentinel` |
+| **Active EAS project** | ID `ce9ad511-1168-4d71-941d-35a5f4214892`, slug `cshadnews`, owner `shaunatg-2` (petrographics.adm@gmail.com) |
+| Original EAS project | ID `41d9d284-b014-48ab-9238-fe2c0724fd98` (quota exhausted) |
+| Supabase URL | `https://vitkuegjjopikdovklcb.supabase.co` |
+| Firebase project | CSHAD-news (exposed key revoked; new key not yet used) |
+| Play Console | Production live (version code 9 from Beta 3) |
+| Keystore | Original keystore from old EAS project transferred to new project; production AAB signed correctly |
+
+---
+
+## 2. HOW WE WORK — THE IMMUTABLE WORKFLOW (unchanged)
+
+1. **Discuss & Design** – Developer describes the goal; AI asks clarifying questions, stress‑tests, and proposes a concrete plan with files to touch.  
+2. **Confirm** – Developer approves before any code is written.  
+3. **Implement** – AI provides **full‑file replacements** (never partial edits unless 1–2 lines). Every file starts with `// path/to/file`.  
+4. **Test Locally** – `npx tsc --noEmit` must pass; optional dev client test.  
+5. **Commit & Push** – Every logical change gets its own commit with a descriptive message.  
+6. **Ship** – Build via `eas build` (preview APK for testing, production AAB for Play Store). OTA updates for JS‑only patches (channel still not configured).
+
+### Moving between betas:
+- Copy previous beta directory → new directory (e.g., `beta3` → `beta4`).
+- Create new branch (`beta4`).
+- Verify base: TypeScript clean, APK builds.
+- Add new features one by one.
+- Previous beta directory left untouched as fallback.
+
+---
+
+## 3. THE 15 MASTER RULES (always in effect)
+
+1. Never delete or create files without confirmation.  
+2. Always check existing file content before modifying.  
+3. Commit after every logical change.  
+4. Atomic package updates.  
+5. All tools/services must be free and work from South Africa.  
+6. Pre‑verify commands before file‑modifying operations.  
+7. Stop and fix the entire step on failure.  
+8. Full‑file replacements unless only 1–2 lines change.  
+9. Tokens/keys are ephemeral – never paste real secrets.  
+10. Never use the old package name `com.atg.pshad.sentinel`.  
+11. Setup instructions must be step‑by‑step, newbie‑friendly.  
+12. Every file must have its project‑relative path as a first‑line comment.  
+13. If the first‑line comment doesn’t match the actual path, fix it immediately.  
+14. Dependencies must be reproducible from scratch.  
+15. All environment variables and secrets must be in `.env.example`.
+
+---
+
+## 4. BETA 4 — WHAT’S BEEN BUILT (COMPLETED)
+
+### 4.1 Architecture & Navigation
+- **Removed** the bottom‑tab navigator.
+- **Built** a Stack‑based layout (`app/(stack)/_layout.tsx`) with a single **Home screen** as the entry point.
+- All existing screens (News, Opportunities, Map, Safety, Settings, Live, Incidents) are pushable from the home screen.
+- **LocationContext** (`src/contexts/LocationContext.tsx`) created and wrapped around the entire app in `app/_layout.tsx`. Every screen reads city, radius, and scope from one shared source. Changes on Home, News, or Settings sync instantly across all.
+
+### 4.2 Home Screen (`app/(stack)/index.tsx`)
+- **Top bar** – CSHAD logo (left), LIVE button with pulsing icon (centre), settings gear (right).
+- **Integrated breaking news carousel** – city pill + radius pills are now **inside** the carousel card, above the headline. The headline auto‑slides every 45 seconds, loops infinitely, and fades between items. The carousel is compact and no longer blocks the rest of the home screen.
+- **FavoritesFeed** and **SectionNavigator** preserved.
+- All state comes from `LocationContext`; no direct `useLocation` calls.
+
+### 4.3 News Screen (`app/(stack)/news.tsx`)
+- **Unified `LocationRadiusBar`** replaces the old `LocationHeader`, `ScopeSelector`, `NewsStats`, and results bar.
+- **General tab** shows `WeatherCard` (current conditions), time filter, and news list.
+- **Local Alerts tab** now shows:
+  - `WeatherCard` (current city)
+  - `InfrastructureCard` (live load‑shedding status from Eskom Calendar API, via new `useInfrastructure` hook)
+  - The existing community reports list
+- Uses `LocationContext`, `useCurrentWeather`, `useInfrastructure`, and `useLocalAlerts` – all tied to the shared city.
+- **Removed** the separate `BreakingNewsCarousel` (breaking news is on Home).
+
+### 4.4 Hooks Updated / Created
+- **`useCurrentWeather`** – now reads from `LocationContext`.
+- **`useLocalAlerts`** – now reads from `LocationContext`; fetches weather alerts + community reports for the current city.
+- **`useInfrastructure`** (new) – fetches load‑shedding status via `fetchLoadsheddingStatus()`.
+
+### 4.5 Safety Hub (`app/(stack)/safety.tsx`)
+- **Map‑first hybrid navigator** with `followsUserLocation` (smoothly tracks user movement, not locked to roads).
+- Hazard markers with voting (Cleared/Still There) via callouts.
+- Floating “Report” button opens `HazardReportModal` at the user’s live, smoothed location.
+- Draggable bottom sheet listing local incidents and hazards.
+
+### 4.6 Live Hub (`app/(stack)/live.tsx`)
+- Screen was already built; we **hardcoded** YouTube demo streams into `liveService.ts` (2 live streams, 6 sports podcasts, 1 news analysis video).
+- In‑app player (`LivePlayer`) with WebView and full‑screen modal.
+- Mini‑player bar for background listening.
+
+### 4.7 Article Detail (`app/(stack)/article/[id].tsx`)
+- Displays the **full summary** with larger, well‑spaced text.
+- “Read Full Article” button opens the original source in an in‑app browser.
+- Media placeholder ready for future scraper enhancements.
+
+### 4.8 Infrastructure & Dependencies
+- `babel-preset-expo` pinned to `~55.0.22` (SDK 55 compatible).
+- All extra Babel plugins removed; lock file regenerated with all required dev dependencies.
+- OpenWeatherMap key rotated; Firebase service account key revoked and purged from Git history.
+
+---
+
+## 5. KNOWN BUGS & PENDING ITEMS
+
+| # | Issue | Status |
+|---|-------|--------|
+| 1 | **NewsCard truncation** – still uses `truncate(…,150)` and `numberOfLines={3}`, cutting content and showing “Continue reading”. | Not yet fixed |
+| 2 | **Media fallback** – `newsMapper.ts` does not extract images from RSS `enclosure`, `media:content`, or first `<img>`. Many cards lack thumbnails. | Not yet fixed |
+| 3 | **Logo size** – header logo still 40×40; needs to be increased to 75×50. | Not yet fixed |
+| 4 | **Premium toggle (Bug 1)** – applies to all categories, not just tenders; lock condition uses `is_premium` (always false). | Not yet fixed |
+| 5 | **Opportunities re‑seeding (Bug 2)** – GitHub Actions schedule and date parsing fix not yet applied to repository. | Code ready, not applied |
+| 6 | **Jobs filter (Bug 3)** – province mapping backfill and Adzuna scraper update not yet applied. | Code ready, not applied |
+| 7 | **Push notifications removal (Bug 7)** – temporary type assertions in `pushService.ts`; full removal pending. | Not yet fixed |
+| 8 | **OTA updates channel** – not configured in `eas.json`. | Not yet done |
+| 9 | **Feedback RLS policy** – must be run in Supabase SQL Editor. | Not yet done |
+| 10 | **Full glassmorphism UI pass** – theme tokens ready, but only partially applied. | Not yet done |
+| 11 | **Monetisation integrations** – Paystack/Stripe, sponsored content, subscriptions, affiliate shop. | Not started |
+| 12 | **YouTube Data API integration** – Live Hub still uses hardcoded demo data. | Not started |
+| 13 | **Personalised feed** – Home “For You” section still a placeholder. | Not started |
+| 14 | **Tender search (premium)** and **AI auto‑apply for jobs** – part of monetisation plan. | Not started |
+| 15 | **Version bump** – `app.config.ts` still shows `versionCode: 7`; needs bumping for next preview. | Not yet done |
+
+---
+
+## 6. FILE STRUCTURE (key changes)
+
+```
+app/
+├── _layout.tsx                         (wraps app with LocationProvider)
+├── (stack)/
+│   ├── _layout.tsx                     (stack navigator with header logo & live button)
+│   ├── index.tsx                       (Home – integrated carousel, favorites, section nav)
+│   ├── news.tsx                        (General + Local Alerts with widgets)
+│   ├── opportunities.tsx               (migrated, unchanged)
+│   ├── map.tsx                         (migrated, unchanged)
+│   ├── safety.tsx                      (new map-first safety hub)
+│   ├── settings.tsx                    (migrated, unchanged)
+│   ├── live.tsx                        (Live Hub)
+│   ├── incidents.tsx                   (migrated)
+│   └── article/[id].tsx               (improved article detail)
+
+src/
+├── contexts/
+│   ├── LocationContext.tsx              (NEW – shared city/radius/scope)
+│   └── ThemeContext.tsx
+├── hooks/
+│   ├── useCurrentWeather.ts            (updated – reads from LocationContext)
+│   ├── useLocalAlerts.ts               (updated – reads from LocationContext)
+│   ├── useInfrastructure.ts            (NEW – fetches load-shedding status)
+│   └── ... (others unchanged)
+├── components/
+│   ├── home/
+│   │   ├── BreakingNewsCarousel.tsx     (REPLACED – integrated location + radius + headline)
+│   │   ├── SectionNavigator.tsx
+│   │   └── FavoritesFeed.tsx
+│   ├── location/
+│   │   └── LocationRadiusBar.tsx        (NEW – shared city+radius bar for News screen)
+│   ├── news/
+│   │   ├── NewsCard.tsx                (needs truncation fix)
+│   │   └── BreakingNewsCarousel.tsx    (OLD – still used? Should be removed if not)
+│   └── ...
+└── services/
+    ├── live/
+    │   └── liveService.ts              (hardcoded demo streams)
+    └── ...
+```
+
+---
+
+## 7. ENVIRONMENT VARIABLES (`.env` & EAS)
+
+```
+EXPO_PUBLIC_SUPABASE_URL=https://vitkuegjjopikdovklcb.supabase.co
+EXPO_PUBLIC_SUPABASE_KEY=sb_publishable_3U3qzc6G-_boPVYTSXwBFg_qeZhPJCU
+EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyBhOSPYnYnoraCNu44xqtTw6C-_8KZF4ew
+EXPO_PUBLIC_OPENWEATHERMAP_API_KEY=<new rotated key>
+EXPO_PUBLIC_NEWS_API_KEY=93b5c1c881e141a4afd3e26f6657a87d
+EXPO_PUBLIC_FIREBASE_API_KEY=AIzaSyBCs_EmnXFv1wKV6hfupmd-uZGNhVoNk7I
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=pshad-sentinel-ihub.firebaseapp.com
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=pshad-sentinel-ihub
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=pshad-sentinel-ihub.firebasestorage.app
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=993330483619
+EXPO_PUBLIC_FIREBASE_APP_ID=1:993330483619:android:5d2c36fc9bd2b939754a16
+EXPO_PUBLIC_MAP_TILE_URL=https://tile.openstreetmap.org/{z}/{x}/{y}.png
+EXPO_PUBLIC_APP_ENV=development
+EXPO_PUBLIC_APP_VERSION=1.265.0
+```
+
+**GitHub Secrets** (for CI test builds):
+- `EXPO_TOKEN` (from shaunatg-2 account)
+- `GH_RELEASE_TOKEN` (classic PAT with `repo` scope)
+- `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_KEY`
+- `GOOGLE_MAPS_API_KEY`
+
+---
+
+## 8. BUILD & DEPLOY COMMANDS
+
+```powershell
+# TypeScript check
+npx tsc --noEmit
+
+# Preview APK (test)
+npx eas-cli build --platform android --profile preview --non-interactive
+
+# Production AAB (Play Store)
+npx eas-cli build --platform android --profile production --non-interactive
+
+# Check account & project
+eas whoami
+eas project:info
+
+# Trigger GitHub Actions test build (preview APK + GitHub Release)
+git tag v1.0.133-beta
+git push origin v1.0.133-beta
+```
+
+---
+
+## 9. NEXT STEPS (immediate priority)
+
+We need to finish the items that directly affect the home/news experience before moving to monetisation and the Live Hub API integration. Proposed order:
+
+1. **Fix NewsCard truncation** – remove `truncate`, increase `numberOfLines` to 4, show full summary.
+2. **Add media fallback** in `newsMapper.ts` – extract images from RSS enclosures, media:content, and first `<img>`.
+3. **Increase logo size** in `_layout.tsx` to 75×50.
+4. **Remove the old `BreakingNewsCarousel` from `components/news/`** if it’s no longer used, to avoid confusion.
+5. **Bump version code** to `8` and build a preview APK to test all changes.
+6. **Fix the premium toggle** (Bug 1) – restrict to tenders only, fix lock condition.
+7. **Apply the ready code for Bugs 2 & 3** (GH Actions, jobs filter).
+8. **Complete push notification removal** (Bug 7) and remove `expo-notifications` if no longer needed.
+9. **Configure OTA channel** in `eas.json`.
+
+After these, we can start the monetisation phase (Paystack/Stripe integration, sponsored content, tender search, AI auto‑apply).
+
+---
+
+**This is the complete Beta 4 checkpoint. We are aligned on what’s done, what’s left, and the exact order to proceed.**
