@@ -1,6 +1,5 @@
 // app/(stack)/_layout.tsx
-// Beta 4 – Responsive header: 80 px home (bold logo), 56 px other screens.
-// Status‑bar background matches header in both themes.
+// Beta 4 – Responsive header, home logo 84×56, user icon + settings on Live
 
 import React, { useEffect, useState } from 'react';
 import { Stack, useRouter, usePathname } from 'expo-router';
@@ -31,14 +30,13 @@ export default function StackLayout() {
   // ----- Dynamic header sizing -----
   const headerHeight = isHome ? 80 : 56;
   const logoStyle = isHome
-    ? { width: 105, height: 70 }
+    ? { width: 84, height: 56 }
     : { width: 60, height: 40 };
 
   const headerBg = theme.isDark ? theme.colors.background : '#FFFFFF';
 
   return (
     <>
-      {/* Local StatusBar – solid background matching header */}
       <StatusBar
         style={theme.isDark ? 'light' : 'dark'}
         backgroundColor={Platform.OS === 'android' ? headerBg : undefined}
@@ -86,9 +84,14 @@ export default function StackLayout() {
           headerRight: () => {
             if (isLive) {
               return (
-                <TouchableOpacity onPress={() => router.push('settings' as any)} style={{ marginRight: 8 }}>
-                  <Ionicons name="person-circle-outline" size={28} color={theme.colors.text} />
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 16, marginRight: 8 }}>
+                  <TouchableOpacity onPress={() => { /* handled by live screen */ }}>
+                    <Ionicons name="person-circle-outline" size={28} color={theme.colors.text} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => router.push('settings' as any)}>
+                    <Ionicons name="settings-outline" size={24} color={theme.colors.text} />
+                  </TouchableOpacity>
+                </View>
               );
             }
             return (
@@ -126,14 +129,14 @@ export default function StackLayout() {
         <Stack.Screen name="article/[id]" options={{ title: 'Article' }} />
       </Stack>
 
-      {/* Floating Home Button (only on non‑home screens) */}
+      {/* Floating Home Button */}
       {!isHome && (
         <TouchableOpacity
           onPress={() => router.navigate('/')}
-          style={[styles.fab, { backgroundColor: theme.glass.bg, borderColor: theme.glass.border }]}
+          style={[styles.fab, { backgroundColor: theme.pastel.blue, borderColor: theme.glass.border }]}
           activeOpacity={0.8}
         >
-          <Ionicons name="home" size={24} color={theme.colors.text} />
+          <Ionicons name="home" size={24} color={theme.colors.primary} />
         </TouchableOpacity>
       )}
     </>

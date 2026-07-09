@@ -56,7 +56,6 @@ function RootLayoutInner() {
 
   if (!isReady) return null;
 
-  // Dynamic status bar background for dark mode
   const statusBarBg = isDark ? colors.background : '#FFFFFF';
 
   return (
@@ -83,7 +82,7 @@ export default function RootLayout() {
     <I18nextProvider i18n={i18n}>
       <ThemeProvider>
         <ErrorBoundary>
-          <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }} edges={["top"]}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }} edges={["bottom"]}>
             <RootLayoutInner />
           </SafeAreaView>
         </ErrorBoundary>

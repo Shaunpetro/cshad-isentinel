@@ -1,8 +1,16 @@
 // src/components/home/BreakingNewsCarousel.tsx
-// Beta 4 – Breaking news card with image, city & radius dropdowns, auto‑sliding headline
+// Beta 4 – Breaking news carousel with section header, swipeable headlines, city & radius controls
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Animated,
+  Dimensions,
+  FlatList,
+} from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -11,9 +19,11 @@ import RadiusPickerModal from '../location/RadiusPickerModal';
 import type { NewsItem } from '../../types';
 import type { SACity } from '@/services/location';
 
+const RADIUS_OPTIONS = [5, 10, 25, 50, 100];
 const SLIDE_INTERVAL = 45000;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_HORIZONTAL_PADDING = 32;
+const CARD_WIDTH = SCREEN_WIDTH - 64; // 32px padding on each side
+const ITEM_WIDTH = CARD_WIDTH; // each item fills the card width
 
 interface Props {
   articles: NewsItem[];
@@ -36,8 +46,9 @@ export default function BreakingNewsCarousel({
   const router = useRouter();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [radiusVisible, setRadiusVisible] = useState(false);
-  const slideAnim = useRef(new Animated.Value(1)).current;
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const flatListRef = useRef<FlatList<NewsItem>>(null);
+  const autoSlideTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isUserInteracting = useRef(false);
 
   const handleArticlePress = useCallback(
     (article: NewsItem) => {
@@ -46,49 +57,75 @@ export default function BreakingNewsCarousel({
     [router]
   );
 
+  // Auto‑slide logic
   useEffect(() => {
     if (!articles || articles.length === 0) return;
-    setCurrentIndex(0);
-    if (timerRef.current) clearInterval(timerRef.current);
+    if (autoSlideTimer.current) clearInterval(autoSlideTimer.current);
 
-    timerRef.current = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % articles.length);
-      Animated.sequence([
-        Animated.timing(slideAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
-        Animated.timing(slideAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
-      ]).start();
+    autoSlideTimer.current = setInterval(() => {
+      if (isUserInteracting.current) return;
+      setCurrentIndex((prev) => {
+        const next = (prev + 1) % articles.length;
+        flatListRef.current?.scrollToIndex({ index: next, animated: true });
+        return next;
+      });
     }, SLIDE_INTERVAL);
 
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (autoSlideTimer.current) clearInterval(autoSlideTimer.current);
     };
   }, [articles]);
+
+  const onScrollBeginDrag = () => { isUserInteracting.current = true; };
+  const onScrollEndDrag = () => {
+    // Resume auto‑slide after a short delay
+    setTimeout(() => { isUserInteracting.current = false; }, 3000);
+  };
+
+  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
+    if (viewableItems && viewableItems.length > 0) {
+      setCurrentIndex(viewableItems[0].index);
+    }
+  }).current;
 
   if (isLoading || !articles || articles.length === 0) {
     return null;
   }
 
-  const currentArticle = articles[currentIndex];
-  const hasImage = !!currentArticle.imageUrl;
+  const renderItem = ({ item }: { item: NewsItem }) => {
+    const hasImage = !!item.imageUrl;
+    return (
+      <TouchableOpacity
+        style={[styles.itemContainer, { backgroundColor: theme.colors.card || theme.colors.surface }]}
+        onPress={() => handleArticlePress(item)}
+        activeOpacity={0.9}
+      >
+        {hasImage && (
+          <Image source={{ uri: item.imageUrl }} style={styles.thumbnail} contentFit="cover" />
+        )}
+        <View style={styles.headlineTextContainer}>
+          <Text style={[styles.itemTitle, { color: theme.colors.text }]} numberOfLines={3}>
+            {item.title}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
-    <>
-      <View
-        style={[
-          styles.container,
-          {
-            backgroundColor: theme.colors.card || theme.colors.surface,
-            borderColor: theme.colors.border,
-          },
-        ]}
-      >
-        {/* Top bar: city pill + radius dropdown */}
+    <View style={styles.wrapper}>
+      {/* Section header */}
+      <Text style={[styles.sectionHeader, { color: theme.colors.text }]}>
+        🚨 Breaking News
+      </Text>
+
+      {/* Card */}
+      <View style={[styles.card, { backgroundColor: theme.colors.card || theme.colors.surface, borderColor: theme.colors.border }]}>
+        {/* Controls row: city pill + radius dropdown */}
         <View style={styles.controlsRow}>
-          {/* City pill */}
           <TouchableOpacity
             style={[styles.cityPill, { borderColor: theme.colors.border }]}
             onPress={onCityPress}
-            activeOpacity={0.7}
           >
             <Ionicons name="location" size={14} color={theme.colors.primary} />
             <Text style={[styles.pillText, { color: theme.colors.text }]} numberOfLines={1}>
@@ -97,11 +134,9 @@ export default function BreakingNewsCarousel({
             <Ionicons name="chevron-down" size={12} color={theme.colors.textSecondary} />
           </TouchableOpacity>
 
-          {/* Radius dropdown */}
           <TouchableOpacity
             style={[styles.radiusPill, { borderColor: theme.colors.border }]}
             onPress={() => setRadiusVisible(true)}
-            activeOpacity={0.7}
           >
             <Ionicons name="radio-outline" size={14} color={theme.colors.primary} />
             <Text style={[styles.pillText, { color: theme.colors.text }]}>{radiusKm} km</Text>
@@ -109,55 +144,46 @@ export default function BreakingNewsCarousel({
           </TouchableOpacity>
         </View>
 
-        {/* Article image (if available) */}
-        {hasImage && (
-          <View style={styles.imageContainer}>
-            <Image
-              source={{ uri: currentArticle.imageUrl }}
-              style={styles.articleImage}
-              contentFit="cover"
-              transition={300}
-            />
-            <View style={styles.imageOverlay} />
-          </View>
-        )}
-
-        {/* Headline area */}
-        <TouchableOpacity
-          onPress={() => handleArticlePress(currentArticle)}
-          activeOpacity={0.9}
-          style={[styles.headlineArea, hasImage && styles.headlineOverlay]}
-        >
-          <Animated.View style={[styles.headlineRow, { opacity: slideAnim }]}>
-            <View style={styles.badgeContainer}>
-              <View style={[styles.liveDot, { backgroundColor: theme.colors.danger }]} />
-              <Text style={[styles.breakingLabel, { color: theme.colors.danger }]}>BREAKING</Text>
-            </View>
-            <Text
-              style={[styles.title, { color: hasImage ? '#FFFFFF' : theme.colors.text }]}
-              numberOfLines={2}
-            >
-              {currentArticle.title}
-            </Text>
-          </Animated.View>
-        </TouchableOpacity>
+        {/* Swipeable headline row */}
+        <FlatList
+          ref={flatListRef}
+          data={articles}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScrollBeginDrag={onScrollBeginDrag}
+          onScrollEndDrag={onScrollEndDrag}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
+          snapToInterval={ITEM_WIDTH}
+          decelerationRate="fast"
+          contentContainerStyle={styles.listContent}
+        />
       </View>
 
-      {/* Radius picker modal */}
       <RadiusPickerModal
         visible={radiusVisible}
         selected={radiusKm}
         onSelect={onRadiusChange}
         onClose={() => setRadiusVisible(false)}
       />
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    width: SCREEN_WIDTH - CARD_HORIZONTAL_PADDING,
-    alignSelf: 'center',
+  wrapper: {
+    width: '100%',
+    paddingHorizontal: 16,
+  },
+  sectionHeader: {
+    fontSize: 18,
+    fontFamily: 'DMSans-Bold',
+    marginBottom: 8,
+  },
+  card: {
     borderRadius: 14,
     borderWidth: 1,
     overflow: 'hidden',
@@ -165,9 +191,11 @@ const styles = StyleSheet.create({
   controlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     gap: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E0E0E0',
   },
   cityPill: {
     flexDirection: 'row',
@@ -192,56 +220,27 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'DMSans-Medium',
   },
-  imageContainer: {
-    position: 'relative',
+  listContent: {
+    // No extra padding needed; items fill the width
   },
-  articleImage: {
-    width: '100%',
-    height: 130,
-  },
-  imageOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 50,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
-  headlineArea: {
-    paddingHorizontal: 12,
-    paddingBottom: 12,
-    paddingTop: 6,
-  },
-  headlineOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingTop: 20,
-  },
-  headlineRow: {
+  itemContainer: {
+    width: ITEM_WIDTH,
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 12,
   },
-  badgeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 8,
-    gap: 4,
+  thumbnail: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 12,
   },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  breakingLabel: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
-  },
-  title: {
+  headlineTextContainer: {
     flex: 1,
+  },
+  itemTitle: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: 'DMSans-Bold',
+    lineHeight: 18,
   },
 });

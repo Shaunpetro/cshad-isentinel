@@ -1,5 +1,5 @@
 // app/(stack)/safety.tsx
-// Beta 4 – Safety Hub: map-first with repositioned sheet, incident markers, tap‑to‑zoom, custom user icon
+// Beta 4 – Safety Hub: repositioned sheet, + Report Incident, tap‑to‑dismiss, local incidents, motion‑aware pointer
 
 import React, { useState, useRef, useCallback } from "react";
 import {
@@ -34,14 +34,16 @@ const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const SHEET_MIN_HEIGHT = 60;
 const SHEET_MAX_HEIGHT = SCREEN_HEIGHT * 0.4;
 const FAB_OFFSET = 80; // space reserved for home FAB
-const REPORT_FAB_BOTTOM = 150; // above the sheet when expanded
+const REPORT_FAB_BOTTOM = 160; // above the sheet when expanded
 
-// custom user icon component
-function UserLocationMarker() {
+// custom user icon – walking person or car based on speed (m/s)
+function UserLocationMarker({ speed }: { speed: number | null }) {
+  const isWalking = speed === null || speed < 5; // under 5 m/s (~18 km/h) = walking
+  const iconName = isWalking ? "walk" : "car";
   return (
     <View style={userMarkerStyles.wrapper}>
       <View style={userMarkerStyles.outer}>
-        <Ionicons name="shield" size={20} color="#FFFFFF" />
+        <Ionicons name={iconName} size={18} color="#FFFFFF" />
       </View>
       <View style={userMarkerStyles.arrow} />
     </View>
@@ -51,9 +53,9 @@ function UserLocationMarker() {
 const userMarkerStyles = StyleSheet.create({
   wrapper: { alignItems: "center", justifyContent: "center" },
   outer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: "#1E88E5",
     justifyContent: "center",
     alignItems: "center",
@@ -99,6 +101,8 @@ export default function SafetyHubScreen() {
     currentCity,
     deviceLocation,
     permissionStatus,
+    radiusKm,
+    speed,
     refresh: refreshLocation,
   } = useLocationContext();
   const { alerts: nearMeReports, refresh: refreshNearMe } = useLocalAlerts();
@@ -139,11 +143,17 @@ export default function SafetyHubScreen() {
     }).start();
   };
 
-  // ---------- load hazards ----------
+  const collapseSheet = () => {
+    setSheetExpanded(false);
+    Animated.spring(sheetAnim, { toValue: 0, useNativeDriver: false }).start();
+  };
+
+  // ---------- load hazards (filtered by city) ----------
   const loadHazards = useCallback(async () => {
     const data = await fetchHazards();
     if (data) {
-      setHazardMarkers(data.map((h: any) => ({
+      const cityName = currentCity?.name?.toLowerCase();
+      let filtered = data.map((h: any) => ({
         id: h.id,
         latitude: h.latitude,
         longitude: h.longitude,
@@ -155,9 +165,16 @@ export default function SafetyHubScreen() {
         matchedLocation: h.location_name || 'Unknown',
         confidence: 'exact' as const,
         category: h.category || 'other',
-      })));
+      }));
+      // Filter incidents to the selected city area
+      if (cityName) {
+        filtered = filtered.filter(
+          (h) => h.matchedLocation?.toLowerCase().includes(cityName) || !h.matchedLocation
+        );
+      }
+      setHazardMarkers(filtered);
     }
-  }, []);
+  }, [currentCity]);
 
   useFocusEffect(
     useCallback(() => {
@@ -178,20 +195,23 @@ export default function SafetyHubScreen() {
     loadHazards();
   };
 
-  // ---------- incident markers from local alerts ----------
-  const incidentMarkers: MapMarker[] = nearMeReports.map((r) => ({
-    id: r.id,
-    latitude: r.latitude,
-    longitude: r.longitude,
-    title: r.description,
-    description: r.description,
-    type: 'nearme' as const,
-    severity: 'medium' as const,
-    timestamp: r.createdAt,
-    matchedLocation: r.locationName,
-    confidence: 'city' as const,
-    category: r.category,
-  }));
+  // ---------- incident markers from local alerts (also filtered) ----------
+  const cityNameLower = currentCity?.name?.toLowerCase() || '';
+  const incidentMarkers: MapMarker[] = nearMeReports
+    .filter((r) => cityNameLower ? r.locationName?.toLowerCase().includes(cityNameLower) || !r.locationName : true)
+    .map((r) => ({
+      id: r.id,
+      latitude: r.latitude,
+      longitude: r.longitude,
+      title: r.description,
+      description: r.description,
+      type: 'nearme' as const,
+      severity: 'medium' as const,
+      timestamp: r.createdAt,
+      matchedLocation: r.locationName,
+      confidence: 'city' as const,
+      category: r.category,
+    }));
 
   const allMarkers = [...hazardMarkers, ...incidentMarkers];
 
@@ -208,6 +228,11 @@ export default function SafetyHubScreen() {
       );
       setSelectedId(item.id);
     }
+  };
+
+  const handleMapPress = () => {
+    setSelectedId(null);
+    collapseSheet();
   };
 
   if (isLoading) {
@@ -235,6 +260,7 @@ export default function SafetyHubScreen() {
         showsUserLocation={false}
         followsUserLocation={false}
         showsMyLocationButton={false}
+        onPress={handleMapPress}
         mapPadding={{
           top: 0,
           right: 0,
@@ -245,7 +271,7 @@ export default function SafetyHubScreen() {
         {/* Custom user location marker */}
         {userLat && userLng && (
           <Marker coordinate={{ latitude: userLat, longitude: userLng }} anchor={{ x: 0.5, y: 1 }}>
-            <UserLocationMarker />
+            <UserLocationMarker speed={speed} />
           </Marker>
         )}
 
@@ -290,7 +316,8 @@ export default function SafetyHubScreen() {
         style={[styles.reportFab, { backgroundColor: '#FF6D00', bottom: REPORT_FAB_BOTTOM }]}
         onPress={() => setHazardModalVisible(true)}
       >
-        <Ionicons name="add" size={28} color="#FFFFFF" />
+        <Ionicons name="add-circle" size={24} color="#FFFFFF" />
+        <Text style={styles.reportFabText}>+ Report Incident</Text>
       </TouchableOpacity>
 
       {/* Draggable Bottom Sheet */}
@@ -313,7 +340,9 @@ export default function SafetyHubScreen() {
         </TouchableOpacity>
         <FlatList
           data={[
-            ...nearMeReports.map(r => ({ id: r.id, title: r.description, description: r.description, type: 'nearme', latitude: r.latitude, longitude: r.longitude })),
+            ...nearMeReports
+              .filter((r) => cityNameLower ? r.locationName?.toLowerCase().includes(cityNameLower) || !r.locationName : true)
+              .map(r => ({ id: r.id, title: r.description, description: r.description, type: 'nearme', latitude: r.latitude, longitude: r.longitude })),
             ...hazardMarkers.map(h => ({ id: h.id, title: h.title, description: h.description || '', type: 'hazard', latitude: h.latitude, longitude: h.longitude }))
           ]}
           renderItem={({ item }) => (
@@ -356,17 +385,23 @@ const styles = StyleSheet.create({
   reportFab: {
     position: 'absolute',
     right: 16,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 24,
     elevation: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
     zIndex: 10,
+    gap: 6,
+  },
+  reportFabText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: 'DMSans-Bold',
   },
   bottomSheet: {
     position: 'absolute',

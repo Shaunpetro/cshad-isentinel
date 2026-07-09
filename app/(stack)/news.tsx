@@ -1,11 +1,12 @@
 // app/(stack)/news.tsx
-// Phase 4 – News screen with unified LocationRadiusBar, weather + infrastructure widgets on Local Alerts tab
+// Beta 4 – News screen with carousel‑style location/radius, permission check, weather & infrastructure widgets
 
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   RefreshControl, ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Typography, Spacing } from '../../src/config/theme';
@@ -18,15 +19,16 @@ import {
 import WeatherCard from '../../src/components/news/WeatherCard';
 import InfrastructureCard from '../../src/components/hub/InfrastructureCard';
 import LocalAlertCard from '../../src/components/local/LocalAlertCard';
-import LocationRadiusBar from '../../src/components/location/LocationRadiusBar';
+import RadiusPickerModal from '../../src/components/location/RadiusPickerModal';
 import { useLocationContext } from '@/contexts/LocationContext';
+import type { SACity } from '@/services/location';
 import { useCurrentWeather } from '../../src/hooks/useCurrentWeather';
 import { useInfrastructure } from '../../src/hooks/useInfrastructure';
 import { useNews } from '../../src/hooks/useNews';
 import { useLocalAlerts } from '../../src/hooks/useLocalAlerts';
 import { usePreferences } from '../../src/hooks/usePreferences';
 import { useTheme } from '../../src/contexts';
-import type { NewsItem, NewsCategory } from '../../src/types';
+import type { NewsItem } from '../../src/types';
 import type { TimeFilter } from '../../src/services/news';
 
 const LOCATION_UPDATE_CATEGORIES = new Set([
@@ -43,6 +45,7 @@ export default function NewsScreen() {
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('general');
   const [cityPickerVisible, setCityPickerVisible] = useState(false);
+  const [radiusVisible, setRadiusVisible] = useState(false);
   const [permissionModalVisible, setPermissionModalVisible] = useState(false);
 
   const {
@@ -52,6 +55,7 @@ export default function NewsScreen() {
     scope,
     setScope,
     radiusKm,
+    setRadius,
     permissionStatus,
     requestPermission,
   } = useLocationContext();
@@ -108,6 +112,14 @@ export default function NewsScreen() {
     if (granted) console.log('[NewsScreen] Location permission granted');
   }, [requestPermission]);
 
+  const handleDetectLocation = useCallback(async (): Promise<SACity | null> => {
+    if (permissionStatus !== 'granted') {
+      const granted = await requestPermission();
+      if (!granted) return null;
+    }
+    return await detectLocation();
+  }, [permissionStatus, requestPermission, detectLocation]);
+
   const getTimeFilterName = useCallback(
     (filter: TimeFilter) => {
       switch (filter) {
@@ -124,9 +136,31 @@ export default function NewsScreen() {
   const ListHeader = useMemo(
     () => (
       <View>
-        {/* Location + radius bar */}
+        {/* Location + radius bar (matching carousel style) */}
         <View style={styles.locationBarWrapper}>
-          <LocationRadiusBar onCityPress={() => setCityPickerVisible(true)} />
+          <View style={[styles.controlsRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            {/* City pill */}
+            <TouchableOpacity
+              style={[styles.cityPill, { borderColor: colors.border }]}
+              onPress={() => setCityPickerVisible(true)}
+            >
+              <Ionicons name="location" size={14} color={colors.primary} />
+              <Text style={[styles.pillText, { color: colors.text }]} numberOfLines={1}>
+                {currentCity?.name || 'Select city'}
+              </Text>
+              <Ionicons name="chevron-down" size={12} color={colors.textSecondary} />
+            </TouchableOpacity>
+
+            {/* Radius dropdown */}
+            <TouchableOpacity
+              style={[styles.radiusPill, { borderColor: colors.border }]}
+              onPress={() => setRadiusVisible(true)}
+            >
+              <Ionicons name="radio-outline" size={14} color={colors.primary} />
+              <Text style={[styles.pillText, { color: colors.text }]}>{radiusKm} km</Text>
+              <Ionicons name="chevron-down" size={12} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Tab bar */}
@@ -152,7 +186,7 @@ export default function NewsScreen() {
         {/* Controls for General tab */}
         {activeTab === 'general' && (
           <>
-            {/* Weather widget (current conditions) */}
+            {/* Weather widget */}
             {currentWeather && currentCity && (
               <WeatherCard
                 cityName={currentCity.name}
@@ -176,7 +210,7 @@ export default function NewsScreen() {
           </>
         )}
 
-        {/* Local Alerts tab header: weather + infrastructure widgets */}
+        {/* Local Alerts tab header */}
         {activeTab === 'local' && (
           <View style={{ paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm }}>
             {permissionStatus !== 'granted' || !currentCity ? (
@@ -185,7 +219,6 @@ export default function NewsScreen() {
               </Text>
             ) : (
               <>
-                {/* Weather widget */}
                 {currentWeather && (
                   <WeatherCard
                     cityName={currentCity.name}
@@ -194,8 +227,6 @@ export default function NewsScreen() {
                     icon={currentWeather.icon}
                   />
                 )}
-
-                {/* Load‑shedding widget (with real data from hook) */}
                 {loadshedding && (
                   <InfrastructureCard loadshedding={loadshedding} compact />
                 )}
@@ -254,7 +285,21 @@ export default function NewsScreen() {
         currentCityId={currentCity?.id || ''}
         onSelectCity={(city) => { setCity(city); setCityPickerVisible(false); }}
         onClose={() => setCityPickerVisible(false)}
-        onDetectLocation={detectLocation}
+        onDetectLocation={handleDetectLocation}
+      />
+
+      <RadiusPickerModal
+        visible={radiusVisible}
+        selected={radiusKm}
+        onSelect={(r) => { setRadius(r); setRadiusVisible(false); }}
+        onClose={() => setRadiusVisible(false)}
+      />
+
+      <LocationPermissionModal
+        visible={permissionModalVisible}
+        onClose={() => setPermissionModalVisible(false)}
+        onRequestPermission={handleRequestPermission}
+        permissionDenied={permissionStatus === 'denied'}
       />
     </View>
   );
@@ -266,6 +311,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.sm,
+  },
+  controlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 8,
+  },
+  cityPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 4,
+    flex: 1,
+  },
+  radiusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 4,
+  },
+  pillText: {
+    fontSize: 13,
+    fontFamily: 'DMSans-Medium',
   },
   tabBar: {
     flexDirection: 'row',

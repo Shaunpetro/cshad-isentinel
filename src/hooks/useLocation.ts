@@ -1,4 +1,6 @@
 // src/hooks/useLocation.ts
+// Beta 4 – returns speed (m/s) from device location for motion‑aware pointer
+
 /**
  * Hook for managing location state in the app
  * Handles city selection, GPS detection, and scope management
@@ -34,12 +36,13 @@ export interface UseLocationResult {
   isDetecting: boolean;
   error: string | null;
   permissionStatus: LocationStatus;
+  speed: number | null;  // m/s, null if unavailable
 
   // Actions
   setCity: (city: SACity) => Promise<void>;
   setRadius: (radiusKm: number) => Promise<void>;
   setScope: (scope: NewsScope) => void;
-  detectLocation: () => Promise<SACity | null>; // ✅ NOW RETURNS CITY OR NULL
+  detectLocation: () => Promise<SACity | null>;
   requestPermission: () => Promise<boolean>;
   refresh: () => Promise<void>;
   checkPermission: () => Promise<void>;
@@ -54,12 +57,12 @@ export function useLocation(): UseLocationResult {
   const [isDetecting, setIsDetecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [permissionStatus, setPermissionStatus] = useState<LocationStatus>('undetermined');
+  const [speed, setSpeed] = useState<number | null>(null);
 
   // Check permission status
   const checkPermission = useCallback(async () => {
     try {
       const { status } = await Location.getForegroundPermissionsAsync();
-      
       if (status === 'granted') {
         setPermissionStatus('granted');
       } else if (status === 'denied') {
@@ -83,20 +86,9 @@ export function useLocation(): UseLocationResult {
     setError(null);
 
     try {
-      // Check permission status first
       await checkPermission();
-
-      // Try to get saved preferences for default city
       const prefs = getPreferences();
-      
       const result = await initializeLocation();
-      
-      // If no city detected and we have a home location in preferences, use it
-      if (!result.fromDevice && prefs.homeLocation) {
-        // homeLocation might be set in settings as default
-        console.log('[useLocation] Using home location from preferences');
-      }
-      
       setCurrentCity(result.city);
       setRadiusKm(result.radius);
 
@@ -113,17 +105,38 @@ export function useLocation(): UseLocationResult {
     }
   };
 
+  // Watch location for speed updates
+  useEffect(() => {
+    let subscription: Location.LocationSubscription | null = null;
+
+    const startWatching = async () => {
+      const { status } = await Location.getForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+
+      subscription = await Location.watchPositionAsync(
+        { accuracy: Location.Accuracy.High, timeInterval: 2000, distanceInterval: 5 },
+        (loc) => {
+          if (loc.coords.speed !== undefined && loc.coords.speed !== null) {
+            setSpeed(loc.coords.speed);
+          }
+        }
+      );
+    };
+
+    startWatching();
+
+    return () => {
+      if (subscription) subscription.remove();
+    };
+  }, [permissionStatus]);
+
   const handleSetCity = useCallback(async (city: SACity) => {
     try {
       setCurrentCity(city);
-
-      // Save custom cities differently than major cities
       if (city.isCustom) {
         await saveCustomCity(city);
-        console.log('[useLocation] Custom city saved:', city.name);
       } else {
         await saveSelectedCity(city.id);
-        console.log('[useLocation] City changed to:', city.name);
       }
     } catch (err) {
       console.error('[useLocation] Error saving city:', err);
@@ -134,7 +147,6 @@ export function useLocation(): UseLocationResult {
     try {
       setRadiusKm(newRadius);
       await saveRadius(newRadius);
-      console.log('[useLocation] Radius changed to:', newRadius, 'km');
     } catch (err) {
       console.error('[useLocation] Error saving radius:', err);
     }
@@ -142,21 +154,17 @@ export function useLocation(): UseLocationResult {
 
   const handleSetScope = useCallback((newScope: NewsScope) => {
     setScope(newScope);
-    console.log('[useLocation] Scope changed to:', newScope);
   }, []);
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
     try {
       const granted = await requestLocationPermission();
-      
       if (granted) {
         setPermissionStatus('granted');
-        // Auto-detect location after permission granted
         await detectLocation();
       } else {
         setPermissionStatus('denied');
       }
-      
       return granted;
     } catch (err) {
       console.error('[useLocation] Permission request error:', err);
@@ -171,38 +179,30 @@ export function useLocation(): UseLocationResult {
 
     try {
       const { status } = await Location.getForegroundPermissionsAsync();
-      
       if (status !== 'granted') {
         setPermissionStatus(status === 'denied' ? 'denied' : 'undetermined');
         setError('Location permission not granted');
-        return null; // ✅ RETURN NULL ON PERMISSION ERROR
+        return null;
       }
 
       setPermissionStatus('granted');
       const detectedCity = await detectNearestCity();
-
       if (detectedCity) {
         setCurrentCity(detectedCity);
-
-        // Save custom cities differently
         if (detectedCity.isCustom) {
           await saveCustomCity(detectedCity);
-          console.log('[useLocation] Detected custom location:', detectedCity.name);
         } else {
           await saveSelectedCity(detectedCity.id);
-          console.log('[useLocation] Detected major city:', detectedCity.name);
         }
-
-        return detectedCity; // ✅ RETURN THE DETECTED CITY
+        return detectedCity;
       } else {
         setError('Could not detect location');
-        return null; // ✅ RETURN NULL IF NO CITY DETECTED
+        return null;
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Detection failed';
       setError(message);
-      console.error('[useLocation] Detection error:', message);
-      return null; // ✅ RETURN NULL ON ERROR
+      return null;
     } finally {
       setIsDetecting(false);
     }
@@ -221,6 +221,7 @@ export function useLocation(): UseLocationResult {
     isDetecting,
     error,
     permissionStatus,
+    speed,
     setCity: handleSetCity,
     setRadius: handleSetRadius,
     setScope: handleSetScope,

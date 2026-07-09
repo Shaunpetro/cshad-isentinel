@@ -1,5 +1,5 @@
 // src/components/settings/OptionPickerModal.tsx
-// Beta 4 – iOS-style option picker modal that respects theme
+// Beta 4 – iOS-style option picker modal with proper right margin for close button
 
 import React from 'react';
 import {
@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.heading,
     fontFamily: Typography.fonts.bold,
   },
-  closeButton: { padding: Spacing.xs },
+  closeButton: { padding: Spacing.xs, marginRight: Spacing.md },
   list: { flex: 1 },
   listContent: { padding: Spacing.md },
   option: {

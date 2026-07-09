@@ -1,28 +1,20 @@
 // app/(stack)/index.tsx
-// Phase 4 – Home screen with integrated breaking-news carousel
+// Beta 4 – Home screen with refined carousel, card‑wrapped favorites & sections
 
 import React, { useState, useCallback } from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
-import { useTranslation } from 'react-i18next';
+import { View, ScrollView, StyleSheet, Text } from 'react-native';
 import { useTheme } from '@/contexts';
 import { useLocationContext } from '@/contexts/LocationContext';
 import { useNews } from '../../src/hooks/useNews';
-import {
-  CityPickerModal,
-  LocationPermissionModal,
-} from '../../src/components/news';
+import { CityPickerModal, LocationPermissionModal } from '../../src/components/news';
 import BreakingNewsCarousel from '../../src/components/home/BreakingNewsCarousel';
 import SectionNavigator from '../../src/components/home/SectionNavigator';
 import FavoritesFeed from '../../src/components/home/FavoritesFeed';
 
 export default function HomeScreen() {
   const theme = useTheme();
-  const { t } = useTranslation();
 
-  // ── Favorites refresh key ──
   const [favoritesKey, setFavoritesKey] = useState(0);
-
-  // ── Location state (from context) ──
   const [cityPickerVisible, setCityPickerVisible] = useState(false);
   const [permissionModalVisible, setPermissionModalVisible] = useState(false);
 
@@ -36,7 +28,6 @@ export default function HomeScreen() {
     requestPermission,
   } = useLocationContext();
 
-  // ── News (only need breaking news) ──
   const { breakingNews, isLoading: newsLoading } = useNews({
     scope: 'local',
     latitude: currentCity?.latitude,
@@ -49,16 +40,9 @@ export default function HomeScreen() {
     autoRefresh: false,
   });
 
-  // ── Permission handlers ──
-  const handleEnableLocation = useCallback(() => {
-    setPermissionModalVisible(true);
-  }, []);
-
   const handleRequestPermission = useCallback(async () => {
     const granted = await requestPermission();
-    if (granted) {
-      console.log('[HomeScreen] Location permission granted');
-    }
+    if (granted) console.log('[HomeScreen] Location permission granted');
   }, [requestPermission]);
 
   return (
@@ -66,7 +50,7 @@ export default function HomeScreen() {
       style={[styles.container, { backgroundColor: theme.colors.background }]}
       contentContainerStyle={styles.content}
     >
-      {/* Integrated breaking news carousel (location + radius + headlines) */}
+      {/* Integrated breaking news carousel */}
       <BreakingNewsCarousel
         articles={breakingNews}
         isLoading={newsLoading}
@@ -76,27 +60,23 @@ export default function HomeScreen() {
         onRadiusChange={setRadius}
       />
 
-      {/* Dynamic Favorites Feed */}
-      <FavoritesFeed refreshKey={favoritesKey} />
+      {/* Favorites + Sections wrapped in a card */}
+      <View style={[styles.discoverCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+        <Text style={[styles.discoverHeading, { color: theme.colors.text }]}>
+          Explore CSHAD
+        </Text>
+        <FavoritesFeed refreshKey={favoritesKey} />
+        <SectionNavigator onSectionPress={() => setFavoritesKey((prev) => prev + 1)} />
+      </View>
 
-      {/* Section Navigator (with visit tracking) */}
-      <SectionNavigator
-        onSectionPress={() => setFavoritesKey((prev) => prev + 1)}
-      />
-
-      {/* City Picker Modal */}
       <CityPickerModal
         visible={cityPickerVisible}
         currentCityId={currentCity?.id || ''}
-        onSelectCity={(city) => {
-          setCity(city);
-          setCityPickerVisible(false);
-        }}
+        onSelectCity={(city) => { setCity(city); setCityPickerVisible(false); }}
         onClose={() => setCityPickerVisible(false)}
         onDetectLocation={detectLocation}
       />
 
-      {/* Location Permission Modal */}
       <LocationPermissionModal
         visible={permissionModalVisible}
         onClose={() => setPermissionModalVisible(false)}
@@ -109,5 +89,17 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 16, gap: 16, alignItems: 'center' },
+  content: { padding: 16, gap: 20, alignItems: 'center' },
+  discoverCard: {
+    width: '100%',
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    gap: 16,
+  },
+  discoverHeading: {
+    fontSize: 18,
+    fontFamily: 'DMSans-Bold',
+    marginBottom: 4,
+  },
 });
