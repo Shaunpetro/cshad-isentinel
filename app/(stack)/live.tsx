@@ -1,18 +1,13 @@
 // app/(stack)/live.tsx
-// Beta 4 – Live Hub with proper login/logout flow, Activity tab with discover comments, threaded replies
+// Beta 4 – Live Hub with header‑wired login/logout, swipeable discover player
 
-import React, { useState } from 'react';
+import React, { useState, useLayoutEffect } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  RefreshControl,
-  ActivityIndicator,
-  Alert,
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  RefreshControl, ActivityIndicator, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation, useRouter } from 'expo-router';
 import { useTheme } from '@/contexts';
 import { useAuth } from '../../src/hooks/useAuth';
 import { useLiveStreams } from '../../src/hooks/useLiveStreams';
@@ -22,7 +17,6 @@ import type { LiveStream } from '@/services/live/liveService';
 
 type Tab = 'liveNow' | 'discover' | 'activity';
 
-// Mock activity data for logged‑in users
 const MOCK_ACTIVITY = [
   { id: 'a1', type: 'reply', user: 'Zanele M.', text: 'replied to your comment on "Sports Podcast: Match Analysis"', timestamp: '2m ago', thread: 'Thanks! I agree with you.' },
   { id: 'a2', type: 'like', user: 'Thabo K.', text: 'liked your comment on "Offside Review"', timestamp: '5m ago' },
@@ -32,13 +26,14 @@ const MOCK_ACTIVITY = [
 ];
 
 export default function LiveHubScreen() {
+  const navigation = useNavigation();
+  const router = useRouter();
   const theme = useTheme();
   const { isLoggedIn, profile, login, logout } = useAuth();
   const { liveNow, upcoming, isLoading, isRefreshing, error, refresh } = useLiveStreams();
   const [activeStream, setActiveStream] = useState<LiveStream | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('liveNow');
 
-  // This function is called by the header user icon (wired via a ref or navigation param)
   const handleHeaderUserPress = () => {
     if (isLoggedIn) {
       Alert.alert(
@@ -51,9 +46,7 @@ export default function LiveHubScreen() {
         ]
       );
     } else {
-      Alert.alert(
-        'Login?',
-        'Sign in to unlock Activity and comments.',
+      Alert.alert('Login?', 'Sign in to unlock Activity and comments.',
         [
           { text: 'Yes', onPress: login },
           { text: 'No', style: 'cancel' },
@@ -62,11 +55,25 @@ export default function LiveHubScreen() {
     }
   };
 
-  // Expose the handler to the header via a ref or effect
-  // For now, the header icon navigation is handled in _layout.tsx but we can use navigation.setOptions
-  React.useEffect(() => {
-    // This is a placeholder — the actual header press is wired in the live screen's own floating button
-  }, []);
+  // Wire the header user icon to the login/logout popup
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={{ flexDirection: 'row', gap: 16, marginRight: 8 }}>
+          <TouchableOpacity onPress={handleHeaderUserPress}>
+            <Ionicons
+              name={isLoggedIn ? 'person-circle' : 'person-circle-outline'}
+              size={28}
+              color={isLoggedIn ? theme.colors.primary : theme.colors.text}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/settings')}>
+            <Ionicons name="settings-outline" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+        </View>
+      ),
+    });
+  }, [navigation, isLoggedIn, theme, router]);
 
   if (isLoading) {
     return (
@@ -131,6 +138,14 @@ export default function LiveHubScreen() {
     ...(isLoggedIn ? [{ key: 'activity' as Tab, label: 'Activity' }] : []),
   ];
 
+  // Swipe helpers for the immersive player
+  const currentList = activeTab === 'liveNow' ? liveNow : discoverStreams;
+  const activeIndex = activeStream ? currentList.findIndex(s => s.id === activeStream.id) : -1;
+  const hasPrev = activeIndex > 0;
+  const hasNext = activeIndex < currentList.length - 1;
+  const swipeUp = () => { if (hasNext) setActiveStream(currentList[activeIndex + 1]); };
+  const swipeDown = () => { if (hasPrev) setActiveStream(currentList[activeIndex - 1]); };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       {/* Tab bar */}
@@ -148,18 +163,6 @@ export default function LiveHubScreen() {
         ))}
       </View>
 
-      {/* Floating user button for login/logout (visible when header icon is not accessible) */}
-      <TouchableOpacity
-        style={[styles.floatingUserButton, { backgroundColor: isLoggedIn ? theme.colors.primary : theme.colors.surface, borderColor: theme.colors.border }]}
-        onPress={handleHeaderUserPress}
-      >
-        <Ionicons
-          name={isLoggedIn ? 'person-circle' : 'person-circle-outline'}
-          size={32}
-          color={isLoggedIn ? '#FFFFFF' : theme.colors.text}
-        />
-      </TouchableOpacity>
-
       {/* Content */}
       {activeTab === 'activity' ? (
         <FlatList
@@ -168,9 +171,7 @@ export default function LiveHubScreen() {
           keyExtractor={(item) => item.id}
           ListEmptyComponent={
             <View style={styles.centered}>
-              <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
-                No recent activity.
-              </Text>
+              <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>No recent activity.</Text>
             </View>
           }
           contentContainerStyle={styles.list}
@@ -183,9 +184,7 @@ export default function LiveHubScreen() {
           keyExtractor={(item) => item.id}
           ListEmptyComponent={
             <View style={styles.centered}>
-              <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
-                No streams available.
-              </Text>
+              <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>No streams available.</Text>
             </View>
           }
           refreshControl={
@@ -196,7 +195,7 @@ export default function LiveHubScreen() {
         />
       )}
 
-      {/* Immersive player */}
+      {/* Immersive player with swipe */}
       {activeStream && (
         <LivePlayer
           videoId={activeStream.videoId}
@@ -206,6 +205,10 @@ export default function LiveHubScreen() {
           visible={true}
           onClose={() => setActiveStream(null)}
           isLoggedIn={isLoggedIn}
+          onSwipeUp={swipeUp}
+          onSwipeDown={swipeDown}
+          hasPrev={hasPrev}
+          hasNext={hasNext}
         />
       )}
     </View>
@@ -216,46 +219,18 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
   list: { padding: 16 },
-  tabBar: {
-    flexDirection: 'row',
-    marginHorizontal: 16,
-    borderBottomWidth: 1,
-    marginTop: 8,
-  },
+  tabBar: { flexDirection: 'row', marginHorizontal: 16, borderBottomWidth: 1, marginTop: 8 },
   tab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
   activeTab: { borderBottomWidth: 2 },
   tabText: { fontSize: 15, fontFamily: 'DMSans-Bold' },
   errorText: { fontSize: 16, textAlign: 'center' },
   emptyText: { fontSize: 16, textAlign: 'center', marginTop: 16 },
-  floatingUserButton: {
-    position: 'absolute',
-    top: 12,
-    right: 16,
-    zIndex: 20,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-  },
   activityItem: {
-    flexDirection: 'row',
-    gap: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 8,
-    alignItems: 'flex-start',
+    flexDirection: 'row', gap: 12, paddingVertical: 14, paddingHorizontal: 16,
+    borderRadius: 12, borderWidth: 1, marginBottom: 8, alignItems: 'flex-start',
   },
   activityText: { fontSize: 14, fontFamily: 'DMSans-Regular', marginBottom: 4 },
-  threadContainer: {
-    padding: 8,
-    borderRadius: 6,
-    marginBottom: 4,
-    marginTop: 2,
-  },
+  threadContainer: { padding: 8, borderRadius: 6, marginBottom: 4, marginTop: 2 },
   threadText: { fontSize: 13, fontFamily: 'DMSans-Regular', fontStyle: 'italic' },
   activityTime: { fontSize: 12, fontFamily: 'DMSans-Regular' },
 });

@@ -1,5 +1,5 @@
 // app/(stack)/safety.tsx
-// Beta 4 – Safety Hub: repositioned sheet, + Report Incident, tap‑to‑dismiss, local incidents, motion‑aware pointer
+// Beta 4 – Safety Hub: auto‑zoom, CSHAD pointer, polished sheet
 
 import React, { useState, useRef, useCallback } from "react";
 import {
@@ -34,16 +34,15 @@ const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const SHEET_MIN_HEIGHT = 60;
 const SHEET_MAX_HEIGHT = SCREEN_HEIGHT * 0.4;
 const FAB_OFFSET = 80; // space reserved for home FAB
-const REPORT_FAB_BOTTOM = 160; // above the sheet when expanded
+const REPORT_FAB_BOTTOM = 160;
 
-// custom user icon – walking person or car based on speed (m/s)
+// ---------- custom CSHAD user marker ----------
 function UserLocationMarker({ speed }: { speed: number | null }) {
-  const isWalking = speed === null || speed < 5; // under 5 m/s (~18 km/h) = walking
-  const iconName = isWalking ? "walk" : "car";
+  const isWalking = speed === null || speed < 5;
   return (
     <View style={userMarkerStyles.wrapper}>
       <View style={userMarkerStyles.outer}>
-        <Ionicons name={iconName} size={18} color="#FFFFFF" />
+        <Ionicons name="shield" size={18} color="#FFFFFF" />
       </View>
       <View style={userMarkerStyles.arrow} />
     </View>
@@ -53,9 +52,9 @@ function UserLocationMarker({ speed }: { speed: number | null }) {
 const userMarkerStyles = StyleSheet.create({
   wrapper: { alignItems: "center", justifyContent: "center" },
   outer: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: "#1E88E5",
     justifyContent: "center",
     alignItems: "center",
@@ -166,7 +165,6 @@ export default function SafetyHubScreen() {
         confidence: 'exact' as const,
         category: h.category || 'other',
       }));
-      // Filter incidents to the selected city area
       if (cityName) {
         filtered = filtered.filter(
           (h) => h.matchedLocation?.toLowerCase().includes(cityName) || !h.matchedLocation
@@ -185,6 +183,21 @@ export default function SafetyHubScreen() {
     }, [refreshLocation, loadHazards, refreshNearMe])
   );
 
+  // ---------- auto‑zoom to user location on map ready ----------
+  const handleMapReady = useCallback(() => {
+    if (mapRef.current && deviceLocation) {
+      mapRef.current.animateToRegion(
+        {
+          latitude: deviceLocation.latitude,
+          longitude: deviceLocation.longitude,
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.005,
+        },
+        600
+      );
+    }
+  }, [deviceLocation]);
+
   const handleVoteCleared = async (hazardId: string) => {
     await voteHazardCleared(hazardId);
     loadHazards();
@@ -195,7 +208,7 @@ export default function SafetyHubScreen() {
     loadHazards();
   };
 
-  // ---------- incident markers from local alerts (also filtered) ----------
+  // ---------- incident markers from local alerts (filtered) ----------
   const cityNameLower = currentCity?.name?.toLowerCase() || '';
   const incidentMarkers: MapMarker[] = nearMeReports
     .filter((r) => cityNameLower ? r.locationName?.toLowerCase().includes(cityNameLower) || !r.locationName : true)
@@ -257,6 +270,7 @@ export default function SafetyHubScreen() {
           latitudeDelta: 0.05,
           longitudeDelta: 0.05,
         }}
+        onMapReady={handleMapReady}
         showsUserLocation={false}
         followsUserLocation={false}
         showsMyLocationButton={false}
@@ -334,6 +348,7 @@ export default function SafetyHubScreen() {
       >
         <TouchableOpacity onPress={toggleSheet} style={styles.sheetHandleArea}>
           <View style={[styles.sheetHandle, { backgroundColor: colors.divider }]} />
+          <View style={[styles.sheetDivider, { backgroundColor: colors.divider }]} />
           <Text style={[styles.sheetTitle, { color: colors.text }]}>
             Local Incidents ({nearMeReports.length + hazardMarkers.length})
           </Text>
@@ -420,23 +435,30 @@ const styles = StyleSheet.create({
   },
   sheetHandleArea: {
     alignItems: 'center',
-    paddingVertical: Spacing.sm,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.sm,
   },
   sheetHandle: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    marginBottom: Spacing.xs,
+    marginBottom: Spacing.sm,
+  },
+  sheetDivider: {
+    width: 40,
+    height: 1,
+    marginBottom: Spacing.sm,
   },
   sheetTitle: {
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.bold,
+    marginBottom: Spacing.xs,
   },
   sheetItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   sheetItemTitle: {

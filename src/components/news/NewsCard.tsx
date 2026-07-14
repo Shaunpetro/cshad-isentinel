@@ -1,19 +1,17 @@
 // src/components/news/NewsCard.tsx
+// Beta 4 – News card with designed fallback placeholder
+
 import React from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Image } from "expo-image";
+import { Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "@/contexts/ThemeContext";
-import {
-  Typography,
-  Spacing,
-  BorderRadius,
-  Shadows,
-} from "@/config/theme";
+import { Typography, Spacing, BorderRadius, Shadows } from "@/config/theme";
 import { SeverityBadge } from "./SeverityBadge";
 import { SourceBadge } from "./SourceBadge";
 import { VerifiedBadge } from "./VerifiedBadge";
-import { stripHtml, truncate } from "@/utils/formatters";
+import { stripHtml, truncate, extractFirstImage } from "@/utils/formatters";
 import type { NewsItem } from "@/types";
 
 interface Props {
@@ -25,16 +23,12 @@ export function NewsCard({ article, onPress }: Props) {
   const { colors } = useTheme();
   const { t } = useTranslation();
 
-  // Get translated category
   const getCategoryLabel = (category: string): string => {
     const key = `news.categories.${category}`;
     const translated = t(key);
-    return translated !== key
-      ? translated.toUpperCase()
-      : category.toUpperCase();
+    return translated !== key ? translated.toUpperCase() : category.toUpperCase();
   };
 
-  // Translated time ago function
   const getTimeAgo = (dateString: string): string => {
     const now = new Date();
     const date = new Date(dateString);
@@ -42,16 +36,24 @@ export function NewsCard({ article, onPress }: Props) {
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMins / 60);
     const diffDays = Math.floor(diffHours / 24);
-
     if (diffMins < 1) return t("time.justNow");
     if (diffMins < 60) return t("time.minutesAgo", { count: diffMins });
     if (diffHours < 24) return t("time.hoursAgo", { count: diffHours });
     return t("time.daysAgo", { count: diffDays });
   };
 
-  // Clean title and summary from HTML tags
   const cleanTitle = stripHtml(article.title);
   const cleanSummary = stripHtml(article.summary);
+
+  // ---- media fallback chain ----
+  const imageUrl =
+    article.imageUrl ||
+    extractFirstImage(article.body) ||
+    extractFirstImage(article.summary) ||
+    null;
+
+  // App logo for fallback
+  const logoSrc = require("../../assets/brand/cshad-isentinel-logo-main.png");
 
   return (
     <Pressable
@@ -62,18 +64,25 @@ export function NewsCard({ article, onPress }: Props) {
         pressed && styles.cardPressed,
       ]}
     >
-      {/* Image */}
-      {article.imageUrl && (
+      {/* Image or designed fallback */}
+      {imageUrl ? (
         <Image
-          source={{ uri: article.imageUrl }}
+          source={{ uri: imageUrl }}
           style={styles.image}
           contentFit="cover"
           transition={200}
         />
+      ) : (
+        <View style={[styles.fallbackContainer, { backgroundColor: colors.surface }]}>
+          <Image source={logoSrc} style={styles.fallbackLogo} resizeMode="contain" />
+          <Text style={[styles.fallbackText, { color: colors.textSecondary }]}>
+            Breaking News
+          </Text>
+        </View>
       )}
 
       <View style={styles.content}>
-        {/* Top row: Category + Severity */}
+        {/* Category + Severity */}
         <View style={styles.metaRow}>
           <Text style={[styles.category, { color: colors.primary }]}>
             {getCategoryLabel(article.category)}
@@ -94,7 +103,7 @@ export function NewsCard({ article, onPress }: Props) {
           {truncate(cleanSummary, 150)}
         </Text>
 
-        {/* Source row: Source Badge + Verified Badge */}
+        {/* Source + Verified */}
         <View style={styles.sourceRow}>
           <SourceBadge
             sourceType={article.sourceType}
@@ -108,19 +117,16 @@ export function NewsCard({ article, onPress }: Props) {
           />
         </View>
 
-        {/* Bottom row: Location + Time */}
+        {/* Location + Time */}
         <View style={styles.footer}>
           <View style={styles.footerLeft}>
             {article.locationName && (
-              <Text
-                style={[styles.location, { color: colors.textSecondary }]}
-                numberOfLines={1}
-              >
+              <Text style={[styles.location, { color: colors.textSecondary }]} numberOfLines={1}>
                 📍 {article.locationName}
               </Text>
             )}
           </View>
-          <Text style={[styles.time, { color: colors.textDisabled }]}>
+          <Text style={[styles.time, { color: colors.textSecondary }]}>
             {getTimeAgo(article.publishedAt)}
           </Text>
         </View>
@@ -132,26 +138,42 @@ export function NewsCard({ article, onPress }: Props) {
 const styles = StyleSheet.create({
   card: {
     borderRadius: BorderRadius.lg,
-    marginHorizontal: Spacing.md,
+    overflow: 'hidden',
     marginBottom: Spacing.md,
-    overflow: "hidden",
-    ...Shadows.md,
+    ...Shadows.sm,
   },
-  cardPressed: {
-    opacity: 0.85,
-  },
+  cardPressed: { opacity: 0.95 },
   image: {
-    width: "100%",
+    width: '100%',
     height: 180,
+  },
+  fallbackContainer: {
+    width: '100%',
+    height: 180,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  fallbackLogo: {
+    width: 80,
+    height: 53,
+    opacity: 0.7,
+  },
+  fallbackText: {
+    fontSize: Typography.sizes.caption,
+    fontFamily: Typography.fonts.bold,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    opacity: 0.5,
   },
   content: {
     padding: Spacing.md,
   },
   metaRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: Spacing.sm,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.xs,
   },
   category: {
     fontSize: Typography.sizes.tiny,
@@ -159,9 +181,9 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   title: {
-    fontSize: Typography.sizes.heading,
+    fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.bold,
-    lineHeight: Typography.sizes.heading * 1.2,
+    lineHeight: Typography.sizes.body * 1.2,
     marginBottom: Spacing.sm,
   },
   summary: {
@@ -171,26 +193,23 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   sourceRow: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.sm,
-    marginBottom: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   footer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  footerLeft: {
-    flex: 1,
-    marginRight: Spacing.sm,
-  },
+  footerLeft: { flex: 1 },
   location: {
-    fontSize: Typography.sizes.label,
+    fontSize: Typography.sizes.tiny,
     fontFamily: Typography.fonts.regular,
   },
   time: {
-    fontSize: Typography.sizes.label,
+    fontSize: Typography.sizes.tiny,
     fontFamily: Typography.fonts.mono,
   },
 });

@@ -1,5 +1,5 @@
 // app/(stack)/news.tsx
-// Beta 4 – News screen with carousel‑style location/radius, permission check, weather & infrastructure widgets
+// Beta 4 – News screen with carousel‑style location/radius, permission check, weather & infrastructure widgets, local news feed, and mock ad
 
 import React, { useState, useCallback, useMemo } from 'react';
 import {
@@ -20,6 +20,7 @@ import WeatherCard from '../../src/components/news/WeatherCard';
 import InfrastructureCard from '../../src/components/hub/InfrastructureCard';
 import LocalAlertCard from '../../src/components/local/LocalAlertCard';
 import RadiusPickerModal from '../../src/components/location/RadiusPickerModal';
+import AdBanner from '../../src/components/monetisation/AdBanner';
 import { useLocationContext } from '@/contexts/LocationContext';
 import type { SACity } from '@/services/location';
 import { useCurrentWeather } from '../../src/hooks/useCurrentWeather';
@@ -93,6 +94,25 @@ export default function NewsScreen() {
     [allNews]
   );
 
+  // localised water/electricity/weather/infrastructure news for Local Alerts tab
+  const localNewsCategories = ['water', 'electricity', 'weather', 'infrastructure'];
+  const { news: localNews } = useNews({
+    scope: 'local',
+    latitude: currentCity?.latitude,
+    longitude: currentCity?.longitude,
+    cityName: currentCity?.name,
+    radiusKm: 25,
+    limit: 10,
+    realtime: false,
+    autoRefresh: false,
+  });
+  const filteredLocalNews = useMemo(
+    () => localNews
+      .filter(article => localNewsCategories.includes(article.category))
+      .slice(0, 5),
+    [localNews]
+  );
+
   const {
     alerts: localAlerts,
     isRefreshing: alertsRefreshing,
@@ -136,10 +156,9 @@ export default function NewsScreen() {
   const ListHeader = useMemo(
     () => (
       <View>
-        {/* Location + radius bar (matching carousel style) */}
+        {/* Location + radius bar */}
         <View style={styles.locationBarWrapper}>
           <View style={[styles.controlsRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            {/* City pill */}
             <TouchableOpacity
               style={[styles.cityPill, { borderColor: colors.border }]}
               onPress={() => setCityPickerVisible(true)}
@@ -150,8 +169,6 @@ export default function NewsScreen() {
               </Text>
               <Ionicons name="chevron-down" size={12} color={colors.textSecondary} />
             </TouchableOpacity>
-
-            {/* Radius dropdown */}
             <TouchableOpacity
               style={[styles.radiusPill, { borderColor: colors.border }]}
               onPress={() => setRadiusVisible(true)}
@@ -186,7 +203,6 @@ export default function NewsScreen() {
         {/* Controls for General tab */}
         {activeTab === 'general' && (
           <>
-            {/* Weather widget */}
             {currentWeather && currentCity && (
               <WeatherCard
                 cityName={currentCity.name}
@@ -195,7 +211,9 @@ export default function NewsScreen() {
                 icon={currentWeather.icon}
               />
             )}
-
+            <View style={{ paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm }}>
+              <AdBanner />
+            </View>
             {scope === 'local' && permissionStatus !== 'granted' && (
               <View style={{ paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm }}>
                 <LocationPermissionModal
@@ -214,9 +232,15 @@ export default function NewsScreen() {
         {activeTab === 'local' && (
           <View style={{ paddingHorizontal: Spacing.lg, paddingBottom: Spacing.sm }}>
             {permissionStatus !== 'granted' || !currentCity ? (
-              <Text style={{ color: colors.textSecondary, marginBottom: Spacing.sm }}>
-                Location permission required for local alerts.
-              </Text>
+              <TouchableOpacity
+                style={[styles.permissionPrompt, { backgroundColor: colors.primary + '15' }]}
+                onPress={handleRequestPermission}
+              >
+                <Ionicons name="navigate-outline" size={18} color={colors.primary} />
+                <Text style={[styles.permissionPromptText, { color: colors.primary }]}>
+                  Tap to enable location for local alerts
+                </Text>
+              </TouchableOpacity>
             ) : (
               <>
                 {currentWeather && (
@@ -230,6 +254,40 @@ export default function NewsScreen() {
                 {loadshedding && (
                   <InfrastructureCard loadshedding={loadshedding} compact />
                 )}
+
+                {/* Localised water/electricity/weather/infrastructure news */}
+                {filteredLocalNews.length > 0 && (
+                  <View style={styles.localNewsSection}>
+                    <Text style={[styles.localNewsTitle, { color: colors.text }]}>Local Updates</Text>
+                    {filteredLocalNews.map((article) => {
+                      const iconMap: Record<string, keyof typeof Ionicons.glyphMap> = {
+                        water: 'water',
+                        electricity: 'flash',
+                        weather: 'cloud',
+                        infrastructure: 'construct',
+                      };
+                      const iconName = iconMap[article.category] || 'alert-circle';
+                      return (
+                        <TouchableOpacity
+                          key={article.id}
+                          style={[styles.localNewsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                          onPress={() => handleArticlePress(article)}
+                          activeOpacity={0.8}
+                        >
+                          <Ionicons name={iconName} size={18} color={colors.primary} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.localNewsCardTitle, { color: colors.text }]} numberOfLines={2}>
+                              {article.title}
+                            </Text>
+                            <Text style={[styles.localNewsCardSource, { color: colors.textSecondary }]}>
+                              {article.source}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
               </>
             )}
           </View>
@@ -240,7 +298,7 @@ export default function NewsScreen() {
       activeTab, currentWeather, currentCity, colors, scope,
       permissionStatus, timeFilter, lastUpdated, handleEnableLocation, t,
       getTimeFilterName, permissionModalVisible, handleRequestPermission,
-      loadshedding,
+      loadshedding, filteredLocalNews, handleArticlePress,
     ]
   );
 
@@ -367,5 +425,44 @@ const styles = StyleSheet.create({
   emptyContainer: {
     padding: 32,
     alignItems: 'center',
+  },
+  permissionPrompt: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.sm,
+    borderRadius: 12,
+    marginBottom: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  permissionPromptText: {
+    fontSize: Typography.sizes.caption,
+    fontFamily: Typography.fonts.medium,
+    flex: 1,
+  },
+  localNewsSection: {
+    marginTop: Spacing.md,
+  },
+  localNewsTitle: {
+    fontSize: Typography.sizes.body,
+    fontFamily: Typography.fonts.bold,
+    marginBottom: Spacing.sm,
+  },
+  localNewsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.sm,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: Spacing.xs,
+    gap: Spacing.sm,
+  },
+  localNewsCardTitle: {
+    fontSize: Typography.sizes.caption,
+    fontFamily: Typography.fonts.medium,
+    marginBottom: 2,
+  },
+  localNewsCardSource: {
+    fontSize: Typography.sizes.tiny,
+    fontFamily: Typography.fonts.regular,
   },
 });

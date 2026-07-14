@@ -8,13 +8,9 @@ export function stripHtml(html: string): string {
   if (!html) return '';
   
   return html
-    // Replace <br> and <br/> with newlines
     .replace(/<br\s*\/?>/gi, '\n')
-    // Replace </p> with double newline
     .replace(/<\/p>/gi, '\n\n')
-    // Remove all remaining HTML tags
     .replace(/<[^>]*>/g, '')
-    // Decode common HTML entities
     .replace(/&nbsp;/gi, ' ')
     .replace(/&amp;/gi, '&')
     .replace(/&lt;/gi, '<')
@@ -31,7 +27,6 @@ export function stripHtml(html: string): string {
     .replace(/&rsquo;/gi, "'")
     .replace(/&ldquo;/gi, '"')
     .replace(/&rdquo;/gi, '"')
-    // Clean up extra whitespace
     .replace(/\n{3,}/g, '\n\n')
     .replace(/[ \t]+/g, ' ')
     .trim();
@@ -101,13 +96,26 @@ export function formatDistance(meters: number): string {
 
 /**
  * Generate a random anonymous reference code for tips
- * Format: PSHAD-XXXX-XXXX (no user-identifiable info)
+ * Format: CSHAD-XXXX-XXXX (no user-identifiable info)
  */
 export function generateTipReference(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // No I/O/0/1 (avoid confusion)
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "";
   for (let i = 0; i < 8; i++) {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-  return `PSHAD-${code.slice(0, 4)}-${code.slice(4, 8)}`;
+  return `CSHAD-${code.slice(0, 4)}-${code.slice(4, 8)}`;
+}
+
+/**
+ * Extract the first image URL from HTML content.
+ * Checks for <img> tags and Markdown image syntax.
+ */
+export function extractFirstImage(html?: string): string | null {
+  if (!html) return null;
+  const imgMatch = html.match(/<img[^>]+src\s*=\s*["']([^"']+)["']/i);
+  if (imgMatch) return imgMatch[1];
+  const mdMatch = html.match(/!\[.*?\]\(\s*(https?:\/\/[^\s)]+)\s*\)/i);
+  if (mdMatch) return mdMatch[1];
+  return null;
 }

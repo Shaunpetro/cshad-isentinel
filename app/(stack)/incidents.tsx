@@ -1,5 +1,5 @@
 // app/(stack)/incidents.tsx
-// Beta 4 – Incidents feed: local hazards and reports in a glassmorphism timeline
+// Beta 4 – Incidents feed: local hazards, near‑me reports, and localised water/electricity/weather news
 
 import React, { useState, useCallback } from "react";
 import {
@@ -12,11 +12,12 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "@/contexts";
 import { useLocationContext } from "@/contexts/LocationContext";
 import { useLocalAlerts } from "@/hooks/useLocalAlerts";
+import { useNews } from "@/hooks/useNews";
 import { Typography, Spacing, Shadows, BorderRadius } from "@/config/theme";
 import { HazardReportModal } from "@/components/hub/HazardReportModal";
 import {
@@ -25,7 +26,9 @@ import {
   voteHazardStillThere,
 } from "@/services/map/mapService";
 import type { MapMarker } from "@/services/map";
+import type { NewsItem } from "@/types";
 
+// ---------- shared types ----------
 interface IncidentItem {
   id: string;
   title: string;
@@ -75,18 +78,41 @@ function formatTimeAgo(dateString: string): string {
   return date.toLocaleDateString();
 }
 
+// ---------- component ----------
 export default function IncidentsScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
-  const { currentCity, deviceLocation, permissionStatus, requestPermission } = useLocationContext();
-  const { alerts: nearMeReports, refresh: refreshNearMe, isLoading: alertsLoading } = useLocalAlerts();
+  const router = useRouter();
+  const {
+    currentCity,
+    deviceLocation,
+    permissionStatus,
+    requestPermission,
+  } = useLocationContext();
+  const { alerts: nearMeReports, refresh: refreshNearMe } = useLocalAlerts();
   const [hazardMarkers, setHazardMarkers] = useState<MapMarker[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hazardModalVisible, setHazardModalVisible] = useState(false);
 
-  const cityName = currentCity?.name || 'Your area';
+  // --- localised news for water/electricity/weather ---
+  const cityName = currentCity?.name || '';
+  const newsCategories = ['water', 'electricity', 'weather', 'infrastructure'];
+  const { news: localNews } = useNews({
+    scope: 'local',
+    latitude: currentCity?.latitude,
+    longitude: currentCity?.longitude,
+    cityName: cityName,
+    radiusKm: 25,
+    limit: 10,
+    realtime: false,
+    autoRefresh: false,
+  });
+  const filteredNews = localNews
+    .filter(article => newsCategories.includes(article.category))
+    .slice(0, 5);
 
+  // --- load hazards ---
   const loadData = useCallback(async (isRefresh = false) => {
     if (isRefresh) setIsRefreshing(true);
     else setIsLoading(true);
@@ -129,6 +155,7 @@ export default function IncidentsScreen() {
     }, [loadData, refreshNearMe])
   );
 
+  // --- build incident lists ---
   const cityNameLower = currentCity?.name?.toLowerCase() || '';
   const localIncidents: IncidentItem[] = nearMeReports
     .filter((r) => cityNameLower ? r.locationName?.toLowerCase().includes(cityNameLower) || !r.locationName : true)
@@ -177,13 +204,40 @@ export default function IncidentsScreen() {
     loadData(true);
   };
 
-  const renderItem = ({ item }: { item: IncidentItem }) => {
+  const handleArticlePress = (article: NewsItem) => {
+    router.push({ pathname: '/(stack)/article/[id]', params: { id: article.id } });
+  };
+
+  // --- render helpers ---
+  const renderNewsCard = ({ item }: { item: NewsItem }) => {
+    const iconName = CATEGORY_ICONS[item.category] || 'alert-circle';
+    return (
+      <TouchableOpacity
+        style={[styles.newsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        onPress={() => handleArticlePress(item)}
+        activeOpacity={0.8}
+      >
+        <View style={[styles.newsIconBox, { backgroundColor: colors.primary + '20' }]}>
+          <Ionicons name={iconName} size={20} color={colors.primary} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.newsTitle, { color: colors.text }]} numberOfLines={2}>
+            {item.title}
+          </Text>
+          <Text style={[styles.newsMeta, { color: colors.textSecondary }]}>
+            {item.source} · {formatTimeAgo(item.publishedAt)}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderIncidentItem = ({ item }: { item: IncidentItem }) => {
     const iconName = CATEGORY_ICONS[item.category] || 'alert-circle';
     const severityColor = SEVERITY_COLORS[item.severity] || '#4CAF50';
 
     return (
       <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        {/* Header row */}
         <View style={styles.cardHeader}>
           <View style={[styles.iconBox, { backgroundColor: item.type === 'hazard' ? '#FF6D00' + '20' : '#00D4AA' + '20' }]}>
             <Ionicons name={iconName} size={22} color={item.type === 'hazard' ? '#FF6D00' : '#00D4AA'} />
@@ -207,14 +261,12 @@ export default function IncidentsScreen() {
           </Text>
         </View>
 
-        {/* Description */}
         {item.description && (
           <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={3}>
             {item.description}
           </Text>
         )}
 
-        {/* Voting for hazards */}
         {item.type === 'hazard' && (
           <View style={[styles.voteRow, { borderTopColor: colors.divider }]}>
             <TouchableOpacity style={styles.voteButton} onPress={() => handleVoteCleared(item.id)}>
@@ -231,6 +283,7 @@ export default function IncidentsScreen() {
     );
   };
 
+  // --- list header ---
   const renderHeader = () => (
     <View style={styles.headerSection}>
       <View style={styles.headerRow}>
@@ -259,8 +312,23 @@ export default function IncidentsScreen() {
           </Text>
         </TouchableOpacity>
       )}
+
+      {/* Local news section */}
+      {filteredNews.length > 0 && (
+        <View style={styles.newsSection}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Local Updates</Text>
+          {filteredNews.map((article) => (
+            <React.Fragment key={article.id}>{renderNewsCard({ item: article })}</React.Fragment>
+          ))}
+        </View>
+      )}
     </View>
   );
+
+  const combinedData = [
+    ...filteredNews.map(a => ({ type: 'news', data: a })),
+    ...allIncidents.map(i => ({ type: 'incident', data: i })),
+  ];
 
   if (isLoading && allIncidents.length === 0) {
     return (
@@ -276,9 +344,12 @@ export default function IncidentsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <FlatList
-        data={allIncidents}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
+        data={combinedData}
+        renderItem={({ item }) => {
+          if (item.type === 'news') return renderNewsCard({ item: item.data as NewsItem });
+          return renderIncidentItem({ item: item.data as IncidentItem });
+        }}
+        keyExtractor={(item) => item.data.id}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -310,6 +381,7 @@ export default function IncidentsScreen() {
   );
 }
 
+// ---------- styles ----------
 const styles = StyleSheet.create({
   container: { flex: 1 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -354,6 +426,41 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fonts.medium,
     flex: 1,
   },
+  // news cards
+  newsSection: {
+    marginTop: Spacing.lg,
+  },
+  sectionTitle: {
+    fontSize: Typography.sizes.body,
+    fontFamily: Typography.fonts.bold,
+    marginBottom: Spacing.sm,
+  },
+  newsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.xs,
+    gap: Spacing.sm,
+  },
+  newsIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  newsTitle: {
+    fontSize: Typography.sizes.caption,
+    fontFamily: Typography.fonts.medium,
+    marginBottom: 2,
+  },
+  newsMeta: {
+    fontSize: Typography.sizes.tiny,
+    fontFamily: Typography.fonts.regular,
+  },
+  // incident cards
   card: {
     marginHorizontal: Spacing.md,
     marginBottom: Spacing.md,

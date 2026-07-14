@@ -1,5 +1,5 @@
 // app/(stack)/opportunities.tsx
-// Beta 4 - Phase 1: Opportunities stack screen
+// Beta 4 – Opportunities with premium tender search
 
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
@@ -21,6 +21,7 @@ import { OpportunityCard } from '@/components/opportunities/OpportunityCard';
 import { OpportunityDetailModal } from '@/components/opportunities/OpportunityDetailModal';
 import { FilterSheet } from '@/components/opportunities/FilterSheet';
 import { SubscriptionModal } from '@/components/opportunities/SubscriptionModal';
+import { TenderSearchModal } from '@/components/opportunities/TenderSearchModal';
 import { Typography, Spacing, BorderRadius } from '@/config/theme';
 import type { Opportunity } from '@/services/opportunities';
 
@@ -42,6 +43,7 @@ export default function OpportunitiesScreen() {
   const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
+  const [searchVisible, setSearchVisible] = useState(false);
 
   // Premium state with persistence
   const [isSubscribed, setIsSubscribed] = useState<boolean>(false);
@@ -142,9 +144,18 @@ export default function OpportunitiesScreen() {
     setSelectedSubmissionType(null);
   };
 
+  // Search button press – gated by premium
+  const handleSearchPress = () => {
+    if (!isSubscribed) {
+      setSubscriptionModalVisible(true);
+      return;
+    }
+    setSearchVisible(true);
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Top Tabs + Filter Button */}
+      {/* Top Tabs + Filter Button + Search Button */}
       <View style={[styles.topBar, { backgroundColor: colors.surface, borderBottomColor: colors.divider }]}>
         <View style={styles.tabsRow}>
           {TOP_TABS.map((tab) => (
@@ -175,10 +186,20 @@ export default function OpportunitiesScreen() {
             </Pressable>
           ))}
         </View>
-        <Pressable
-          style={styles.filterButton}
-          onPress={() => setFilterSheetVisible(true)}
-        >
+        {/* Search icon (only for tenders) */}
+        {activeCategory === 'tender' && (
+          <Pressable style={styles.searchButton} onPress={handleSearchPress}>
+            <Ionicons
+              name="search"
+              size={20}
+              color={isSubscribed ? colors.primary : colors.textDisabled}
+            />
+            {!isSubscribed && (
+              <Ionicons name="lock-closed" size={10} color={colors.warning} style={styles.lockBadge} />
+            )}
+          </Pressable>
+        )}
+        <Pressable style={styles.filterButton} onPress={() => setFilterSheetVisible(true)}>
           <Ionicons name="options-outline" size={20} color={colors.text} />
           {activeFilterCount > 0 && (
             <View style={[styles.filterBadge, { backgroundColor: colors.primary }]}>
@@ -251,6 +272,14 @@ export default function OpportunitiesScreen() {
         onClose={() => setSubscriptionModalVisible(false)}
         onSelectPlan={handleSelectPlan}
       />
+
+      {/* Tender Search Modal */}
+      <TenderSearchModal
+        visible={searchVisible}
+        onClose={() => setSearchVisible(false)}
+        onSelect={handlePress}
+        tenders={opportunities}
+      />
     </View>
   );
 }
@@ -267,6 +296,16 @@ const styles = StyleSheet.create({
   tabsRow: { flex: 1, flexDirection: 'row' },
   tab: { flex: 1, alignItems: 'center', paddingVertical: Spacing.sm, gap: 4 },
   tabText: { fontSize: Typography.sizes.label },
+  searchButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    position: 'relative',
+  },
+  lockBadge: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+  },
   filterButton: { paddingHorizontal: 12, paddingVertical: 8, position: 'relative' },
   filterBadge: {
     position: 'absolute', top: 2, right: 2, minWidth: 16, height: 16,

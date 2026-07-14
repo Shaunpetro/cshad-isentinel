@@ -1,5 +1,5 @@
 // app/(stack)/_layout.tsx
-// Beta 4 – Responsive header, home logo 84×56, user icon + settings on Live
+// Beta 4 – Responsive header, home logo 76×50 with bottom spacing
 
 import React, { useEffect, useState } from 'react';
 import { Stack, useRouter, usePathname } from 'expo-router';
@@ -30,7 +30,7 @@ export default function StackLayout() {
   // ----- Dynamic header sizing -----
   const headerHeight = isHome ? 80 : 56;
   const logoStyle = isHome
-    ? { width: 84, height: 56 }
+    ? { width: 76, height: 50, marginBottom: 4 }
     : { width: 60, height: 40 };
 
   const headerBg = theme.isDark ? theme.colors.background : '#FFFFFF';
@@ -129,7 +129,6 @@ export default function StackLayout() {
         <Stack.Screen name="article/[id]" options={{ title: 'Article' }} />
       </Stack>
 
-      {/* Floating Home Button */}
       {!isHome && (
         <TouchableOpacity
           onPress={() => router.navigate('/')}
