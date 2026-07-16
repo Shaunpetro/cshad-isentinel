@@ -4,10 +4,10 @@ import { ExpoConfig, ConfigContext } from "expo/config";
 export default ({ config }: ConfigContext): ExpoConfig => {
   const expoConfig: ExpoConfig = {
     name: "CSHAD iSentinel News",
-    slug: "cshad-isentinel-news",
-    owner: process.env.EAS_OWNER || "shaunpetro",
-    version: "2.2606.01",
-    runtimeVersion: "2.2606.01",                    // ← fixed
+    slug: "cshadnews",
+    owner: process.env.EAS_OWNER || "shaunatg",
+    version: "3.2607.03",
+    runtimeVersion: "3.2607.03",                    // ← fixed
     orientation: "portrait",
     icon: "./assets/brand/cshad-isentinel-logo-icon.png",
     scheme: "cshad-isentinel",
@@ -80,7 +80,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       buildDate: new Date().toISOString(),
       developer: "Petro@ATG",
       eas: {
-        projectId: process.env.EAS_PROJECT_ID || "41d9d284-b014-48ab-9238-fe2c0724fd98",
+        projectId: process.env.EAS_PROJECT_ID || "ce9ad511-1168-4d71-941d-35a5f4214892",
       },
     },
   };

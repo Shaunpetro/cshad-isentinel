@@ -53,7 +53,7 @@ export function NewsCard({ article, onPress }: Props) {
     null;
 
   // App logo for fallback
-  const logoSrc = require("../../assets/brand/cshad-isentinel-logo-main.png");
+  const logoSrc = require("../../../assets/brand/cshad-isentinel-logo-main.png");
 
   return (
     <Pressable
