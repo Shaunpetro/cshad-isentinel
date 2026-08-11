@@ -71,7 +71,7 @@ export default function StackLayout() {
             );
           },
           headerLeft: ({ canGoBack }) => {
-            if (!canGoBack) return null;
+            if (isHome || !canGoBack) return null;
             return (
               <TouchableOpacity
                 onPress={() => router.back()}

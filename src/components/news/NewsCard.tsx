@@ -1,5 +1,5 @@
 // src/components/news/NewsCard.tsx
-// Beta 4 – News card with designed fallback placeholder
+// Beta 4 – News card with red "Breaking News" fallback
 
 import React from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
@@ -52,7 +52,6 @@ export function NewsCard({ article, onPress }: Props) {
     extractFirstImage(article.summary) ||
     null;
 
-  // App logo for fallback
   const logoSrc = require("../../../assets/brand/cshad-isentinel-logo-main.png");
 
   return (
@@ -75,9 +74,7 @@ export function NewsCard({ article, onPress }: Props) {
       ) : (
         <View style={[styles.fallbackContainer, { backgroundColor: colors.surface }]}>
           <Image source={logoSrc} style={styles.fallbackLogo} resizeMode="contain" />
-          <Text style={[styles.fallbackText, { color: colors.textSecondary }]}>
-            Breaking News
-          </Text>
+          <Text style={styles.fallbackText}>Breaking News</Text>
         </View>
       )}
 
@@ -164,7 +161,7 @@ const styles = StyleSheet.create({
     fontFamily: Typography.fonts.bold,
     letterSpacing: 1,
     textTransform: 'uppercase',
-    opacity: 0.5,
+    color: '#FF4757',   // red
   },
   content: {
     padding: Spacing.md,

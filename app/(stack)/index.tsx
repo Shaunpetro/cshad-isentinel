@@ -1,5 +1,5 @@
 // app/(stack)/index.tsx
-// Beta 4 – Home screen with refined carousel, card‑wrapped favorites & sections
+// Beta 4 – Home screen with separate Favorites and Explore CSHAD cards
 
 import React, { useState, useCallback } from 'react';
 import { View, ScrollView, StyleSheet, Text } from 'react-native';
@@ -60,12 +60,19 @@ export default function HomeScreen() {
         onRadiusChange={setRadius}
       />
 
-      {/* Favorites + Sections wrapped in a card */}
-      <View style={[styles.discoverCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-        <Text style={[styles.discoverHeading, { color: theme.colors.text }]}>
-          Explore CSHAD
+      {/* Your Favorites – separate card */}
+      <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+        <Text style={[styles.sectionHeading, { color: theme.colors.text }]}>
+          ⭐ Your Favorites
         </Text>
         <FavoritesFeed refreshKey={favoritesKey} />
+      </View>
+
+      {/* Explore CSHAD – separate card */}
+      <View style={[styles.sectionCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+        <Text style={[styles.sectionHeading, { color: theme.colors.text }]}>
+          Explore CSHAD
+        </Text>
         <SectionNavigator onSectionPress={() => setFavoritesKey((prev) => prev + 1)} />
       </View>
 
@@ -90,16 +97,15 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 16, gap: 20, alignItems: 'center' },
-  discoverCard: {
+  sectionCard: {
     width: '100%',
     borderRadius: 16,
     borderWidth: 1,
     padding: 16,
-    gap: 16,
+    gap: 12,
   },
-  discoverHeading: {
+  sectionHeading: {
     fontSize: 18,
     fontFamily: 'DMSans-Bold',
-    marginBottom: 4,
   },
 });

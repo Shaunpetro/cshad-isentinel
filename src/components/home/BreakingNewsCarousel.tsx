@@ -1,5 +1,5 @@
 // src/components/home/BreakingNewsCarousel.tsx
-// Beta 4 – Breaking news carousel with section header, swipeable headlines, city & radius controls
+// Beta 4 – Breaking news carousel with red badge and image+headline layout
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
@@ -7,7 +7,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Animated,
   Dimensions,
   FlatList,
 } from 'react-native';
@@ -19,11 +18,9 @@ import RadiusPickerModal from '../location/RadiusPickerModal';
 import type { NewsItem } from '../../types';
 import type { SACity } from '@/services/location';
 
-const RADIUS_OPTIONS = [5, 10, 25, 50, 100];
 const SLIDE_INTERVAL = 45000;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = SCREEN_WIDTH - 64; // 32px padding on each side
-const ITEM_WIDTH = CARD_WIDTH; // each item fills the card width
+const ITEM_WIDTH = SCREEN_WIDTH - 64;
 
 interface Props {
   articles: NewsItem[];
@@ -57,7 +54,7 @@ export default function BreakingNewsCarousel({
     [router]
   );
 
-  // Auto‑slide logic
+  // Auto‑slide
   useEffect(() => {
     if (!articles || articles.length === 0) return;
     if (autoSlideTimer.current) clearInterval(autoSlideTimer.current);
@@ -78,7 +75,6 @@ export default function BreakingNewsCarousel({
 
   const onScrollBeginDrag = () => { isUserInteracting.current = true; };
   const onScrollEndDrag = () => {
-    // Resume auto‑slide after a short delay
     setTimeout(() => { isUserInteracting.current = false; }, 3000);
   };
 
@@ -100,10 +96,18 @@ export default function BreakingNewsCarousel({
         onPress={() => handleArticlePress(item)}
         activeOpacity={0.9}
       >
-        {hasImage && (
+        {/* Image (or placeholder) on the left */}
+        {hasImage ? (
           <Image source={{ uri: item.imageUrl }} style={styles.thumbnail} contentFit="cover" />
+        ) : (
+          <View style={[styles.thumbnailPlaceholder, { backgroundColor: theme.colors.surface }]}>
+            <Text style={styles.placeholderText}>BREAKING</Text>
+          </View>
         )}
+
+        {/* Headline on the right */}
         <View style={styles.headlineTextContainer}>
+          <Text style={styles.badge}>BREAKING NEWS</Text>
           <Text style={[styles.itemTitle, { color: theme.colors.text }]} numberOfLines={3}>
             {item.title}
           </Text>
@@ -115,13 +119,11 @@ export default function BreakingNewsCarousel({
   return (
     <View style={styles.wrapper}>
       {/* Section header */}
-      <Text style={[styles.sectionHeader, { color: theme.colors.text }]}>
-        🚨 Breaking News
-      </Text>
+      <Text style={styles.sectionHeader}>🚨 Breaking News</Text>
 
       {/* Card */}
       <View style={[styles.card, { backgroundColor: theme.colors.card || theme.colors.surface, borderColor: theme.colors.border }]}>
-        {/* Controls row: city pill + radius dropdown */}
+        {/* Controls row */}
         <View style={styles.controlsRow}>
           <TouchableOpacity
             style={[styles.cityPill, { borderColor: theme.colors.border }]}
@@ -182,6 +184,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: 'DMSans-Bold',
     marginBottom: 8,
+    color: '#FF4757',
   },
   card: {
     borderRadius: 14,
@@ -220,9 +223,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: 'DMSans-Medium',
   },
-  listContent: {
-    // No extra padding needed; items fill the width
-  },
+  listContent: {},
   itemContainer: {
     width: ITEM_WIDTH,
     flexDirection: 'row',
@@ -230,13 +231,36 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   thumbnail: {
-    width: 60,
-    height: 60,
+    width: 80,
+    height: 80,
     borderRadius: 8,
     marginRight: 12,
   },
+  thumbnailPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FF4757',
+  },
+  placeholderText: {
+    fontSize: 10,
+    fontFamily: 'DMSans-Bold',
+    color: '#FF4757',
+    textAlign: 'center',
+  },
   headlineTextContainer: {
     flex: 1,
+  },
+  badge: {
+    fontSize: 10,
+    fontFamily: 'DMSans-Bold',
+    letterSpacing: 1,
+    marginBottom: 4,
+    color: '#FF4757',
   },
   itemTitle: {
     fontSize: 14,
