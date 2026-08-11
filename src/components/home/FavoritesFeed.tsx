@@ -53,9 +53,6 @@ export default function FavoritesFeed({ refreshKey }: Props) {
 
   return (
     <View style={{ width: '100%' }}>
-      <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-        ⭐ {t('home.favorites', 'Your Favorites')}
-      </Text>
       <View style={styles.favoritesRow}>
         {topSections.map((item) => {
           const meta = SECTION_META[item.key];

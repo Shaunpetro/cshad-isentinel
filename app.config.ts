@@ -65,6 +65,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       "react-native-google-mobile-ads",
     ],
 
+    // @ts-ignore
     "react-native-google-mobile-ads": {
       android_app_id: process.env.EXPO_PUBLIC_ADMOB_ANDROID_APP_ID ?? "ca-app-pub-3940256099942544~3347511713",
       ios_app_id: process.env.EXPO_PUBLIC_ADMOB_IOS_APP_ID ?? "ca-app-pub-3940256099942544~1458002511",
