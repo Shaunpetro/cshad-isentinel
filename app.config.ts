@@ -7,7 +7,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     slug: "cshadnews",
     owner: process.env.EAS_OWNER || "shaunatg",
     version: "3.2607.03",
-    runtimeVersion: "3.2607.03",                    // ← fixed
+    runtimeVersion: "3.2607.03",
     orientation: "portrait",
     icon: "./assets/brand/cshad-isentinel-logo-icon.png",
     scheme: "cshad-isentinel",
@@ -62,7 +62,14 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       "expo-dev-client",
       "expo-sharing",
       "expo-web-browser",
+      "react-native-google-mobile-ads",
     ],
+
+    "react-native-google-mobile-ads": {
+      android_app_id: process.env.EXPO_PUBLIC_ADMOB_ANDROID_APP_ID ?? "ca-app-pub-3940256099942544~3347511713",
+      ios_app_id: process.env.EXPO_PUBLIC_ADMOB_IOS_APP_ID ?? "ca-app-pub-3940256099942544~1458002511",
+      delay_app_measurement_init: true,
+    },
 
     experiments: {
       typedRoutes: true,

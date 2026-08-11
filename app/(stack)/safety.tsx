@@ -1,5 +1,5 @@
 // app/(stack)/safety.tsx
-// Beta 4 – Safety Hub: auto‑zoom, CSHAD pointer, polished sheet
+// Beta 4 – Safety Hub: auto‑zoom to device location on open, CSHAD pointer, polished sheet
 
 import React, { useState, useRef, useCallback } from "react";
 import {
@@ -38,11 +38,12 @@ const REPORT_FAB_BOTTOM = 160;
 
 // ---------- custom CSHAD user marker ----------
 function UserLocationMarker({ speed }: { speed: number | null }) {
+  // speed in m/s; if < 5, show walking icon (shield‑checkmark), else car (speedometer)
   const isWalking = speed === null || speed < 5;
   return (
     <View style={userMarkerStyles.wrapper}>
       <View style={userMarkerStyles.outer}>
-        <Ionicons name="shield" size={18} color="#FFFFFF" />
+        <Ionicons name={isWalking ? "shield-checkmark" : "speedometer"} size={18} color="#FFFFFF" />
       </View>
       <View style={userMarkerStyles.arrow} />
     </View>

@@ -1,5 +1,5 @@
 // src/hooks/useNews.ts
-// Phase 3E – fixed duplicate realtime subscription
+// Phase 3E – fixed duplicate realtime subscription + news deduplication
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -41,6 +41,17 @@ export interface UseNewsResult {
   totalCount: number | null;
 }
 
+// ── Deduplication helper ──
+const deduplicateByTitle = (list: NewsItem[]): NewsItem[] => {
+  const seen = new Set<string>();
+  return list.filter((item) => {
+    const key = item.title.trim().toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
 export function useNews(options: UseNewsOptions = {}): UseNewsResult {
   const {
     category,
@@ -68,7 +79,7 @@ export function useNews(options: UseNewsOptions = {}): UseNewsResult {
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
-  const channelNameRef = useRef<string | null>(null);   // guard duplicate channels
+  const channelNameRef = useRef<string | null>(null);
 
   const buildParams = useCallback(
     (customOffset?: number): NewsQueryParams => ({
@@ -106,12 +117,12 @@ export function useNews(options: UseNewsOptions = {}): UseNewsResult {
           return;
         }
 
-        const items = mapRecordsToNewsItems(result.data);
+        const items = deduplicateByTitle(mapRecordsToNewsItems(result.data));
 
         if (isRefresh || offset === 0) {
           setNews(items);
         } else {
-          setNews((prev) => [...prev, ...items]);
+          setNews((prev) => deduplicateByTitle([...prev, ...items]));
         }
 
         setTotalCount(result.count);
@@ -120,7 +131,7 @@ export function useNews(options: UseNewsOptions = {}): UseNewsResult {
 
         const breakingResult = await fetchBreakingNews(10);
         if (!breakingResult.error && isMountedRef.current) {
-          setBreakingNews(mapRecordsToNewsItems(breakingResult.data));
+          setBreakingNews(deduplicateByTitle(mapRecordsToNewsItems(breakingResult.data)));
         }
       } catch (err) {
         if (!isMountedRef.current) return;
@@ -168,20 +179,32 @@ export function useNews(options: UseNewsOptions = {}): UseNewsResult {
     };
   }, [autoRefresh, timeFilter, backgroundRefresh]);
 
-  // Realtime subscription – guarded against duplicates
+  // Realtime subscription – guarded + deduplicated
   useEffect(() => {
     if (!realtime) return;
     const name = `news-realtime-${cityName || 'all'}`;
-    if (channelNameRef.current === name) return;   // already subscribed
+    if (channelNameRef.current === name) return;
     channelNameRef.current = name;
 
     unsubscribeRef.current = subscribeToNews(
       (record: any) => {
         const newItem = mapRecordToNewsItem(record);
-        setNews((prev) => [newItem, ...prev]);
+        setNews((prev) => {
+          const alreadyExists = prev.some(
+            (i) => i.title.trim().toLowerCase() === newItem.title.trim().toLowerCase()
+          );
+          if (alreadyExists) return prev;
+          return [newItem, ...prev];
+        });
         setLastUpdated(new Date());
         if (newItem.isBreaking) {
-          setBreakingNews((prev) => [newItem, ...prev.slice(0, 9)]);
+          setBreakingNews((prev) => {
+            const alreadyExists = prev.some(
+              (i) => i.title.trim().toLowerCase() === newItem.title.trim().toLowerCase()
+            );
+            if (alreadyExists) return prev;
+            return [newItem, ...prev.slice(0, 9)];
+          });
         }
       },
       (record: any) => {

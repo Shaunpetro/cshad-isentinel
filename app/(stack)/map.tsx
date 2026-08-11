@@ -1,5 +1,5 @@
 // app/(stack)/map.tsx
-// Beta 4 – Map with background refresh, wrapping filters, city pills below, inline loader, permission modal
+// Beta 4 – Map with centered city pills
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Linking,
-  Platform,
 } from "react-native";
 import MapView, { Marker, Callout, Circle } from "react-native-maps";
 import { Ionicons } from "@expo/vector-icons";
@@ -188,7 +187,6 @@ export default function MapScreen() {
       refreshLocation();
       loadHazards();
       if (showNearMe) refreshNearMe();
-      // After first load, switch to background updates
       if (initialLoad) setInitialLoad(false);
     }, [refreshLocation, loadHazards, showNearMe, refreshNearMe, initialLoad])
   );
@@ -541,33 +539,35 @@ export default function MapScreen() {
         </Pressable>
       </View>
 
-      {/* City pills – below filter bar, wrapping */}
-      <View style={[styles.cityBar, { backgroundColor: colors.surface + '00' }]}>
-        {nearbyCities.map((city) => {
-          const isActive = city.key === 'current' || city.key === activeCity;
-          return (
-            <Pressable
-              key={city.key}
-              onPress={() => {
-                if (city.key === 'current') {
-                  if (mapRef.current && userLat && userLng) {
-                    mapRef.current.animateToRegion({ latitude: userLat, longitude: userLng, ...ZOOM_LEVELS.city }, 800);
+      {/* City pills – centered below filter bar */}
+      <View style={styles.cityBarWrapper}>
+        <View style={[styles.cityBar, { backgroundColor: colors.surface + '00' }]}>
+          {nearbyCities.map((city) => {
+            const isActive = city.key === 'current' || city.key === activeCity;
+            return (
+              <Pressable
+                key={city.key}
+                onPress={() => {
+                  if (city.key === 'current') {
+                    if (mapRef.current && userLat && userLng) {
+                      mapRef.current.animateToRegion({ latitude: userLat, longitude: userLng, ...ZOOM_LEVELS.city }, 800);
+                    }
+                  } else {
+                    handleZoomToCity(city.key);
                   }
-                } else {
-                  handleZoomToCity(city.key);
-                }
-              }}
-              style={({ pressed }) => [
-                styles.cityButton,
-                { backgroundColor: isActive ? colors.primary : colors.surface, borderColor: isActive ? colors.primary : 'transparent' },
-                pressed && styles.buttonPressed,
-              ]}
-            >
-              <Text style={[styles.cityLabel, { color: isActive ? '#FFFFFF' : colors.text }]}>{city.label}</Text>
-              {isActive && <View style={styles.activeIndicator}><Ionicons name="location" size={10} color="#FFFFFF" /></View>}
-            </Pressable>
-          );
-        })}
+                }}
+                style={({ pressed }) => [
+                  styles.cityButton,
+                  { backgroundColor: isActive ? colors.primary : colors.surface, borderColor: isActive ? colors.primary : 'transparent' },
+                  pressed && styles.buttonPressed,
+                ]}
+              >
+                <Text style={[styles.cityLabel, { color: isActive ? '#FFFFFF' : colors.text }]}>{city.label}</Text>
+                {isActive && <View style={styles.activeIndicator}><Ionicons name="location" size={10} color="#FFFFFF" /></View>}
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
 
       {/* Legend */}
@@ -664,15 +664,20 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   filterButtonText: { fontSize: 12, fontFamily: Typography.fonts.medium },
-  cityBar: {
+  cityBarWrapper: {
     position: 'absolute',
     top: 105,
-    left: Spacing.sm,
-    right: Spacing.sm,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  cityBar: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    zIndex: 10,
+    justifyContent: 'center',
     gap: 4,
+    paddingHorizontal: Spacing.sm,
   },
   cityButton: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: BorderRadius.md, borderWidth: 2, minWidth: 40, alignItems: 'center', ...Shadows.sm },
   buttonPressed: { opacity: 0.7, transform: [{ scale: 0.95 }] },
