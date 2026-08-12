@@ -1,88 +1,154 @@
-// app/_layout.tsx
-import React, { useEffect } from "react";
-import { Stack } from "expo-router";
-import { View, Text, StyleSheet } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
-import { I18nextProvider } from "react-i18next";
-import i18n from "@/i18n";
-import { useAppReady } from "@/hooks/useAppReady";
-import { CustomSplashScreen } from "@/components/core/SplashScreen";
-import { useNotifications } from "@/hooks/useNotifications";
-import { ThemeProvider, useTheme } from "@/contexts";
-import { AdProvider } from "@/components/ads/AdProvider";
-import { UpdateBanner } from "@/components/common/UpdateBanner";
+// app/(stack)/_layout.tsx
+// Beta 4 – Responsive header, home logo, no FAB, no AdProvider
 
-class ErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { error: Error | null }
-> {
-  state = { error: null as Error | null };
+import React, { useEffect, useState } from 'react';
+import { Stack, useRouter, usePathname } from 'expo-router';
+import { TouchableOpacity, Platform, View, StyleSheet, Image, Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '@/contexts';
+import { StatusBar } from 'expo-status-bar';
 
-  static getDerivedStateFromError(error: Error) {
-    return { error };
-  }
+export default function StackLayout() {
+  const theme = useTheme();
+  const router = useRouter();
+  const pathname = usePathname();
+  const [blink, setBlink] = useState(false);
 
-  render() {
-    if (this.state.error) {
-      return (
-        <SafeAreaView style={errorStyles.container}>
-          <Text style={errorStyles.title}>Startup Error</Text>
-          <Text style={errorStyles.message}>{this.state.error.message}</Text>
-        </SafeAreaView>
-      );
-    }
-    return this.props.children;
-  }
-}
-
-const errorStyles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", alignItems: "center", padding: 32 },
-  title: { fontSize: 20, fontFamily: "DMSans-Bold", color: "#FF4757", marginBottom: 16 },
-  message: { fontSize: 14, fontFamily: "DMSans-Regular", color: "#FF4757", textAlign: "center" },
-});
-
-function RootLayoutInner() {
-  const { isReady, showCustomSplash, onLayoutReady, onSplashComplete } = useAppReady();
-  const { colors } = useTheme();
-  const { isInitialized: notificationsReady, error: notificationError } = useNotifications();
+  const isHome = pathname === '/' || pathname.endsWith('index');
+  const isLive = pathname.endsWith('live');
 
   useEffect(() => {
-    if (notificationsReady) {
-      if (notificationError) console.log("[RootLayout] Notifications note:", notificationError);
-      else console.log("[RootLayout] Notifications initialized");
+    if (isHome) {
+      const interval = setInterval(() => setBlink((prev) => !prev), 800);
+      return () => clearInterval(interval);
     }
-  }, [notificationsReady, notificationError]);
+  }, [isHome]);
 
-  if (!isReady) return null;
+  const logoSrc = require('../../assets/brand/cshad-isentinel-logo-main.png');
+  const liveIconColor = blink ? '#FBC4C4' : theme.colors.text;
+
+  const headerHeight = isHome ? 80 : 56;
+  const logoStyle = isHome
+    ? { width: 76, height: 50, marginBottom: 4 }
+    : { width: 60, height: 40 };
+
+  const headerBg = theme.isDark ? theme.colors.background : '#FFFFFF';
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]} onLayout={onLayoutReady}>
-      <StatusBar style={colors.statusBar === 'light' ? 'light' : 'dark'} />
-      <UpdateBanner />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background} }}>
-        <Stack.Screen name="(stack)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
+    <>
+      <StatusBar
+        style={theme.isDark ? 'light' : 'dark'}
+        backgroundColor={Platform.OS === 'android' ? headerBg : undefined}
+        translucent={false}
+      />
+      <Stack
+        screenOptions={({ navigation }) => ({
+          headerStyle: {
+            backgroundColor: headerBg,
+            borderBottomColor: theme.glass.border,
+            borderBottomWidth: 1,
+            height: headerHeight,
+          } as any,
+          headerTintColor: theme.colors.text,
+          headerTitleStyle: { fontWeight: 'bold' },
+          headerTitle: ({ children }) => {
+            return (
+              <View style={styles.headerTitleContainer}>
+                <Image source={logoSrc} style={[styles.headerLogo, logoStyle]} resizeMode="contain" />
+                {children === 'Live' ? (
+                  <TouchableOpacity
+                    onPress={() => router.push('live' as any)}
+                    style={styles.liveSection}
+                  >
+                    <Ionicons name="play-circle-outline" size={22} color={liveIconColor} />
+                    <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Live</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{children}</Text>
+                )}
+              </View>
+            );
+          },
+          headerLeft: ({ canGoBack }) => {
+            if (isHome || !canGoBack) return null;
+            return (
+              <TouchableOpacity
+                onPress={() => router.back()}
+                style={{ marginLeft: Platform.OS === 'android' ? 8 : 0 }}
+              >
+                <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+            );
+          },
+          headerRight: () => {
+            if (isLive) {
+              return (
+                <View style={{ flexDirection: 'row', gap: 16, marginRight: 8 }}>
+                  <TouchableOpacity onPress={() => { /* handled by live screen */ }}>
+                    <Ionicons name="person-circle-outline" size={28} color={theme.colors.text} />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => router.push('settings' as any)}>
+                    <Ionicons name="settings-outline" size={24} color={theme.colors.text} />
+                  </TouchableOpacity>
+                </View>
+              );
+            }
+            return (
+              <TouchableOpacity onPress={() => router.push('settings' as any)} style={{ marginRight: 8 }}>
+                <Ionicons name="settings-outline" size={24} color={theme.colors.text} />
+              </TouchableOpacity>
+            );
+          },
+        })}
+      >
+        <Stack.Screen
+          name="index"
+          options={{
+            title: 'Live',
+            headerLeft: () => null,
+            headerRight: () => (
+              <View style={{ flexDirection: 'row', gap: 16, marginRight: 8 }}>
+                <TouchableOpacity onPress={() => {}}>
+                  <Ionicons name="notifications-outline" size={24} color={theme.colors.text} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => router.push('settings' as any)}>
+                  <Ionicons name="settings-outline" size={24} color={theme.colors.text} />
+                </TouchableOpacity>
+              </View>
+            ),
+          }}
+        />
+        <Stack.Screen name="news" options={{ title: 'News' }} />
+        <Stack.Screen name="opportunities" options={{ title: 'Opportunities' }} />
+        <Stack.Screen name="map" options={{ title: 'Map' }} />
+        <Stack.Screen name="safety" options={{ title: 'Safety Hub' }} />
+        <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        <Stack.Screen name="live" options={{ title: 'Live Hub' }} />
+        <Stack.Screen name="incidents" options={{ title: 'Incidents' }} />
+        <Stack.Screen name="article/[id]" options={{ title: 'Article' }} />
       </Stack>
-      {showCustomSplash && <CustomSplashScreen onComplete={onSplashComplete} />}
-    </View>
+    </>
   );
 }
 
-export default function RootLayout() {
-  return (
-    <I18nextProvider i18n={i18n}>
-      <ThemeProvider>
-        <AdProvider>
-          <ErrorBoundary>
-            <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }} edges={["top"]}>
-              <RootLayoutInner />
-            </SafeAreaView>
-          </ErrorBoundary>
-        </AdProvider>
-      </ThemeProvider>
-    </I18nextProvider>
-  );
-}
-
-const styles = StyleSheet.create({ root: { flex: 1 } });
+const styles = StyleSheet.create({
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  headerLogo: {
+    marginRight: 10,
+  },
+  liveSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+});
