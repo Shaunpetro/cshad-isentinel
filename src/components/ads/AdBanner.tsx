@@ -1,36 +1,18 @@
 // src/components/ads/AdBanner.tsx
-// Premium‑aware banner ad
+// Placeholder banner – will be replaced with real AdMob after fixing Kotlin compatibility
 
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { BannerAd, BannerAdSize } from 'react-native-google-mobile-ads';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useAdUnits } from '../../hooks/useAdUnits';
-
-const PREMIUM_KEY = 'pshad_premium_subscribed';
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { useTheme } from '../../contexts';
 
 export function AdBanner() {
-  const { banner } = useAdUnits();
-  const [isSubscribed, setIsSubscribed] = useState(false);
-
-  useEffect(() => {
-    AsyncStorage.getItem(PREMIUM_KEY).then((val) => {
-      setIsSubscribed(val === 'true');
-    });
-  }, []);
-
-  // Premium users see no ads
-  if (isSubscribed) return null;
+  const theme = useTheme();
 
   return (
-    <View style={styles.container}>
-      <BannerAd
-        unitId={banner}
-        size={BannerAdSize.BANNER}
-        requestOptions={{
-          requestNonPersonalizedAdsOnly: true,
-        }}
-      />
+    <View style={[styles.container, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+      <Text style={[styles.text, { color: theme.colors.textDisabled }]}>
+        Advertisement
+      </Text>
     </View>
   );
 }
@@ -40,5 +22,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginVertical: 12,
+    paddingVertical: 32,
+    borderWidth: 1,
+    borderRadius: 8,
+    borderStyle: 'dashed',
+  },
+  text: {
+    fontSize: 14,
+    fontFamily: 'DMSans-Medium',
+    letterSpacing: 1,
   },
 });

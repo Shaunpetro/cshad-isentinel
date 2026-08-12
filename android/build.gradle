@@ -21,11 +21,5 @@ allprojects {
   }
 }
 
-// Force Kotlin 2.3.0 to satisfy the Google Mobile Ads SDK
-ext {
-    kotlinVersion = "2.3.0"
-    kspVersion = "2.3.0-1.0.29"
-}
-
 apply plugin: "expo-root-project"
 apply plugin: "com.facebook.react.rootproject"
