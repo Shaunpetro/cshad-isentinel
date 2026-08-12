@@ -62,15 +62,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       "expo-dev-client",
       "expo-sharing",
       "expo-web-browser",
-      "react-native-google-mobile-ads",
+      // "react-native-google-mobile-ads"  ← removed
     ],
-
-    // @ts-ignore
-    "react-native-google-mobile-ads": {
-      android_app_id: process.env.EXPO_PUBLIC_ADMOB_ANDROID_APP_ID ?? "ca-app-pub-3940256099942544~3347511713",
-      ios_app_id: process.env.EXPO_PUBLIC_ADMOB_IOS_APP_ID ?? "ca-app-pub-3940256099942544~1458002511",
-      delay_app_measurement_init: true,
-    },
 
     experiments: {
       typedRoutes: true,
@@ -84,7 +77,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 
     extra: {
       buildPhase: "004",
-      phaseMonth: "June 2026",
+      phaseMonth: "August 2026",
       buildDate: new Date().toISOString(),
       developer: "Petro@ATG",
       eas: {
