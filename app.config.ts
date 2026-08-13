@@ -6,8 +6,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     name: "CSHAD iSentinel News",
     slug: "cshadnews",
     owner: process.env.EAS_OWNER || "shaunatg",
-    version: "3.2607.03",
-    runtimeVersion: "3.2607.03",
+    version: "3.2608.01",
+    runtimeVersion: "3.2608.01",
     orientation: "portrait",
     icon: "./assets/brand/cshad-isentinel-logo-icon.png",
     scheme: "cshad-isentinel",
@@ -38,7 +38,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         backgroundColor: "#1C1C1C",
       },
       package: "cshad.isentinel.news",
-      versionCode: 9,
+      versionCode: 10,
       googleServicesFile: "./google-services.json",
       config: {
         googleMaps: {
