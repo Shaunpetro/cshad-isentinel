@@ -1,5 +1,5 @@
 // app/(stack)/safety.tsx
-// Beta 4 – Safety Hub: stable loading, auto‑zoom, draggable sheet
+// Beta 4 – Safety Hub: stable map, auto‑zoom, draggable sheet, robust loading
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
@@ -34,7 +34,6 @@ const SHEET_MIN_HEIGHT = 70;
 const SHEET_MAX_HEIGHT = SCREEN_HEIGHT * 0.45;
 const REPORT_FAB_MARGIN = 16;
 
-// ---------- custom CSHAD user marker ----------
 function UserLocationMarker({ speed }: { speed: number | null }) {
   const isWalking = speed === null || speed < 5;
   return (
@@ -77,7 +76,6 @@ const userMarkerStyles = StyleSheet.create({
   },
 });
 
-// ---------- marker color helper ----------
 const getMarkerColor = (marker: MapMarker): string => {
   if (marker.type === 'tip') return '#9C27B0';
   if (marker.type === 'hazard') return '#FF6D00';
@@ -111,8 +109,17 @@ export default function SafetyHubScreen() {
 
   const sheetAnim = useRef(new Animated.Value(0)).current;
   const hasLoaded = useRef(false);
+  const isMounted = useRef(true);
 
-  // ---------- draggable sheet ----------
+  // Ensure cleanup on unmount
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  // Draggable sheet
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 10,
@@ -150,68 +157,69 @@ export default function SafetyHubScreen() {
     extrapolate: 'clamp',
   });
 
-  // ---------- load hazards ----------
+  // Load hazards with fallback
   const loadHazards = useCallback(async () => {
-    const data = await fetchHazards();
-    if (!data) return;
-    const cityName = currentCity?.name?.toLowerCase();
-    let filtered = data.map((h: any) => ({
-      id: h.id,
-      latitude: h.latitude,
-      longitude: h.longitude,
-      title: h.category,
-      description: h.description,
-      type: 'hazard' as const,
-      severity: (h.severity as MapMarker['severity']) || 'medium',
-      timestamp: h.created_at,
-      matchedLocation: h.location_name || 'Unknown',
-      confidence: 'exact' as const,
-      category: h.category || 'other',
-    }));
+    try {
+      const data = await fetchHazards();
+      if (!data || !isMounted.current) return;
+      const cityName = currentCity?.name?.toLowerCase();
+      let filtered = data.map((h: any) => ({
+        id: h.id,
+        latitude: h.latitude,
+        longitude: h.longitude,
+        title: h.category,
+        description: h.description,
+        type: 'hazard' as const,
+        severity: (h.severity as MapMarker['severity']) || 'medium',
+        timestamp: h.created_at,
+        matchedLocation: h.location_name || 'Unknown',
+        confidence: 'exact' as const,
+        category: h.category || 'other',
+      }));
 
-    if (cityName) {
-      filtered = filtered.filter((h) => {
-        const loc = h.matchedLocation?.toLowerCase() || '';
-        if (loc.includes(cityName)) return true;
-        if (deviceLocation && h.latitude && h.longitude) {
-          const R = 6371;
-          const dLat = ((h.latitude - deviceLocation.latitude) * Math.PI) / 180;
-          const dLon = ((h.longitude - deviceLocation.longitude) * Math.PI) / 180;
-          const a =
-            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos((deviceLocation.latitude * Math.PI) / 180) *
-              Math.cos((h.latitude * Math.PI) / 180) *
-              Math.sin(dLon / 2) * Math.sin(dLon / 2);
-          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-          return R * c <= (radiusKm || 25);
-        }
-        return false;
-      });
+      if (cityName) {
+        filtered = filtered.filter((h) => {
+          const loc = h.matchedLocation?.toLowerCase() || '';
+          if (loc.includes(cityName)) return true;
+          if (deviceLocation && h.latitude && h.longitude) {
+            const R = 6371;
+            const dLat = ((h.latitude - deviceLocation.latitude) * Math.PI) / 180;
+            const dLon = ((h.longitude - deviceLocation.longitude) * Math.PI) / 180;
+            const a =
+              Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos((deviceLocation.latitude * Math.PI) / 180) *
+                Math.cos((h.latitude * Math.PI) / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c <= (radiusKm || 25);
+          }
+          return false;
+        });
+      }
+      setHazardMarkers(filtered);
+    } catch (error) {
+      console.warn('[SafetyHub] loadHazards error:', error);
     }
-    setHazardMarkers(filtered);
   }, [currentCity, deviceLocation, radiusKm]);
 
-  // ---------- focus effect: refresh data without spinner loops ----------
+  // Focus effect: only first time full load; subsequent background refresh
   useFocusEffect(
     useCallback(() => {
       if (hasLoaded.current) {
-        // background refresh on subsequent focuses – no spinner
         refreshLocation();
         loadHazards();
         refreshNearMe();
       } else {
         hasLoaded.current = true;
-        // first load only
         (async () => {
           await refreshLocation();
-          await loadHazards();
-          await refreshNearMe();
+          await Promise.all([loadHazards(), refreshNearMe()]);
         })();
       }
     }, [refreshLocation, loadHazards, refreshNearMe])
   );
 
-  // Auto‑zoom / follow device location
+  // Auto-zoom/follow device location
   useEffect(() => {
     if (deviceLocation && mapRef.current && permissionStatus === 'granted') {
       mapRef.current.animateToRegion(
@@ -298,15 +306,6 @@ export default function SafetyHubScreen() {
   const userLat = deviceLocation?.latitude;
   const userLng = deviceLocation?.longitude;
 
-  // Only show full spinner before map is ready and no location yet
-  if (!mapReady && !userLat) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} style={{ flex: 1 }} />
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <MapView
@@ -330,18 +329,12 @@ export default function SafetyHubScreen() {
           left: 0,
         }}
       >
-        {/* Custom user location marker */}
         {userLat && userLng && (
-          <Marker
-            coordinate={{ latitude: userLat, longitude: userLng }}
-            anchor={{ x: 0.5, y: 1 }}
-            tracksViewChanges={false}
-          >
+          <Marker coordinate={{ latitude: userLat, longitude: userLng }} anchor={{ x: 0.5, y: 1 }} tracksViewChanges={false}>
             <UserLocationMarker speed={speed} />
           </Marker>
         )}
 
-        {/* Hazard and incident markers */}
         {allMarkers.map((marker) => (
           <Marker
             key={marker.id}
@@ -377,6 +370,13 @@ export default function SafetyHubScreen() {
           </Marker>
         ))}
       </MapView>
+
+      {/* Loading overlay – only until map ready, map stays mounted */}
+      {!mapReady && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      )}
 
       {/* Report FAB */}
       <TouchableOpacity
@@ -473,6 +473,12 @@ export default function SafetyHubScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { flex: 1 },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 20,
+  },
   reportFab: {
     position: 'absolute',
     right: REPORT_FAB_MARGIN,
@@ -489,11 +495,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
     gap: 6,
   },
-  reportFabText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontFamily: 'DMSans-Bold',
-  },
+  reportFabText: { color: '#FFFFFF', fontSize: 14, fontFamily: 'DMSans-Bold' },
   bottomSheet: {
     position: 'absolute',
     bottom: 0,
