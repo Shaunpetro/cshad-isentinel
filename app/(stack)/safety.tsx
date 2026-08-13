@@ -1,7 +1,7 @@
 // app/(stack)/safety.tsx
-// Beta 4 – Safety Hub: auto‑zoom to device location on open, CSHAD pointer, polished sheet
+// Beta 4 – Safety Hub: location‑aware map with auto‑follow, draggable sheet, city filtering
 
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -31,14 +31,12 @@ import type { MapMarker } from "@/services/map";
 
 // ---------- constants ----------
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
-const SHEET_MIN_HEIGHT = 60;
-const SHEET_MAX_HEIGHT = SCREEN_HEIGHT * 0.4;
-const FAB_OFFSET = 80; // space reserved for home FAB
-const REPORT_FAB_BOTTOM = 160;
+const SHEET_MIN_HEIGHT = 70;
+const SHEET_MAX_HEIGHT = SCREEN_HEIGHT * 0.45;
+const REPORT_FAB_MARGIN = 16;
 
 // ---------- custom CSHAD user marker ----------
 function UserLocationMarker({ speed }: { speed: number | null }) {
-  // speed in m/s; if < 5, show walking icon (shield‑checkmark), else car (speedometer)
   const isWalking = speed === null || speed < 5;
   return (
     <View style={userMarkerStyles.wrapper}>
@@ -113,23 +111,20 @@ export default function SafetyHubScreen() {
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const sheetAnim = useRef(new Animated.Value(0)).current;
 
-  // ---------- draggable sheet ----------
+  // ---------- draggable sheet (only handle area captures drag) ----------
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 10,
-      onPanResponderMove: (_, gesture) => {
-        const newHeight = (sheetExpanded ? SHEET_MAX_HEIGHT : SHEET_MIN_HEIGHT) - gesture.dy;
-        if (newHeight >= SHEET_MIN_HEIGHT && newHeight <= SHEET_MAX_HEIGHT) {
-          Animated.event([null, { dy: sheetAnim }], { useNativeDriver: false })(_, { dy: gesture.dy });
-        }
-      },
       onPanResponderRelease: (_, gesture) => {
         if (gesture.dy > 50 || gesture.vy > 0.5) {
           setSheetExpanded(false);
           Animated.spring(sheetAnim, { toValue: 0, useNativeDriver: false }).start();
         } else if (gesture.dy < -50 || gesture.vy < -0.5) {
           setSheetExpanded(true);
-          Animated.spring(sheetAnim, { toValue: SHEET_MAX_HEIGHT - SHEET_MIN_HEIGHT, useNativeDriver: false }).start();
+          Animated.spring(sheetAnim, {
+            toValue: SHEET_MAX_HEIGHT - SHEET_MIN_HEIGHT,
+            useNativeDriver: false,
+          }).start();
         }
       },
     })
@@ -148,51 +143,90 @@ export default function SafetyHubScreen() {
     Animated.spring(sheetAnim, { toValue: 0, useNativeDriver: false }).start();
   };
 
-  // ---------- load hazards (filtered by city) ----------
+  const sheetHeight = sheetAnim.interpolate({
+    inputRange: [0, SHEET_MAX_HEIGHT - SHEET_MIN_HEIGHT],
+    outputRange: [SHEET_MIN_HEIGHT, SHEET_MAX_HEIGHT],
+    extrapolate: 'clamp',
+  });
+
+  // ---------- load hazards and reports ----------
   const loadHazards = useCallback(async () => {
     const data = await fetchHazards();
-    if (data) {
-      const cityName = currentCity?.name?.toLowerCase();
-      let filtered = data.map((h: any) => ({
-        id: h.id,
-        latitude: h.latitude,
-        longitude: h.longitude,
-        title: h.category,
-        description: h.description,
-        type: 'hazard' as const,
-        severity: (h.severity as MapMarker['severity']) || 'medium',
-        timestamp: h.created_at,
-        matchedLocation: h.location_name || 'Unknown',
-        confidence: 'exact' as const,
-        category: h.category || 'other',
-      }));
-      if (cityName) {
-        filtered = filtered.filter(
-          (h) => h.matchedLocation?.toLowerCase().includes(cityName) || !h.matchedLocation
-        );
-      }
-      setHazardMarkers(filtered);
+    if (!data) return;
+    const cityName = currentCity?.name?.toLowerCase();
+    let filtered = data.map((h: any) => ({
+      id: h.id,
+      latitude: h.latitude,
+      longitude: h.longitude,
+      title: h.category,
+      description: h.description,
+      type: 'hazard' as const,
+      severity: (h.severity as MapMarker['severity']) || 'medium',
+      timestamp: h.created_at,
+      matchedLocation: h.location_name || 'Unknown',
+      confidence: 'exact' as const,
+      category: h.category || 'other',
+    }));
+
+    // Filter by city name when present, using device location radius as fallback
+    if (cityName) {
+      filtered = filtered.filter((h) => {
+        const loc = h.matchedLocation?.toLowerCase() || '';
+        if (loc.includes(cityName)) return true;
+        // fallback: within radius of current location
+        if (deviceLocation && h.latitude && h.longitude) {
+          const R = 6371;
+          const dLat = ((h.latitude - deviceLocation.latitude) * Math.PI) / 180;
+          const dLon = ((h.longitude - deviceLocation.longitude) * Math.PI) / 180;
+          const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos((deviceLocation.latitude * Math.PI) / 180) *
+              Math.cos((h.latitude * Math.PI) / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+          return R * c <= (radiusKm || 25);
+        }
+        return false;
+      });
     }
-  }, [currentCity]);
+    setHazardMarkers(filtered);
+  }, [currentCity, deviceLocation, radiusKm]);
 
   useFocusEffect(
     useCallback(() => {
-      refreshLocation();
-      loadHazards();
-      refreshNearMe();
-      setIsLoading(false);
+      setIsLoading(true);
+      (async () => {
+        await refreshLocation();
+        await loadHazards();
+        await refreshNearMe();
+        setIsLoading(false);
+      })();
     }, [refreshLocation, loadHazards, refreshNearMe])
   );
 
-  // ---------- auto‑zoom to user location on map ready ----------
-  const handleMapReady = useCallback(() => {
-    if (mapRef.current && deviceLocation) {
+  // Auto‑zoom / follow device location
+  useEffect(() => {
+    if (deviceLocation && mapRef.current && permissionStatus === 'granted') {
       mapRef.current.animateToRegion(
         {
           latitude: deviceLocation.latitude,
           longitude: deviceLocation.longitude,
-          latitudeDelta: 0.005,
-          longitudeDelta: 0.005,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        },
+        600
+      );
+    }
+  }, [deviceLocation?.latitude, deviceLocation?.longitude, permissionStatus]);
+
+  const handleMapReady = useCallback(() => {
+    if (deviceLocation) {
+      mapRef.current?.animateToRegion(
+        {
+          latitude: deviceLocation.latitude,
+          longitude: deviceLocation.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
         },
         600
       );
@@ -209,10 +243,13 @@ export default function SafetyHubScreen() {
     loadHazards();
   };
 
-  // ---------- incident markers from local alerts (filtered) ----------
   const cityNameLower = currentCity?.name?.toLowerCase() || '';
   const incidentMarkers: MapMarker[] = nearMeReports
-    .filter((r) => cityNameLower ? r.locationName?.toLowerCase().includes(cityNameLower) || !r.locationName : true)
+    .filter((r) => {
+      if (!cityNameLower) return true;
+      const loc = r.locationName?.toLowerCase() || '';
+      return loc.includes(cityNameLower) || !r.locationName;
+    })
     .map((r) => ({
       id: r.id,
       latitude: r.latitude,
@@ -227,7 +264,7 @@ export default function SafetyHubScreen() {
       category: r.category,
     }));
 
-  const allMarkers = [...hazardMarkers, ...incidentMarkers];
+  const allMarkers = useMemo(() => [...hazardMarkers, ...incidentMarkers], [hazardMarkers, incidentMarkers]);
 
   const handleSheetItemPress = (item: any) => {
     if (item.latitude && item.longitude && mapRef.current) {
@@ -241,6 +278,7 @@ export default function SafetyHubScreen() {
         600
       );
       setSelectedId(item.id);
+      collapseSheet();
     }
   };
 
@@ -249,16 +287,16 @@ export default function SafetyHubScreen() {
     collapseSheet();
   };
 
-  if (isLoading) {
+  const userLat = deviceLocation?.latitude;
+  const userLng = deviceLocation?.longitude;
+
+  if (isLoading && !userLat) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} style={{ flex: 1 }} />
       </View>
     );
   }
-
-  const userLat = deviceLocation?.latitude;
-  const userLng = deviceLocation?.longitude;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -279,13 +317,17 @@ export default function SafetyHubScreen() {
         mapPadding={{
           top: 0,
           right: 0,
-          bottom: sheetExpanded ? SHEET_MAX_HEIGHT + FAB_OFFSET : SHEET_MIN_HEIGHT + FAB_OFFSET,
+          bottom: sheetExpanded ? SHEET_MAX_HEIGHT : SHEET_MIN_HEIGHT,
           left: 0,
         }}
       >
         {/* Custom user location marker */}
         {userLat && userLng && (
-          <Marker coordinate={{ latitude: userLat, longitude: userLng }} anchor={{ x: 0.5, y: 1 }}>
+          <Marker
+            coordinate={{ latitude: userLat, longitude: userLng }}
+            anchor={{ x: 0.5, y: 1 }}
+            tracksViewChanges={false}
+          >
             <UserLocationMarker speed={speed} />
           </Marker>
         )}
@@ -297,6 +339,7 @@ export default function SafetyHubScreen() {
             coordinate={{ latitude: marker.latitude, longitude: marker.longitude }}
             pinColor={getMarkerColor(marker)}
             onPress={() => setSelectedId(marker.id)}
+            tracksViewChanges={false}
           >
             {selectedId === marker.id && (
               <Callout tooltip onPress={() => setSelectedId(null)}>
@@ -326,40 +369,63 @@ export default function SafetyHubScreen() {
         ))}
       </MapView>
 
-      {/* Report FAB */}
+      {/* Report FAB – positioned above sheet */}
       <TouchableOpacity
-        style={[styles.reportFab, { backgroundColor: '#FF6D00', bottom: REPORT_FAB_BOTTOM }]}
+        style={[
+          styles.reportFab,
+          {
+            backgroundColor: '#FF6D00',
+            bottom: sheetExpanded ? SHEET_MAX_HEIGHT + REPORT_FAB_MARGIN : SHEET_MIN_HEIGHT + REPORT_FAB_MARGIN,
+          },
+        ]}
         onPress={() => setHazardModalVisible(true)}
       >
         <Ionicons name="add-circle" size={24} color="#FFFFFF" />
         <Text style={styles.reportFabText}>+ Report Incident</Text>
       </TouchableOpacity>
 
-      {/* Draggable Bottom Sheet */}
+      {/* Bottom Sheet */}
       <Animated.View
         style={[
           styles.bottomSheet,
           {
-            height: Animated.add(sheetAnim, new Animated.Value(SHEET_MIN_HEIGHT)),
+            height: sheetHeight,
             backgroundColor: colors.surface,
-            paddingBottom: FAB_OFFSET,
           },
         ]}
-        {...panResponder.panHandlers}
       >
-        <TouchableOpacity onPress={toggleSheet} style={styles.sheetHandleArea}>
-          <View style={[styles.sheetHandle, { backgroundColor: colors.divider }]} />
-          <View style={[styles.sheetDivider, { backgroundColor: colors.divider }]} />
-          <Text style={[styles.sheetTitle, { color: colors.text }]}>
-            Local Incidents ({nearMeReports.length + hazardMarkers.length})
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.sheetHeader} {...panResponder.panHandlers}>
+          <TouchableOpacity onPress={toggleSheet} style={styles.sheetHandleArea}>
+            <View style={[styles.sheetHandle, { backgroundColor: colors.divider }]} />
+            <Text style={[styles.sheetTitle, { color: colors.text }]}>
+              Local Incidents ({nearMeReports.length + hazardMarkers.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
         <FlatList
           data={[
             ...nearMeReports
-              .filter((r) => cityNameLower ? r.locationName?.toLowerCase().includes(cityNameLower) || !r.locationName : true)
-              .map(r => ({ id: r.id, title: r.description, description: r.description, type: 'nearme', latitude: r.latitude, longitude: r.longitude })),
-            ...hazardMarkers.map(h => ({ id: h.id, title: h.title, description: h.description || '', type: 'hazard', latitude: h.latitude, longitude: h.longitude }))
+              .filter((r) => {
+                if (!cityNameLower) return true;
+                const loc = r.locationName?.toLowerCase() || '';
+                return loc.includes(cityNameLower) || !r.locationName;
+              })
+              .map((r) => ({
+                id: r.id,
+                title: r.description,
+                description: r.description,
+                type: 'nearme',
+                latitude: r.latitude,
+                longitude: r.longitude,
+              })),
+            ...hazardMarkers.map((h) => ({
+              id: h.id,
+              title: h.title,
+              description: h.description || '',
+              type: 'hazard',
+              latitude: h.latitude,
+              longitude: h.longitude,
+            })),
           ]}
           renderItem={({ item }) => (
             <TouchableOpacity
@@ -381,7 +447,7 @@ export default function SafetyHubScreen() {
           )}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 20 }}
+          contentContainerStyle={{ paddingBottom: 24 }}
         />
       </Animated.View>
 
@@ -400,7 +466,7 @@ const styles = StyleSheet.create({
   map: { flex: 1 },
   reportFab: {
     position: 'absolute',
-    right: 16,
+    right: REPORT_FAB_MARGIN,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
@@ -434,26 +500,24 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     overflow: 'hidden',
   },
+  sheetHeader: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+  },
   sheetHandleArea: {
     alignItems: 'center',
-    paddingTop: Spacing.md,
+    paddingTop: Spacing.sm,
     paddingBottom: Spacing.sm,
   },
   sheetHandle: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    marginBottom: Spacing.sm,
-  },
-  sheetDivider: {
-    width: 40,
-    height: 1,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
   },
   sheetTitle: {
     fontSize: Typography.sizes.body,
     fontFamily: Typography.fonts.bold,
-    marginBottom: Spacing.xs,
   },
   sheetItem: {
     flexDirection: 'row',

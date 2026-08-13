@@ -1,4 +1,6 @@
 // src/components/opportunities/OpportunityDetailModal.tsx
+// Beta 4 – Opportunity detail with premium tender countdown
+
 import React, { useState } from 'react';
 import {
   View,
@@ -18,6 +20,7 @@ import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
 import { useTheme } from '@/contexts';
 import { Typography, Spacing, BorderRadius } from '@/config/theme';
+import { useCountdown } from '@/hooks/useCountdown';
 import { SubscriptionModal } from './SubscriptionModal';
 import type { Opportunity } from '@/services/opportunities';
 
@@ -29,15 +32,24 @@ interface Props {
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const LOCK_HOURS = 36;
 
 export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onClose }: Props) {
   const { colors, isDark } = useTheme();
   const [subscriptionVisible, setSubscriptionVisible] = useState(false);
 
+  // Countdown hook always called before any early return
+  const unlockTime = opportunity?.category === 'tender'
+    ? new Date(opportunity.created_at).getTime() + LOCK_HOURS * 60 * 60 * 1000
+    : 0;
+  const { isUnlocked, formatted } = useCountdown(unlockTime);
+
   if (!opportunity) return null;
 
-  // 🔁 UPDATED: Only lock tenders, not all premium opportunities
-  const isPremiumLocked = opportunity.category === 'tender' && !isSubscribed;
+  // Lock only tenders during their 36‑hour window for free users
+  const isPremiumLocked =
+    opportunity.category === 'tender' && !isSubscribed && !isUnlocked;
+
   const docs = opportunity.tender_docs || [];
 
   const handleApply = () => {
@@ -51,7 +63,6 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
     }
   };
 
-  // Hybrid download: try file download + share, fallback to inâ€‘app browser
   const handleDownload = async (url: string) => {
     try {
       const fileName = url.split('/').pop() || 'document';
@@ -63,7 +74,6 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
         await WebBrowser.openBrowserAsync(url);
       }
     } catch {
-      // Fallback to inâ€‘app browser
       try {
         await WebBrowser.openBrowserAsync(url);
       } catch {
@@ -172,9 +182,7 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
               showsVerticalScrollIndicator={false}
               key={opportunity.id}
             >
-              <Text style={[styles.title, { color: colors.text }]}>
-                {opportunity.title}
-              </Text>
+              <Text style={[styles.title, { color: colors.text }]}>{opportunity.title}</Text>
 
               {opportunity.company_name && (
                 <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
@@ -215,28 +223,31 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
                 <View style={styles.row}>
                   <Ionicons name="calendar" size={14} color={colors.textSecondary} />
                   <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                    <Text style={[styles.metaLabel, { color: colors.textSecondary }]}>Advertised:</Text> {formatDateTime(opportunity.date_advertised)}
+                    <Text style={[styles.metaLabel, { color: colors.textSecondary }]}>Advertised:</Text>{' '}
+                    {formatDateTime(opportunity.date_advertised)}
                   </Text>
                 </View>
               )}
               <View style={styles.row}>
                 <Ionicons name="timer" size={14} color={colors.textSecondary} />
                 <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                  <Text style={[styles.metaLabel, { color: colors.textSecondary }]}>Closing:</Text> {formatDateTime(opportunity.closing_date)}
+                  <Text style={[styles.metaLabel, { color: colors.textSecondary }]}>Closing:</Text>{' '}
+                  {formatDateTime(opportunity.closing_date)}
                 </Text>
               </View>
               {opportunity.submission_type && (
                 <View style={styles.row}>
                   <Ionicons name="send" size={14} color={colors.textSecondary} />
                   <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                    <Text style={[styles.metaLabel, { color: colors.textSecondary }]}>Submission:</Text> {opportunity.submission_type}
+                    <Text style={[styles.metaLabel, { color: colors.textSecondary }]}>Submission:</Text>{' '}
+                    {opportunity.submission_type}
                   </Text>
                 </View>
               )}
 
               {renderBriefing()}
 
-              {/* Description: free tier shows faded preview */}
+              {/* Description or locked preview with countdown */}
               {isPremiumLocked ? (
                 <View style={styles.premiumContainer}>
                   <Text style={[styles.body, { color: colors.text }]} numberOfLines={4}>
@@ -246,7 +257,7 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
                     <View style={styles.upgradeBannerContent}>
                       <Ionicons name="lock-closed" size={20} color={colors.warning} />
                       <Text style={[styles.upgradeBannerText, { color: colors.warning }]}>
-                        Subscribe to Premium to view full details and download documents.
+                        This tender unlocks in {formatted}.{'\n'}Subscribe to view full details now.
                       </Text>
                     </View>
                     <Pressable
@@ -258,12 +269,10 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
                   </View>
                 </View>
               ) : (
-                <Text style={[styles.body, { color: colors.text }]}>
-                  {opportunity.body}
-                </Text>
+                <Text style={[styles.body, { color: colors.text }]}>{opportunity.body}</Text>
               )}
 
-              {/* Documents: free tier shows locked */}
+              {/* Documents */}
               {docs.length > 0 && (
                 <View style={styles.section}>
                   <Text style={[styles.sectionTitle, { color: colors.text }]}>Documents</Text>
@@ -318,10 +327,7 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
                 </Pressable>
               )}
 
-              <Pressable
-                style={[styles.closeBottom, { borderColor: colors.border }]}
-                onPress={onClose}
-              >
+              <Pressable style={[styles.closeBottom, { borderColor: colors.border }]} onPress={onClose}>
                 <Text style={[styles.closeBottomText, { color: colors.text }]}>Close</Text>
               </Pressable>
 
@@ -341,159 +347,32 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
 }
 
 const styles = StyleSheet.create({
-  centeredContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-  },
-  card: {
-    width: '100%',
-    maxHeight: SCREEN_HEIGHT * 0.88,
-    borderRadius: BorderRadius.xl,
-    overflow: 'hidden',
-  },
-  dragHandleArea: {
-    alignItems: 'center',
-    paddingTop: 10,
-  },
-  dragHandle: {
-    width: 36,
-    height: 5,
-    borderRadius: 2.5,
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  scrollContent: {
-    paddingHorizontal: Spacing.xl,
-    paddingBottom: Spacing.xxl + 20,
-  },
-  title: {
-    fontSize: Typography.sizes.title,
-    fontFamily: 'DMSans-Bold',
-    marginTop: Spacing.md,
-    marginBottom: Spacing.xs,
-  },
-  subtitle: {
-    fontSize: Typography.sizes.body,
-    fontFamily: 'DMSans-Medium',
-    marginBottom: Spacing.sm,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 4,
-  },
-  metaLabel: {
-    fontFamily: 'DMSans-Bold',
-  },
-  metaText: {
-    fontSize: Typography.sizes.caption,
-    fontFamily: 'DMSans-Regular',
-  },
-  briefingContainer: {
-    marginBottom: Spacing.md,
-  },
-  briefingDetails: {
-    fontSize: Typography.sizes.caption,
-    fontFamily: 'DMSans-Regular',
-    lineHeight: 18,
-    marginTop: Spacing.xs,
-    marginLeft: 18,
-  },
-  body: {
-    fontSize: Typography.sizes.body,
-    fontFamily: 'DMSans-Regular',
-    lineHeight: 22,
-    marginTop: Spacing.md,
-    marginBottom: Spacing.lg,
-  },
-  premiumContainer: {
-    marginBottom: Spacing.lg,
-  },
-  upgradeBanner: {
-    marginTop: Spacing.md,
-    padding: Spacing.lg,
-    backgroundColor: 'rgba(255, 193, 7, 0.1)',
-    borderRadius: BorderRadius.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 193, 7, 0.3)',
-    alignItems: 'center',
-    gap: 12,
-  },
-  upgradeBannerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  upgradeBannerText: {
-    flex: 1,
-    fontSize: Typography.sizes.caption,
-    fontFamily: 'DMSans-Medium',
-  },
-  upgradeButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: BorderRadius.full,
-  },
-  upgradeButtonText: {
-    color: '#FFFFFF',
-    fontFamily: 'DMSans-Bold',
-    fontSize: Typography.sizes.body,
-  },
-  section: {
-    marginBottom: Spacing.lg,
-  },
-  sectionTitle: {
-    fontSize: Typography.sizes.body,
-    fontFamily: 'DMSans-Bold',
-    marginBottom: Spacing.sm,
-  },
-  docItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.sm,
-    borderRadius: BorderRadius.md,
-    marginBottom: Spacing.xs,
-    gap: 8,
-  },
-  docName: {
-    flex: 1,
-    fontSize: Typography.sizes.caption,
-    fontFamily: 'DMSans-Medium',
-  },
-  applyButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: BorderRadius.lg,
-    gap: 8,
-    marginTop: Spacing.md,
-  },
-  applyText: {
-    color: '#FFFFFF',
-    fontSize: Typography.sizes.body,
-    fontFamily: 'DMSans-Bold',
-  },
-  closeBottom: {
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    marginTop: Spacing.md,
-  },
-  closeBottomText: {
-    fontSize: Typography.sizes.body,
-    fontFamily: 'DMSans-Medium',
-  },
+  centeredContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: Spacing.md },
+  card: { width: '100%', maxHeight: SCREEN_HEIGHT * 0.88, borderRadius: BorderRadius.xl, overflow: 'hidden' },
+  dragHandleArea: { alignItems: 'center', paddingTop: 10 },
+  dragHandle: { width: 36, height: 5, borderRadius: 2.5 },
+  closeButton: { position: 'absolute', top: 12, right: 12, width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', zIndex: 10 },
+  scrollContent: { paddingHorizontal: Spacing.xl, paddingBottom: Spacing.xxl + 20 },
+  title: { fontSize: Typography.sizes.title, fontFamily: 'DMSans-Bold', marginTop: Spacing.md, marginBottom: Spacing.xs },
+  subtitle: { fontSize: Typography.sizes.body, fontFamily: 'DMSans-Medium', marginBottom: Spacing.sm },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
+  metaLabel: { fontFamily: 'DMSans-Bold' },
+  metaText: { fontSize: Typography.sizes.caption, fontFamily: 'DMSans-Regular' },
+  briefingContainer: { marginBottom: Spacing.md },
+  briefingDetails: { fontSize: Typography.sizes.caption, fontFamily: 'DMSans-Regular', lineHeight: 18, marginTop: Spacing.xs, marginLeft: 18 },
+  body: { fontSize: Typography.sizes.body, fontFamily: 'DMSans-Regular', lineHeight: 22, marginTop: Spacing.md, marginBottom: Spacing.lg },
+  premiumContainer: { marginBottom: Spacing.lg },
+  upgradeBanner: { marginTop: Spacing.md, padding: Spacing.lg, backgroundColor: 'rgba(255, 193, 7, 0.1)', borderRadius: BorderRadius.lg, borderWidth: 1, borderColor: 'rgba(255, 193, 7, 0.3)', alignItems: 'center', gap: 12 },
+  upgradeBannerContent: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  upgradeBannerText: { flex: 1, fontSize: Typography.sizes.caption, fontFamily: 'DMSans-Medium' },
+  upgradeButton: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: BorderRadius.full },
+  upgradeButtonText: { color: '#FFFFFF', fontFamily: 'DMSans-Bold', fontSize: Typography.sizes.body },
+  section: { marginBottom: Spacing.lg },
+  sectionTitle: { fontSize: Typography.sizes.body, fontFamily: 'DMSans-Bold', marginBottom: Spacing.sm },
+  docItem: { flexDirection: 'row', alignItems: 'center', padding: Spacing.sm, borderRadius: BorderRadius.md, marginBottom: Spacing.xs, gap: 8 },
+  docName: { flex: 1, fontSize: Typography.sizes.caption, fontFamily: 'DMSans-Medium' },
+  applyButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: BorderRadius.lg, gap: 8, marginTop: Spacing.md },
+  applyText: { color: '#FFFFFF', fontSize: Typography.sizes.body, fontFamily: 'DMSans-Bold' },
+  closeBottom: { alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, marginTop: Spacing.md },
+  closeBottomText: { fontSize: Typography.sizes.body, fontFamily: 'DMSans-Medium' },
 });

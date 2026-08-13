@@ -1,5 +1,5 @@
 // app/(stack)/map.tsx
-// Beta 4 – Map with centered city pills
+// Beta 4 – Map with Top 3 news markers (incident‑style), no side panel
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import MapView, { Marker, Callout, Circle } from "react-native-maps";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useTranslation } from "react-i18next";
 import { useTheme } from "../../src/contexts/ThemeContext";
 import { useLocationContext } from "../../src/contexts/LocationContext";
@@ -21,6 +21,7 @@ import { Typography, Spacing, BorderRadius, Shadows } from "../../src/config/the
 import { APP } from "../../src/config/constants";
 import { useMapData } from "../../src/hooks/useMapData";
 import { useLocalAlerts } from "../../src/hooks/useLocalAlerts";
+import { useNews } from "../../src/hooks/useNews";
 import { voteReport } from "../../src/services/localReports";
 import { METRO_QUICK_ACCESS } from "../../src/services/location/saCities";
 import { HazardReportModal } from "../../src/components/hub/HazardReportModal";
@@ -32,8 +33,9 @@ import {
 } from "../../src/services/map/mapService";
 import type { MapMarker } from "../../src/services/map";
 import type { LocalReport } from "../../src/types/news";
+import type { NewsItem } from "../../src/types";
 
-// Hazard icons (unchanged)
+// Hazard icons
 import PotholeIcon from '../../assets/hazard-icons/pothole.svg';
 import BurstPipeIcon from '../../assets/hazard-icons/burst-pipe.svg';
 import PowerLineIcon from '../../assets/hazard-icons/power-line.svg';
@@ -67,11 +69,11 @@ const MAJOR_CITIES = METRO_QUICK_ACCESS.map((loc) => ({
   longitude: loc.longitude,
 }));
 
-// ── helpers ──
 const getMarkerColor = (marker: MapMarker): string => {
   if (marker.type === 'tip') return '#9C27B0';
   if (marker.type === 'hazard') return '#FF6D00';
   if (marker.type === 'nearme') return '#00D4AA';
+  if (marker.type === 'news-top') return '#FFD700';   // gold for top news
   switch (marker.severity) {
     case 'critical': return '#FF1744';
     case 'high': return '#FF5722';
@@ -135,6 +137,7 @@ function VoteModal({ type, visible, onHide }: { type: 'cleared' | 'still-there' 
 export default function MapScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const router = useRouter();
   const mapRef = useRef<MapView>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -161,6 +164,20 @@ export default function MapScreen() {
   } = useLocationContext();
 
   const { alerts: nearMeReports, refresh: refreshNearMe } = useLocalAlerts();
+
+  // Top 3 news (local if available, else national)
+  const newsScope = permissionStatus === 'granted' && currentCity?.latitude ? 'local' : 'national';
+  const { news: topNews } = useNews({
+    scope: newsScope,
+    latitude: currentCity?.latitude,
+    longitude: currentCity?.longitude,
+    cityName: currentCity?.name,
+    radiusKm: radiusKm || 25,
+    timeFilter: 'today',
+    limit: 3,
+    realtime: false,
+    autoRefresh: false,
+  });
 
   const loadHazards = useCallback(() => {
     fetchHazards().then((hazards) => {
@@ -225,7 +242,27 @@ export default function MapScreen() {
 
   const filteredHazardMarkers = useMemo(() => showHazards ? hazardMarkers : [], [showHazards, hazardMarkers]);
 
-  const allMarkers = useMemo(() => [...newsTipMarkers, ...filteredHazardMarkers, ...nearMeMarkers], [newsTipMarkers, filteredHazardMarkers, nearMeMarkers]);
+  // Convert top 3 news to markers
+  const topNewsMarkers: MapMarker[] = useMemo(() => {
+    return topNews.slice(0, 3).map((article: NewsItem) => ({
+      id: article.id,
+      type: 'news-top',
+      title: article.title,
+      description: article.summary || '',
+      latitude: article.location?.latitude ?? userLat ?? -26.2041,
+      longitude: article.location?.longitude ?? userLng ?? 28.0473,
+      category: article.category || 'general',
+      severity: article.severity || 'medium',
+      timestamp: article.publishedAt,
+      matchedLocation: article.locationName || currentCity?.name || 'South Africa',
+      confidence: 'city' as const,
+    }));
+  }, [topNews, userLat, userLng, currentCity]);
+
+  const allMarkers = useMemo(
+    () => [...newsTipMarkers, ...filteredHazardMarkers, ...nearMeMarkers, ...topNewsMarkers],
+    [newsTipMarkers, filteredHazardMarkers, nearMeMarkers, topNewsMarkers]
+  );
 
   const initialRegion = useMemo(() => {
     if (userLat && userLng) return { latitude: userLat, longitude: userLng, ...ZOOM_LEVELS.city };
@@ -253,7 +290,7 @@ export default function MapScreen() {
     });
   }, [allMarkers, viewMode, userLat, userLng, radiusKm]);
 
-  const visibleNewsCount = visibleMarkers.filter(m => m.type === 'news').length;
+  const visibleNewsCount = visibleMarkers.filter(m => m.type === 'news' || m.type === 'news-top').length;
   const visibleTipsCount = visibleMarkers.filter(m => m.type === 'tip').length;
   const visibleHazardCount = visibleMarkers.filter(m => m.type === 'hazard').length;
   const visibleNearMeCount = visibleMarkers.filter(m => m.type === 'nearme').length;
@@ -306,6 +343,10 @@ export default function MapScreen() {
     await voteReport(reportId, type);
     refreshNearMe();
   }, [refreshNearMe]);
+
+  const handleArticlePress = useCallback((articleId: string) => {
+    router.push({ pathname: '/(stack)/article/[id]', params: { id: articleId } });
+  }, [router]);
 
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
@@ -386,7 +427,11 @@ export default function MapScreen() {
               {marker.type === 'hazard' ? (
                 React.createElement(HAZARD_ICONS[marker.category] || HAZARD_ICONS.other, { width: 20, height: 20 })
               ) : (
-                <Ionicons name={marker.type === 'tip' ? 'chatbubble' : getCategoryIcon(marker.category)} size={16} color="#FFFFFF" />
+                <Ionicons
+                  name={marker.type === 'tip' ? 'chatbubble' : marker.type === 'news-top' ? 'star' : getCategoryIcon(marker.category)}
+                  size={16}
+                  color="#FFFFFF"
+                />
               )}
             </View>
 
@@ -433,8 +478,10 @@ export default function MapScreen() {
             ) : (
               <Callout tooltip>
                 <View style={[styles.callout, { backgroundColor: colors.surface }]}>
-                  <View style={[styles.typeBadge, { backgroundColor: marker.type === 'tip' ? '#9C27B0' : colors.primary }]}>
-                    <Text style={styles.typeBadgeText}>{marker.type === 'tip' ? `🟣 ${t('map.showTips')}` : `📰 ${t('map.showNews')}`}</Text>
+                  <View style={[styles.typeBadge, { backgroundColor: marker.type === 'tip' ? '#9C27B0' : marker.type === 'news-top' ? '#FFD700' : colors.primary }]}>
+                    <Text style={styles.typeBadgeText}>
+                      {marker.type === 'tip' ? `🟣 ${t('map.showTips')}` : marker.type === 'news-top' ? '⭐ Top News' : `📰 ${t('map.showNews')}`}
+                    </Text>
                   </View>
                   <Text style={[styles.calloutTitle, { color: colors.text }]} numberOfLines={2}>{marker.title}</Text>
                   {marker.description && <Text style={[styles.calloutDescription, { color: colors.textSecondary }]} numberOfLines={2}>{marker.description}</Text>}
@@ -442,7 +489,18 @@ export default function MapScreen() {
                     <Text style={[styles.calloutLocation, { color: colors.primary }]}>📍 {marker.matchedLocation}</Text>
                     <Text style={[styles.calloutTime, { color: colors.textSecondary }]}>{formatTimestamp(marker.timestamp)}</Text>
                   </View>
-                  {marker.confidence !== 'exact' && <Text style={[styles.confidenceText, { color: colors.textSecondary }]}>📌 {getConfidenceText(marker.confidence)}</Text>}
+                  {(marker.type === 'news' || marker.type === 'news-top') && (
+                    <TouchableOpacity
+                      style={[styles.readArticleButton, { backgroundColor: colors.primary }]}
+                      onPress={() => handleArticlePress(marker.id)}
+                    >
+                      <Ionicons name="document-text-outline" size={16} color="#FFFFFF" />
+                      <Text style={styles.readArticleText}>Read Article</Text>
+                    </TouchableOpacity>
+                  )}
+                  {marker.confidence !== 'exact' && (
+                    <Text style={[styles.confidenceText, { color: colors.textSecondary }]}>📌 {getConfidenceText(marker.confidence)}</Text>
+                  )}
                 </View>
               </Callout>
             )}
@@ -450,21 +508,15 @@ export default function MapScreen() {
         ))}
       </MapView>
 
-      {/* Small inline loading indicator (shown on initial load only) */}
       {showLoadingOverlay && (
         <View style={[styles.inlineLoading, { backgroundColor: colors.surface + 'CC' }]}>
           <ActivityIndicator size="small" color={colors.primary} />
-          <Text style={[styles.inlineLoadingText, { color: colors.textSecondary }]}>
-            {t('location.detecting')}
-          </Text>
+          <Text style={[styles.inlineLoadingText, { color: colors.textSecondary }]}>{t('location.detecting')}</Text>
         </View>
       )}
 
-      {/* Background refresh indicator (small, non-blocking) */}
       {isBackgroundLoading && (
-        <View style={styles.backgroundLoading}>
-          <ActivityIndicator size="small" color={colors.primary} />
-        </View>
+        <View style={styles.backgroundLoading}><ActivityIndicator size="small" color={colors.primary} /></View>
       )}
 
       {mapError && (
@@ -495,7 +547,7 @@ export default function MapScreen() {
 
       <VoteModal type={voteModalType} visible={voteModalVisible} onHide={() => { setVoteModalVisible(false); setVoteModalType(null); }} />
 
-      {/* View mode bar – anchored top left */}
+      {/* View mode bar – top left */}
       <View style={[styles.viewModeBar, { backgroundColor: colors.surface + 'F0' }]}>
         <Pressable onPress={handleMyAreaPress} style={[styles.viewModeButton, viewMode === 'myArea' && { backgroundColor: colors.primary + '20' }]}>
           <Ionicons name="locate" size={18} color={viewMode === 'myArea' ? colors.primary : colors.textSecondary} />
@@ -515,7 +567,7 @@ export default function MapScreen() {
         </Pressable>
       </View>
 
-      {/* Filter bar – wrapping, no horizontal scroll */}
+      {/* Filter bar – top left below view mode */}
       <View style={[styles.filterBar, { backgroundColor: colors.surface + 'F0' }]}>
         <Pressable onPress={() => setShowNews(!showNews)} style={[styles.filterButton, showNews && { backgroundColor: colors.primary + '20' }]}>
           <Text style={[styles.filterButtonText, { color: showNews ? colors.primary : colors.textSecondary }]}>
@@ -539,35 +591,31 @@ export default function MapScreen() {
         </Pressable>
       </View>
 
-      {/* City pills – centered below filter bar */}
-      <View style={styles.cityBarWrapper}>
-        <View style={[styles.cityBar, { backgroundColor: colors.surface + '00' }]}>
-          {nearbyCities.map((city) => {
-            const isActive = city.key === 'current' || city.key === activeCity;
-            return (
-              <Pressable
-                key={city.key}
-                onPress={() => {
-                  if (city.key === 'current') {
-                    if (mapRef.current && userLat && userLng) {
-                      mapRef.current.animateToRegion({ latitude: userLat, longitude: userLng, ...ZOOM_LEVELS.city }, 800);
-                    }
-                  } else {
-                    handleZoomToCity(city.key);
+      {/* City pills – middle right, vertical */}
+      <View style={styles.cityBar}>
+        {nearbyCities.map((city) => {
+          const isActive = city.key === 'current' || city.key === activeCity;
+          return (
+            <Pressable
+              key={city.key}
+              onPress={() => {
+                if (city.key === 'current') {
+                  if (mapRef.current && userLat && userLng) {
+                    mapRef.current.animateToRegion({ latitude: userLat, longitude: userLng, ...ZOOM_LEVELS.city }, 800);
                   }
-                }}
-                style={({ pressed }) => [
-                  styles.cityButton,
-                  { backgroundColor: isActive ? colors.primary : colors.surface, borderColor: isActive ? colors.primary : 'transparent' },
-                  pressed && styles.buttonPressed,
-                ]}
-              >
-                <Text style={[styles.cityLabel, { color: isActive ? '#FFFFFF' : colors.text }]}>{city.label}</Text>
-                {isActive && <View style={styles.activeIndicator}><Ionicons name="location" size={10} color="#FFFFFF" /></View>}
-              </Pressable>
-            );
-          })}
-        </View>
+                } else {
+                  handleZoomToCity(city.key);
+                }
+              }}
+              style={[
+                styles.cityButton,
+                { backgroundColor: isActive ? colors.primary : colors.surface, borderColor: isActive ? colors.primary : 'transparent' },
+              ]}
+            >
+              <Text style={[styles.cityLabel, { color: isActive ? '#FFFFFF' : colors.text }]}>{city.label}</Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       {/* Legend */}
@@ -581,6 +629,7 @@ export default function MapScreen() {
           <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#9C27B0' }]} /><Text style={[styles.legendText, { color: colors.textSecondary }]}>{t('tabs.tip')}</Text></View>
           <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#FF6D00' }]} /><Text style={[styles.legendText, { color: colors.textSecondary }]}>Hazard</Text></View>
           <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#00D4AA' }]} /><Text style={[styles.legendText, { color: colors.textSecondary }]}>Near Me</Text></View>
+          <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#FFD700' }]} /><Text style={[styles.legendText, { color: colors.textSecondary }]}>Top News</Text></View>
         </View>
       </View>
 
@@ -604,25 +653,9 @@ export default function MapScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   map: { ...StyleSheet.absoluteFillObject },
-  inlineLoading: {
-    position: 'absolute',
-    top: 60,
-    left: Spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xs,
-    borderRadius: BorderRadius.md,
-    zIndex: 20,
-    gap: Spacing.xs,
-  },
+  inlineLoading: { position: 'absolute', top: 60, left: Spacing.sm, flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, borderRadius: BorderRadius.md, zIndex: 20, gap: Spacing.xs },
   inlineLoadingText: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.regular },
-  backgroundLoading: {
-    position: 'absolute',
-    top: 60,
-    right: Spacing.sm,
-    zIndex: 20,
-  },
+  backgroundLoading: { position: 'absolute', top: 60, right: Spacing.sm, zIndex: 20 },
   errorBanner: { position: 'absolute', top: 100, left: Spacing.md, right: Spacing.md, padding: Spacing.md, borderRadius: BorderRadius.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 15 },
   errorText: { color: '#FFFFFF', fontSize: Typography.sizes.caption, flex: 1 },
   retryText: { color: '#FFFFFF', fontFamily: Typography.fonts.bold, marginLeft: Spacing.md },
@@ -630,59 +663,18 @@ const styles = StyleSheet.create({
   permissionText: { flex: 1, fontSize: 13 },
   permissionButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, marginLeft: 8 },
   permissionButtonText: { color: '#FFFFFF', fontSize: 13, fontWeight: 'bold' },
-  viewModeBar: {
-    position: 'absolute',
-    top: 10,
-    left: Spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: Spacing.xs,
-    borderRadius: BorderRadius.md,
-    zIndex: 10,
-    gap: 4,
-  },
+  viewModeBar: { position: 'absolute', top: 10, left: Spacing.sm, flexDirection: 'row', alignItems: 'center', padding: Spacing.xs, borderRadius: BorderRadius.md, zIndex: 10, gap: 4 },
   viewModeButton: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, borderRadius: BorderRadius.sm, gap: 4 },
   viewModeText: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.medium },
   flagEmoji: { fontSize: 16 },
   viewModeDivider: { width: 1, height: 20, backgroundColor: '#E0E0E0', marginHorizontal: 2 },
   iconButton: { padding: 4 },
-  filterBar: {
-    position: 'absolute',
-    top: 55,
-    left: Spacing.sm,
-    right: Spacing.sm,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: Spacing.xs,
-    borderRadius: BorderRadius.md,
-    zIndex: 10,
-    gap: 4,
-  },
-  filterButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
+  filterBar: { position: 'absolute', top: 55, left: Spacing.sm, flexDirection: 'row', flexWrap: 'wrap', padding: Spacing.xs, borderRadius: BorderRadius.md, zIndex: 10, gap: 4, maxWidth: '70%' },
+  filterButton: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16 },
   filterButtonText: { fontSize: 12, fontFamily: Typography.fonts.medium },
-  cityBarWrapper: {
-    position: 'absolute',
-    top: 105,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  cityBar: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 4,
-    paddingHorizontal: Spacing.sm,
-  },
-  cityButton: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: BorderRadius.md, borderWidth: 2, minWidth: 40, alignItems: 'center', ...Shadows.sm },
-  buttonPressed: { opacity: 0.7, transform: [{ scale: 0.95 }] },
-  cityLabel: { fontSize: 12, fontFamily: Typography.fonts.bold, textAlign: 'center' },
-  activeIndicator: { position: 'absolute', top: -4, right: -4, backgroundColor: '#FF5722', borderRadius: 8, width: 16, height: 16, justifyContent: 'center', alignItems: 'center' },
+  cityBar: { position: 'absolute', right: Spacing.sm, top: '35%', zIndex: 10, gap: 6 },
+  cityButton: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, borderWidth: 1, minWidth: 40, alignItems: 'center' },
+  cityLabel: { fontSize: 12, fontFamily: 'DMSans-Bold', textAlign: 'center' },
   legend: { position: 'absolute', bottom: 20, left: Spacing.md, padding: Spacing.sm, borderRadius: BorderRadius.md, zIndex: 10 },
   legendTitle: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.bold, marginBottom: Spacing.xs },
   legendItems: { gap: 4 },
@@ -702,6 +694,8 @@ const styles = StyleSheet.create({
   voteRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: Spacing.sm, borderTopWidth: 1, borderTopColor: '#E0E0E0', paddingTop: Spacing.sm },
   voteButton: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 4 },
   voteText: { fontSize: Typography.sizes.tiny, fontFamily: Typography.fonts.bold },
+  readArticleButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: BorderRadius.md, marginTop: Spacing.sm },
+  readArticleText: { color: '#FFFFFF', fontSize: Typography.sizes.caption, fontFamily: Typography.fonts.bold },
   voteModalContainer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', zIndex: 200 },
   voteModal: { padding: Spacing.lg, borderRadius: BorderRadius.lg, alignItems: 'center', maxWidth: '80%' },
   voteModalText: { color: '#FFFFFF', fontSize: Typography.sizes.body, fontFamily: Typography.fonts.bold, marginTop: Spacing.md, textAlign: 'center' },

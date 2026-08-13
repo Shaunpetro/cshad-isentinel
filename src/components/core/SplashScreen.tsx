@@ -1,4 +1,6 @@
 // src/components/core/SplashScreen.tsx
+// Beta 4 – Fixed splash with 5% padding, responsive subtitle, refined logo size
+
 import React, { useEffect, useRef } from "react";
 import {
   View,
@@ -10,10 +12,13 @@ import {
 } from "react-native";
 import { Colors, Typography } from "@/config/theme";
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-// Calculate logo size: 60% of screen width, but capped at 300px
-const LOGO_SIZE = Math.min(SCREEN_WIDTH * 0.6, 300);
+// Logo size: 48% of screen width, capped at 260px (less likely to overflow)
+const LOGO_SIZE = Math.min(SCREEN_WIDTH * 0.48, 260);
+
+// Responsive subtitle font size
+const SUBTITLE_FONT_SIZE = Math.min(SCREEN_WIDTH * 0.042, Typography.sizes.body);
 
 interface Props {
   onComplete: () => void;
@@ -40,7 +45,7 @@ export function CustomSplashScreen({ onComplete }: Props) {
         }),
       ]),
       Animated.timing(subtitleOpacity, {
-        toValue: 0.7,
+        toValue: 0.85,
         duration: 400,
         useNativeDriver: true,
       }),
@@ -72,8 +77,16 @@ export function CustomSplashScreen({ onComplete }: Props) {
         />
       </Animated.View>
 
-      <Animated.Text style={[styles.subtitle, { opacity: subtitleOpacity }]}>
-        Community Safety & Opportunities
+      <Animated.Text
+        style={[
+          styles.subtitle,
+          { opacity: subtitleOpacity },
+        ]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+      >
+        Community Safety &amp; Opportunities
       </Animated.Text>
 
       <Animated.View
@@ -95,11 +108,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.carbon.black,
     justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: "5%",   // ← 5% horizontal spacing
     zIndex: 9999,
   },
   logoWrapper: {
     alignItems: "center",
-    marginTop: -50,
+    marginTop: -40,
     width: LOGO_SIZE,
     height: LOGO_SIZE,
   },
@@ -109,11 +123,13 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     color: Colors.carbon.white,
-    fontSize: Typography.sizes.body,
-    fontFamily: Typography.fonts.regular,
+    fontSize: SUBTITLE_FONT_SIZE,
+    fontFamily: Typography.fonts.medium,
     marginTop: 20,
-    letterSpacing: 2,
+    letterSpacing: 1.2,
     textTransform: "uppercase",
+    textAlign: "center",
+    width: "100%",
   },
   devLogoWrapper: {
     position: "absolute",

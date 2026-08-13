@@ -1,9 +1,12 @@
 // src/components/opportunities/OpportunityCard.tsx
+// Beta 4 – Opportunity card with premium tender lock & 36‑hour countdown
+
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/contexts';
 import { Typography, Spacing, BorderRadius, Shadows } from '@/config/theme';
+import { useCountdown } from '@/hooks/useCountdown';
 import type { Opportunity } from '@/services/opportunities';
 
 interface Props {
@@ -34,8 +37,20 @@ function daysLeft(closingDate: string): string {
   return `${diff} days left`;
 }
 
+const LOCK_HOURS = 36;
+
 export function OpportunityCard({ opportunity, onPress, isSubscribed }: Props) {
   const { colors } = useTheme();
+
+  const unlockTime =
+    opportunity.category === 'tender'
+      ? new Date(opportunity.created_at).getTime() + LOCK_HOURS * 60 * 60 * 1000
+      : 0;
+  const { isUnlocked, formatted } = useCountdown(unlockTime);
+
+  const isLocked =
+    opportunity.category === 'tender' && !isSubscribed && !isUnlocked;
+
   const categoryColor = CATEGORY_COLORS[opportunity.category] || colors.primary;
   const icon = CATEGORY_ICONS[opportunity.category] || 'document';
   const province = opportunity.province || opportunity.location_name;
@@ -73,10 +88,23 @@ export function OpportunityCard({ opportunity, onPress, isSubscribed }: Props) {
           {opportunity.title}
         </Text>
 
-        {/* Body snippet */}
-        <Text style={[styles.body, { color: colors.textSecondary }]} numberOfLines={2}>
-          {opportunity.body}
-        </Text>
+        {/* Body snippet or locked preview */}
+        {isLocked ? (
+          <View style={[styles.lockedContainer, { borderColor: colors.warning + '40', backgroundColor: colors.warning + '10' }]}>
+            <Ionicons name="lock-closed" size={20} color={colors.warning} />
+            <Text style={[styles.lockedTitle, { color: colors.warning }]}>
+              Premium tender — unlocks in
+            </Text>
+            <Text style={[styles.countdown, { color: colors.text }]}>{formatted}</Text>
+            <Text style={[styles.lockedHint, { color: colors.textSecondary }]}>
+              Subscribe to view details instantly.
+            </Text>
+          </View>
+        ) : (
+          <Text style={[styles.body, { color: colors.textSecondary }]} numberOfLines={2}>
+            {opportunity.body}
+          </Text>
+        )}
 
         {/* Meta */}
         <View style={styles.meta}>
@@ -145,6 +173,18 @@ const styles = StyleSheet.create({
   premiumText: { fontSize: 9, fontFamily: 'DMSans-Bold', letterSpacing: 0.5 },
   title: { fontSize: Typography.sizes.body, fontFamily: 'DMSans-Bold', marginBottom: Spacing.xs },
   body: { fontSize: Typography.sizes.caption, fontFamily: 'DMSans-Regular', lineHeight: 18, marginBottom: Spacing.sm },
+  lockedContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.sm,
+  },
+  lockedTitle: { fontSize: Typography.sizes.caption, fontFamily: 'DMSans-Bold', marginTop: 4 },
+  countdown: { fontSize: Typography.sizes.body, fontFamily: 'DMSans-Bold', marginTop: 2, letterSpacing: 1 },
+  lockedHint: { fontSize: Typography.sizes.tiny, fontFamily: 'DMSans-Regular', marginTop: 2 },
   meta: { marginBottom: Spacing.sm },
   company: { fontSize: Typography.sizes.caption, fontFamily: 'DMSans-Medium', marginBottom: 4 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },

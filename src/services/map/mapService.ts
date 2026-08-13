@@ -5,7 +5,7 @@ import { APP } from '@/config/constants';
 
 export interface MapMarker {
   id: string;
-  type: 'news' | 'tip' | 'hazard' | 'nearme';
+  type: 'news' | 'tip' | 'hazard' | 'nearme' | 'news-top';
   title: string;
   description?: string;
   category: string;

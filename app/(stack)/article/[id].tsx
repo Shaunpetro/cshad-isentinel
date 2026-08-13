@@ -1,15 +1,9 @@
 // app/(stack)/article/[id].tsx
-// Beta 4 – Full article with audio reader and ad modal
+// Beta 4 – Full article with inline media, paragraphs, and deep-link sharing
 
 import React, { useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  Share,
-  ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, Pressable, Share, ActivityIndicator,
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { Image } from "expo-image";
@@ -19,7 +13,7 @@ import MapView, { Marker } from "react-native-maps";
 import { useTranslation } from "react-i18next";
 import { Typography, Spacing, BorderRadius } from "../../../src/config/theme";
 import { SeverityBadge, SourceBadge, VerifiedBadge } from "../../../src/components/news";
-import { timeAgo, formatDate } from "../../../src/utils/formatters";
+import { timeAgo, formatDate, stripHtml, parseArticleContent, extractBestImage } from "../../../src/utils/formatters";
 import { useNewsArticle } from "../../../src/hooks/useNews";
 import { useTheme } from "../../../src/contexts";
 import AdBanner from "../../../src/components/monetisation/AdBanner";
@@ -44,13 +38,18 @@ export default function NewsDetailScreen() {
 
   const handleShare = async () => {
     if (!article) return;
+    const articleDeepLink = `cshad-isentinel://article/${article.id}`;
+    const appStoreLink = "https://play.google.com/store/apps/details?id=cshad.isentinel.news";
+    const message = `${article.title}\n\nRead the full article in the CSHAD iSentinel app:\n${articleDeepLink}\n\nDownload the app: ${appStoreLink}`;
     try {
-      await Share.share({
-        title: article.title,
-        message: `${article.title}\n\n${article.summary}\n\n${t("news.shareArticle")} - CSHAD iSentinel`,
-      });
+      await Share.share({ title: article.title, message, url: articleDeepLink });
     } catch (err) {
-      console.error("[NewsDetail] Share error:", err);
+      // Fallback to just the app link
+      try {
+        await Share.share({ title: article.title, message: appStoreLink });
+      } catch (fallbackErr) {
+        console.error("[NewsDetail] Share error:", fallbackErr);
+      }
     }
   };
 
@@ -65,13 +64,10 @@ export default function NewsDetailScreen() {
     setSubscriptionModalVisible(true);
   };
 
-  // Loading
   if (isLoading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Stack.Screen
-          options={{ title: "", headerStyle: { backgroundColor: colors.surface }, headerTintColor: colors.text }}
-        />
+        <Stack.Screen options={{ title: "", headerStyle: { backgroundColor: colors.surface }, headerTintColor: colors.text }} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t("common.loading")}</Text>
@@ -80,13 +76,10 @@ export default function NewsDetailScreen() {
     );
   }
 
-  // Error / not found
   if (error || !article) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Stack.Screen
-          options={{ title: t("common.error"), headerStyle: { backgroundColor: colors.surface }, headerTintColor: colors.text }}
-        />
+        <Stack.Screen options={{ title: t("common.error"), headerStyle: { backgroundColor: colors.surface }, headerTintColor: colors.text }} />
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={64} color={colors.textDisabled} />
           <Text style={[styles.errorTitle, { color: colors.text }]}>{error ? t("common.error") : t("common.noResults")}</Text>
@@ -99,7 +92,18 @@ export default function NewsDetailScreen() {
     );
   }
 
-  const mainContent = article.body || article.summary;
+  // Parse article content into blocks (paragraphs, headings, images)
+  let blocks = parseArticleContent(article.body);
+  let heroImage = extractBestImage(article.imageUrl, article.body, article.summary);
+
+  // Remove the hero image from the blocks to avoid duplication
+  if (heroImage && blocks.length > 0) {
+    blocks = blocks.filter((b) => !(b.type === "image" && b.url === heroImage));
+  }
+  // If no body blocks, use summary as a single paragraph
+  if (blocks.length === 0) {
+    blocks = [{ type: "paragraph", text: stripHtml(article.summary) }];
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -110,7 +114,6 @@ export default function NewsDetailScreen() {
           headerTintColor: colors.text,
           headerRight: () => (
             <View style={{ flexDirection: "row", gap: 12 }}>
-              {/* Audio button */}
               <Pressable onPress={() => setAudioModalVisible(true)} style={styles.headerButton}>
                 <Ionicons name="volume-medium-outline" size={24} color={colors.text} />
               </Pressable>
@@ -128,9 +131,8 @@ export default function NewsDetailScreen() {
       />
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Hero Image */}
-        {article.imageUrl ? (
-          <Image source={{ uri: article.imageUrl }} style={styles.heroImage} contentFit="cover" transition={300} />
+        {heroImage ? (
+          <Image source={{ uri: heroImage }} style={styles.heroImage} contentFit="cover" transition={300} />
         ) : (
           <View style={[styles.heroPlaceholder, { backgroundColor: colors.surface }]}>
             <Ionicons name="newspaper-outline" size={64} color={colors.textDisabled} />
@@ -138,22 +140,18 @@ export default function NewsDetailScreen() {
         )}
 
         <View style={styles.content}>
-          {/* Category + Severity */}
           <View style={styles.metaRow}>
             <Text style={[styles.category, { color: colors.primary }]}>{getCategoryLabel(article.category)}</Text>
             <SeverityBadge severity={article.severity} />
           </View>
 
-          {/* Title */}
           <Text style={[styles.title, { color: colors.text }]}>{article.title}</Text>
 
-          {/* Source + Verified */}
           <View style={styles.sourceRow}>
             <SourceBadge sourceType={article.sourceType} sourceName={article.source} size="medium" />
             <VerifiedBadge isVerified={article.isVerified} showLabel={true} size="medium" />
           </View>
 
-          {/* Time + Location */}
           <View style={styles.infoRow}>
             <View style={styles.infoItem}>
               <Ionicons name="time-outline" size={16} color={colors.textSecondary} />
@@ -169,13 +167,29 @@ export default function NewsDetailScreen() {
 
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-          {/* Full article body */}
-          {mainContent.split('\n').map((para, idx) => {
-            const trimmed = para.trim();
-            if (!trimmed) return null;
+          {/* Render article blocks: paragraphs, headings, images */}
+          {blocks.map((block, index) => {
+            if (block.type === "image") {
+              return (
+                <Image
+                  key={`img-${index}`}
+                  source={{ uri: block.url }}
+                  style={styles.inlineImage}
+                  contentFit="cover"
+                  transition={200}
+                />
+              );
+            }
+            if (block.type === "heading") {
+              return (
+                <Text key={`h-${index}`} style={[styles.heading, { color: colors.text }]}>
+                  {block.text}
+                </Text>
+              );
+            }
             return (
-              <Text key={idx} style={[styles.articleBody, { color: colors.text }]}>
-                {trimmed}
+              <Text key={`p-${index}`} style={[styles.articleBody, { color: colors.text }]}>
+                {block.text}
               </Text>
             );
           })}
@@ -184,14 +198,6 @@ export default function NewsDetailScreen() {
           <View style={{ marginTop: Spacing.lg, marginBottom: Spacing.lg }}>
             <AdBanner />
           </View>
-
-          {/* Read Full Article button */}
-          {article.sourceUrl && (
-            <Pressable style={[styles.readMoreButton, { backgroundColor: colors.primary }]} onPress={handleOpenSource}>
-              <Ionicons name="document-text-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.readMoreText}>{t("news.readMore") || "Read Full Article"}</Text>
-            </Pressable>
-          )}
 
           {/* Location Map */}
           {article.location && (
@@ -210,7 +216,6 @@ export default function NewsDetailScreen() {
             </View>
           )}
 
-          {/* Published Date */}
           <View style={[styles.publishedRow, { borderTopColor: colors.border }]}>
             <Text style={[styles.publishedLabel, { color: colors.textDisabled }]}>{t("news.lastUpdated")}:</Text>
             <Text style={[styles.publishedDate, { color: colors.textSecondary }]}>{formatDate(article.publishedAt)}</Text>
@@ -218,15 +223,13 @@ export default function NewsDetailScreen() {
         </View>
       </ScrollView>
 
-      {/* Audio Ad Modal */}
       <AudioAdModal
         visible={audioModalVisible}
-        articleBody={mainContent}
+        articleBody={article.body || article.summary}
         onClose={() => setAudioModalVisible(false)}
         onSubscribe={handleSubscribe}
       />
 
-      {/* Subscription Modal */}
       <SubscriptionModal
         visible={subscriptionModalVisible}
         onClose={() => setSubscriptionModalVisible(false)}
@@ -256,10 +259,10 @@ const styles = StyleSheet.create({
   infoText: { fontSize: Typography.sizes.caption, fontFamily: Typography.fonts.regular },
   divider: { height: 1, marginVertical: Spacing.lg },
   articleBody: { fontSize: Typography.sizes.body, fontFamily: Typography.fonts.regular, lineHeight: Typography.sizes.body * 1.8, marginBottom: Spacing.md },
-  readMoreButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: Spacing.sm, paddingVertical: Spacing.md, borderRadius: BorderRadius.md, marginBottom: Spacing.lg },
-  readMoreText: { color: "#FFFFFF", fontSize: Typography.sizes.body, fontFamily: Typography.fonts.bold },
-  sectionTitle: { fontSize: Typography.sizes.body, fontFamily: Typography.fonts.bold, marginBottom: Spacing.sm },
+  heading: { fontSize: Typography.sizes.heading, fontFamily: Typography.fonts.bold, marginBottom: Spacing.sm, marginTop: Spacing.sm },
+  inlineImage: { width: '100%', height: 200, borderRadius: BorderRadius.md, marginBottom: Spacing.md },
   mapSection: { marginBottom: Spacing.xl },
+  sectionTitle: { fontSize: Typography.sizes.body, fontFamily: Typography.fonts.bold, marginBottom: Spacing.sm },
   mapContainer: { height: 180, borderRadius: BorderRadius.lg, overflow: "hidden" },
   map: { flex: 1 },
   mapCaption: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.regular, marginTop: Spacing.xs, textAlign: "center" },
