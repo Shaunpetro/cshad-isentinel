@@ -1,5 +1,5 @@
 // app/(stack)/safety.tsx
-// Beta 4 – Safety Hub: location‑aware map with auto‑follow, draggable sheet, city filtering
+// Beta 4 – Safety Hub: stable loading, auto‑zoom, draggable sheet
 
 import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
@@ -29,7 +29,6 @@ import {
 } from "@/services/map/mapService";
 import type { MapMarker } from "@/services/map";
 
-// ---------- constants ----------
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const SHEET_MIN_HEIGHT = 70;
 const SHEET_MAX_HEIGHT = SCREEN_HEIGHT * 0.45;
@@ -106,12 +105,14 @@ export default function SafetyHubScreen() {
   const { alerts: nearMeReports, refresh: refreshNearMe } = useLocalAlerts();
   const [hazardMarkers, setHazardMarkers] = useState<MapMarker[]>([]);
   const [hazardModalVisible, setHazardModalVisible] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sheetExpanded, setSheetExpanded] = useState(false);
-  const sheetAnim = useRef(new Animated.Value(0)).current;
+  const [mapReady, setMapReady] = useState(false);
 
-  // ---------- draggable sheet (only handle area captures drag) ----------
+  const sheetAnim = useRef(new Animated.Value(0)).current;
+  const hasLoaded = useRef(false);
+
+  // ---------- draggable sheet ----------
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 10,
@@ -149,7 +150,7 @@ export default function SafetyHubScreen() {
     extrapolate: 'clamp',
   });
 
-  // ---------- load hazards and reports ----------
+  // ---------- load hazards ----------
   const loadHazards = useCallback(async () => {
     const data = await fetchHazards();
     if (!data) return;
@@ -168,12 +169,10 @@ export default function SafetyHubScreen() {
       category: h.category || 'other',
     }));
 
-    // Filter by city name when present, using device location radius as fallback
     if (cityName) {
       filtered = filtered.filter((h) => {
         const loc = h.matchedLocation?.toLowerCase() || '';
         if (loc.includes(cityName)) return true;
-        // fallback: within radius of current location
         if (deviceLocation && h.latitude && h.longitude) {
           const R = 6371;
           const dLat = ((h.latitude - deviceLocation.latitude) * Math.PI) / 180;
@@ -192,15 +191,23 @@ export default function SafetyHubScreen() {
     setHazardMarkers(filtered);
   }, [currentCity, deviceLocation, radiusKm]);
 
+  // ---------- focus effect: refresh data without spinner loops ----------
   useFocusEffect(
     useCallback(() => {
-      setIsLoading(true);
-      (async () => {
-        await refreshLocation();
-        await loadHazards();
-        await refreshNearMe();
-        setIsLoading(false);
-      })();
+      if (hasLoaded.current) {
+        // background refresh on subsequent focuses – no spinner
+        refreshLocation();
+        loadHazards();
+        refreshNearMe();
+      } else {
+        hasLoaded.current = true;
+        // first load only
+        (async () => {
+          await refreshLocation();
+          await loadHazards();
+          await refreshNearMe();
+        })();
+      }
     }, [refreshLocation, loadHazards, refreshNearMe])
   );
 
@@ -220,6 +227,7 @@ export default function SafetyHubScreen() {
   }, [deviceLocation?.latitude, deviceLocation?.longitude, permissionStatus]);
 
   const handleMapReady = useCallback(() => {
+    setMapReady(true);
     if (deviceLocation) {
       mapRef.current?.animateToRegion(
         {
@@ -290,7 +298,8 @@ export default function SafetyHubScreen() {
   const userLat = deviceLocation?.latitude;
   const userLng = deviceLocation?.longitude;
 
-  if (isLoading && !userLat) {
+  // Only show full spinner before map is ready and no location yet
+  if (!mapReady && !userLat) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} style={{ flex: 1 }} />
@@ -369,7 +378,7 @@ export default function SafetyHubScreen() {
         ))}
       </MapView>
 
-      {/* Report FAB – positioned above sheet */}
+      {/* Report FAB */}
       <TouchableOpacity
         style={[
           styles.reportFab,
