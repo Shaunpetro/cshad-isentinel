@@ -4,12 +4,12 @@
  */
 
 export const APP = {
-  name: "PSHAD Sentinel iHub",
-  version: "1.266.0",
-  phase: "001",
-  phaseMonth: "April 2026",
-  developer: "ATG Development",
-  slug: "pshad-sentinel-ihub",
+  name: "CSHAD iSentinel News",
+  version: "3.2608.01",
+  phase: "004",
+  phaseMonth: "August 2026",
+  developer: "Petro@ATG",
+  slug: "cshad-isentinel-news",
 
   // South Africa default map view
   defaultRegion: {

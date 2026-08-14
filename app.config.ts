@@ -38,7 +38,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         backgroundColor: "#1C1C1C",
       },
       package: "cshad.isentinel.news",
-      versionCode: 10,
+      versionCode: 15,
       googleServicesFile: "./google-services.json",
       config: {
         googleMaps: {
