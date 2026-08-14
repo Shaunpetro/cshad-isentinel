@@ -92,8 +92,8 @@ android {
         applicationId 'cshad.isentinel.news'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 9
-        versionName "3.2607.03"
+        versionCode 15
+        versionName "3.2608.01"
 
         buildConfigField "String", "REACT_NATIVE_RELEASE_LEVEL", "\"${findProperty('reactNativeReleaseLevel') ?: 'stable'}\""
     }
