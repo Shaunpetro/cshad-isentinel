@@ -1,4 +1,3 @@
-// eas.json
 {
   "cli": {
     "version": ">= 14.0.0"
@@ -17,7 +16,10 @@
         "gradleCommand": ":app:assembleRelease",
         "distribution": "internal",
         "env": {
-          "EXPO_NEW_ARCH": "1"
+          "EXPO_NEW_ARCH": "1",
+          "EAS_OWNER": "shaunatg",
+          "EAS_PROJECT_ID": "ce9ad511-1168-4d71-941d-35a5f4214892",
+          "EAS_SLUG": "cshadnews"
         }
       },
       "ios": {
@@ -29,7 +31,10 @@
       "android": {
         "buildType": "app-bundle",
         "env": {
-          "EXPO_NEW_ARCH": "1"
+          "EXPO_NEW_ARCH": "1",
+          "EAS_OWNER": "shaunpetro",
+          "EAS_PROJECT_ID": "41d9d284-b014-48ab-9238-fe2c0724fd98",
+          "EAS_SLUG": "cshad-isentinel-news"
         }
       },
       "ios": {

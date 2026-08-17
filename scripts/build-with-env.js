@@ -9,7 +9,8 @@ if (!target || !['preview', 'production'].includes(target)) {
 const env = { ...process.env };
 
 if (target === 'preview') {
-  env.EAS_OWNER = 'shaunatg-2';
+  // Preview project owner is shaunatg (not shaunatg-2)
+  env.EAS_OWNER = 'shaunatg';
   env.EAS_PROJECT_ID = 'ce9ad511-1168-4d71-941d-35a5f4214892';
   env.EAS_SLUG = 'cshadnews';
 } else {
