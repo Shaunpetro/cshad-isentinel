@@ -19,7 +19,7 @@ if (target === 'preview') {
 }
 
 const profile = target === 'preview' ? 'preview' : 'production';
-console.log(Building C:\Users\Petro Malamule\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1 with owner=, project=, slug=);
+console.log(`Building ${profile} with owner=${env.EAS_OWNER}, project=${env.EAS_PROJECT_ID}, slug=${env.EAS_SLUG}`);
 
 const child = spawn(
   'npx',
