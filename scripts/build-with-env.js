@@ -21,17 +21,16 @@ if (target === 'preview') {
 const profile = target === 'preview' ? 'preview' : 'production';
 console.log(`Building ${profile} with owner=${env.EAS_OWNER}, project=${env.EAS_PROJECT_ID}, slug=${env.EAS_SLUG}`);
 
-// On Windows, npm packages are invoked via .cmd shims.
-const executable = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+const command = `npx eas-cli build --platform android --profile ${profile} --non-interactive`;
 
-const child = spawn(
-  executable,
-  ['eas-cli', 'build', '--platform', 'android', '--profile', profile, '--non-interactive'],
-  { stdio: 'inherit', env }
-);
+const child = spawn(command, {
+  stdio: 'inherit',
+  env,
+  shell: true,
+});
 
 child.on('error', (err) => {
-  console.error(`Failed to start ${executable}:`, err.message);
+  console.error(`Failed to start command:`, err.message);
   process.exit(1);
 });
 
