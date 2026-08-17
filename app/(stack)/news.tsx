@@ -20,7 +20,7 @@ import WeatherCard from '../../src/components/news/WeatherCard';
 import InfrastructureCard from '../../src/components/hub/InfrastructureCard';
 import LocalAlertCard from '../../src/components/local/LocalAlertCard';
 import RadiusPickerModal from '../../src/components/location/RadiusPickerModal';
-import AdBanner from '../../src/components/monetisation/AdBanner';
+import { AdBanner } from '../../src/ads/AdBanner';
 import { useLocationContext } from '@/contexts/LocationContext';
 import type { SACity } from '@/services/location';
 import { useCurrentWeather } from '../../src/hooks/useCurrentWeather';

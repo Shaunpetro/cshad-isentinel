@@ -1,5 +1,5 @@
-// app/(stack)/article/[id].tsx
-// Beta 4 – Full article with inline media, paragraphs, and deep-link sharing
+﻿// app/(stack)/article/[id].tsx
+// Betaâ€¯4 â€“ Full article with inline media, paragraphs, and deep-link sharing
 
 import React, { useState } from "react";
 import {
@@ -16,7 +16,7 @@ import { SeverityBadge, SourceBadge, VerifiedBadge } from "../../../src/componen
 import { timeAgo, formatDate, stripHtml, parseArticleContent, extractBestImage } from "../../../src/utils/formatters";
 import { useNewsArticle } from "../../../src/hooks/useNews";
 import { useTheme } from "../../../src/contexts";
-import AdBanner from "../../../src/components/monetisation/AdBanner";
+import { AdBanner } from "../../../src/ads/AdBanner";
 import AudioAdModal from "../../../src/components/monetisation/AudioAdModal";
 import { SubscriptionModal } from "../../../src/components/opportunities/SubscriptionModal";
 
@@ -202,7 +202,7 @@ export default function NewsDetailScreen() {
           {/* Location Map */}
           {article.location && (
             <View style={styles.mapSection}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>📍 {t("map.incidentDetails")}</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>ðŸ“ {t("map.incidentDetails")}</Text>
               <View style={styles.mapContainer}>
                 <MapView
                   style={styles.map}
