@@ -12,6 +12,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     icon: "./assets/brand/cshad-isentinel-logo-icon.png",
     scheme: "cshad-isentinel",
     userInterfaceStyle: "automatic",
+    // @ts-ignore
+    newArchEnabled: false,   // ← inside object, ensures prebuild respects it
 
     splash: {
       image: "./assets/brand/cshad-isentinel-logo-fs.png",
@@ -95,9 +97,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       },
     },
   };
-
-  // @ts-ignore
-  expoConfig.newArchEnabled = false;
 
   return expoConfig;
 };
