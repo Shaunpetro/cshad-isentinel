@@ -12,6 +12,7 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { ThemeProvider, useTheme } from "@/contexts";
 import { UpdateBanner } from "@/components/common/UpdateBanner";
 import { LocationProvider } from "@/contexts/LocationContext";
+import { initializeAds } from "@/ads/AdMobService";
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -53,6 +54,14 @@ function RootLayoutInner() {
       else console.log("[RootLayout] Notifications initialized");
     }
   }, [notificationsReady, notificationError]);
+
+  // Initialize AdMob without blocking app startup.
+  // Consent / ATT / request config / SDK init are handled inside initializeAds().
+  useEffect(() => {
+    initializeAds().catch((err) => {
+      console.warn("[ads] initialization failed", err);
+    });
+  }, []);
 
   if (!isReady) return null;
 

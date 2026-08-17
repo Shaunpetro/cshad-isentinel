@@ -32,3 +32,6 @@ npm-debug.log*
 node_modules/
 
 android/build/
+
+.expo/
+

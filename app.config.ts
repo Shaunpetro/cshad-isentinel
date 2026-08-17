@@ -62,7 +62,17 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       "expo-dev-client",
       "expo-sharing",
       "expo-web-browser",
-      // "react-native-google-mobile-ads"  ← removed
+      "expo-tracking-transparency",
+      [
+        "react-native-google-mobile-ads",
+        {
+          androidAppId: process.env.EXPO_PUBLIC_ADMOB_ANDROID_APP_ID ?? "ca-app-pub-6042612781832936~9491041854",
+          iosAppId: process.env.EXPO_PUBLIC_ADMOB_IOS_APP_ID ?? "",
+          userTrackingUsageDescription:
+            "This identifier is used to show you more relevant ads and keep CSHAD iSentinel free.",
+          delayAppMeasurementInit: true,
+        },
+      ],
     ],
 
     experiments: {
