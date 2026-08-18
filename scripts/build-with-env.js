@@ -2,6 +2,7 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const target = process.argv[2];
 if (!target || !['preview', 'production'].includes(target)) {
@@ -9,47 +10,42 @@ if (!target || !['preview', 'production'].includes(target)) {
   process.exit(1);
 }
 
-// 1. Parse .env file manually (or use dotenv if installed)
-function loadEnvVars(filePath) {
+// Resolve project root
+const rootDir = path.resolve(__dirname, '..');
+const dotenvPath = path.join(rootDir, '.env');
+
+// Simple .env parser
+function parseEnvFile(filePath) {
   const env = {};
   if (!fs.existsSync(filePath)) {
-    console.warn(`Warning: ${filePath} not found. No local env vars loaded.`);
+    console.warn(`Warning: ${filePath} not found.`);
     return env;
   }
-
   const content = fs.readFileSync(filePath, 'utf8');
   const lines = content.split(/\r?\n/);
-
   for (const line of lines) {
     const trimmed = line.trim();
-    // Skip comments and empty lines
     if (!trimmed || trimmed.startsWith('#')) continue;
-
     const match = trimmed.match(/^([^=]+)=(.*)$/);
     if (match) {
-      const key = match[1].trim();
       let value = match[2].trim();
-      // Remove surrounding quotes if present
-      if ((value.startsWith('"') && value.endsWith('"')) || 
+      if ((value.startsWith('"') && value.endsWith('"')) ||
           (value.startsWith("'") && value.endsWith("'"))) {
         value = value.slice(1, -1);
       }
-      env[key] = value;
+      env[match[1].trim()] = value;
     }
   }
   return env;
 }
 
-// 2. Load .env from project root
-const rootDir = path.resolve(__dirname, '..');
-const dotenvPath = path.join(rootDir, '.env');
-const localEnv = loadEnvVars(dotenvPath);
+// Load local .env
+const localEnv = parseEnvFile(dotenvPath);
 
-// 3. Set EAS project details based on target
+// Set EAS project details
 const env = { ...process.env };
-
 if (target === 'preview') {
-  env.EAS_OWNER = 'shaunatg';  // Update if actual owner is shaunatg-2
+  env.EAS_OWNER = 'shaunatg'; // 🔁 change to 'shaunatg-2' if that is the actual preview owner
   env.EAS_PROJECT_ID = 'ce9ad511-1168-4d71-941d-35a5f4214892';
   env.EAS_SLUG = 'cshadnews';
 } else {
@@ -60,26 +56,31 @@ if (target === 'preview') {
 
 const profile = target === 'preview' ? 'preview' : 'production';
 
-// 4. Collect all EXPO_PUBLIC_* variables from .env
-const expoPublicVars = Object.keys(localEnv)
-  .filter((key) => key.startsWith('EXPO_PUBLIC_'))
-  .map((key) => `${key}=${localEnv[key]}`)
-  .join(',');
-
-// 5. Build command with optional --env
+// Prepare temporary env file for EXPO_PUBLIC_* variables
+const expoPublicKeys = Object.keys(localEnv).filter((key) => key.startsWith('EXPO_PUBLIC_'));
+let tempEnvFilePath = null;
 let command = `npx eas-cli build --platform android --profile ${profile} --non-interactive`;
 
-if (expoPublicVars) {
-  // Pass the variables as a single --env argument (comma-separated)
-  command += ` --env "${expoPublicVars.replace(/"/g, '\\"')}"`;
-  console.log(`ℹ️  Passing ${expoPublicVars.split(',').length} EXPO_PUBLIC_ variables to EAS build.`);
+if (expoPublicKeys.length > 0) {
+  const tempFileName = `.eas-build-${Date.now()}.env`;
+  tempEnvFilePath = path.join(os.tmpdir(), tempFileName);
+  const envFileContent = expoPublicKeys.map((key) => `${key}=${localEnv[key]}`).join('\n');
+  fs.writeFileSync(tempEnvFilePath, envFileContent);
+  command += ` --env-file "${tempEnvFilePath}"`;
+  console.log(`✅ Created temporary env file with ${expoPublicKeys.length} EXPO_PUBLIC_ variables.`);
 } else {
-  console.warn('⚠️  No EXPO_PUBLIC_ variables found in .env. Build may fail if they are not set in EAS dashboard.');
+  console.warn('⚠️  No EXPO_PUBLIC_ variables found in .env. Relying on EAS dashboard variables.');
 }
 
 console.log(`Building ${profile} with owner=${env.EAS_OWNER}, project=${env.EAS_PROJECT_ID}, slug=${env.EAS_SLUG}`);
 
-// 6. Spawn the command
+function cleanupTempFile() {
+  if (tempEnvFilePath && fs.existsSync(tempEnvFilePath)) {
+    fs.unlinkSync(tempEnvFilePath);
+    console.log('🧹 Removed temporary env file.');
+  }
+}
+
 const child = spawn(command, {
   stdio: 'inherit',
   env,
@@ -88,9 +89,11 @@ const child = spawn(command, {
 
 child.on('error', (err) => {
   console.error(`Failed to start command:`, err.message);
+  cleanupTempFile();
   process.exit(1);
 });
 
 child.on('close', (code) => {
+  cleanupTempFile();
   process.exit(code || 0);
 });
