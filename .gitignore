@@ -35,3 +35,6 @@ android/build/
 
 .expo/
 
+
+# Expo generated native project
+android/

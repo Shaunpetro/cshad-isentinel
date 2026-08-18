@@ -18,7 +18,7 @@ import RadiusPickerModal from '../location/RadiusPickerModal';
 import type { NewsItem } from '../../types';
 import type { SACity } from '@/services/location';
 
-const SLIDE_INTERVAL = 45000;
+const SLIDE_INTERVAL = 20000;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ITEM_WIDTH = SCREEN_WIDTH - 64;
 
