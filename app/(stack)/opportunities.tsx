@@ -22,6 +22,7 @@ import { OpportunityDetailModal } from '@/components/opportunities/OpportunityDe
 import { FilterSheet } from '@/components/opportunities/FilterSheet';
 import { SubscriptionModal } from '@/components/opportunities/SubscriptionModal';
 import { TenderSearchModal } from '@/components/opportunities/TenderSearchModal';
+import { AdBanner } from '@/ads/AdBanner';
 import { Typography, Spacing, BorderRadius } from '@/config/theme';
 import type { Opportunity } from '@/services/opportunities';
 
@@ -234,6 +235,11 @@ export default function OpportunitiesScreen() {
           data={filteredOpportunities}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
+          ListHeaderComponent={
+            <View style={{ paddingHorizontal: Spacing.md, paddingBottom: Spacing.sm }}>
+              <AdBanner />
+            </View>
+          }
           ListEmptyComponent={renderEmpty}
           contentContainerStyle={styles.list}
           refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refresh} colors={[colors.primary]} />}

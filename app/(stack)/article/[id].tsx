@@ -1,9 +1,10 @@
 ﻿// app/(stack)/article/[id].tsx
-// Betaâ€¯4 â€“ Full article with inline media, paragraphs, and deep-link sharing
+// Beta 4 – Full article with inline media, paragraphs, deep-link sharing, and interstitials
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View, Text, StyleSheet, ScrollView, Pressable, Share, ActivityIndicator,
+  NativeSyntheticEvent, NativeScrollEvent,
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { Image } from "expo-image";
@@ -19,6 +20,10 @@ import { useTheme } from "../../../src/contexts";
 import { AdBanner } from "../../../src/ads/AdBanner";
 import AudioAdModal from "../../../src/components/monetisation/AudioAdModal";
 import { SubscriptionModal } from "../../../src/components/opportunities/SubscriptionModal";
+import { useInterstitialAd } from "../../../src/ads/useInterstitialAd";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const PREMIUM_KEY = "pshad_premium_subscribed";
 
 export default function NewsDetailScreen() {
   const router = useRouter();
@@ -29,6 +34,19 @@ export default function NewsDetailScreen() {
   const { article, isLoading, error } = useNewsArticle(id);
   const [audioModalVisible, setAudioModalVisible] = useState(false);
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+
+  const { showIfReady } = useInterstitialAd();
+
+  // Refs for scroll-based interstitial
+  const midArticleShown = useRef(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(PREMIUM_KEY).then((val) => {
+      setIsSubscribed(val === "true");
+    });
+  }, []);
 
   const getCategoryLabel = (category: string): string => {
     const key = `news.categories.${category}`;
@@ -44,7 +62,6 @@ export default function NewsDetailScreen() {
     try {
       await Share.share({ title: article.title, message, url: articleDeepLink });
     } catch (err) {
-      // Fallback to just the app link
       try {
         await Share.share({ title: article.title, message: appStoreLink });
       } catch (fallbackErr) {
@@ -63,6 +80,30 @@ export default function NewsDetailScreen() {
     setAudioModalVisible(false);
     setSubscriptionModalVisible(true);
   };
+
+  const handleAudioPress = () => {
+    if (!isSubscribed) {
+      // Show interstitial before audio reader
+      showIfReady();
+    }
+    setAudioModalVisible(true);
+  };
+
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (isSubscribed || midArticleShown.current) return;
+
+      const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+      const scrolled = contentOffset.y + layoutMeasurement.height;
+      const halfContent = contentSize.height * 0.5;
+
+      if (scrolled >= halfContent) {
+        midArticleShown.current = true;
+        showIfReady();
+      }
+    },
+    [isSubscribed, showIfReady]
+  );
 
   if (isLoading) {
     return (
@@ -114,7 +155,7 @@ export default function NewsDetailScreen() {
           headerTintColor: colors.text,
           headerRight: () => (
             <View style={{ flexDirection: "row", gap: 12 }}>
-              <Pressable onPress={() => setAudioModalVisible(true)} style={styles.headerButton}>
+              <Pressable onPress={handleAudioPress} style={styles.headerButton}>
                 <Ionicons name="volume-medium-outline" size={24} color={colors.text} />
               </Pressable>
               <Pressable onPress={handleShare} style={styles.headerButton}>
@@ -130,7 +171,13 @@ export default function NewsDetailScreen() {
         }}
       />
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      >
         {heroImage ? (
           <Image source={{ uri: heroImage }} style={styles.heroImage} contentFit="cover" transition={300} />
         ) : (
@@ -194,7 +241,7 @@ export default function NewsDetailScreen() {
             );
           })}
 
-          {/* Mock ad */}
+          {/* Banner ad after article body, before map */}
           <View style={{ marginTop: Spacing.lg, marginBottom: Spacing.lg }}>
             <AdBanner />
           </View>
@@ -202,7 +249,7 @@ export default function NewsDetailScreen() {
           {/* Location Map */}
           {article.location && (
             <View style={styles.mapSection}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>ðŸ“ {t("map.incidentDetails")}</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>📍 {t("map.incidentDetails")}</Text>
               <View style={styles.mapContainer}>
                 <MapView
                   style={styles.map}

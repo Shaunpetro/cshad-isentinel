@@ -19,6 +19,7 @@ import { useLocationContext } from "@/contexts/LocationContext";
 import { useLocalAlerts } from "@/hooks/useLocalAlerts";
 import { useNews } from "@/hooks/useNews";
 import { Typography, Spacing, Shadows, BorderRadius } from "@/config/theme";
+import { AdBanner } from "@/ads/AdBanner";
 import { HazardReportModal } from "@/components/hub/HazardReportModal";
 import {
   fetchHazards,
@@ -322,6 +323,11 @@ export default function IncidentsScreen() {
           ))}
         </View>
       )}
+
+      {/* Ad banner (placed after local updates to avoid obscuring safety info) */}
+      <View style={{ marginTop: Spacing.md }}>
+        <AdBanner />
+      </View>
     </View>
   );
 
