@@ -59,7 +59,7 @@ const profile = target === 'preview' ? 'preview' : 'production';
 // Prepare temporary env file for EXPO_PUBLIC_* variables
 const expoPublicKeys = Object.keys(localEnv).filter((key) => key.startsWith('EXPO_PUBLIC_'));
 let tempEnvFilePath = null;
-let command = `npx eas-cli build --platform android --profile ${profile} --non-interactive`;
+let command = `npx --yes eas-cli@latest build --platform android --profile ${profile} --non-interactive`;
 
 if (expoPublicKeys.length > 0) {
   const tempFileName = `.eas-build-${Date.now()}.env`;
