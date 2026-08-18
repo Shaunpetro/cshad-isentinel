@@ -4,10 +4,10 @@ import { ExpoConfig, ConfigContext } from "expo/config";
 export default ({ config }: ConfigContext): ExpoConfig => {
   const expoConfig: ExpoConfig = {
     name: "CSHAD iSentinel News",
-    slug: process.env.EAS_SLUG || "cshadnews",
-    owner: process.env.EAS_OWNER || "shaunatg",
-    version: "3.2608.01",
-    runtimeVersion: "3.2608.01",
+    slug: "cshad-isentinel-news", // TEMPORARY: hardcoded for preview-prod build
+    owner: "shaunpetro",           // TEMPORARY: hardcoded for preview-prod build
+    version: "3.2608.02",
+    runtimeVersion: "3.2608.02",
     orientation: "portrait",
     icon: "./assets/brand/cshad-isentinel-logo-icon.png",
     scheme: "cshad-isentinel",
@@ -38,7 +38,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         backgroundColor: "#1C1C1C",
       },
       package: "cshad.isentinel.news",
-      versionCode: 15,
+      versionCode: 16,
       googleServicesFile: "./google-services.json",
       config: {
         googleMaps: {
@@ -91,7 +91,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       buildDate: new Date().toISOString(),
       developer: "Petro@ATG",
       eas: {
-        projectId: process.env.EAS_PROJECT_ID || "41d9d284-b014-48ab-9238-fe2c0724fd98",
+        projectId: "41d9d284-b014-48ab-9238-fe2c0724fd98", // TEMPORARY: hardcoded for preview-prod build
       },
     },
   };
