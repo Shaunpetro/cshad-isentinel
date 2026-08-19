@@ -20,12 +20,13 @@ interface Props {
   articleBody: string;
   onClose: () => void;
   onSubscribe: () => void;
+  isSubscribed?: boolean;
 }
 
-const AD_DURATION = 15; // seconds
-const AUTO_CLOSE_DELAY = 5; // seconds after countdown
+const AD_DURATION = 15;
+const AUTO_CLOSE_DELAY = 5;
 
-export default function AudioAdModal({ visible, articleBody, onClose, onSubscribe }: Props) {
+export default function AudioAdModal({ visible, articleBody, onClose, onSubscribe, isSubscribed = false }: Props) {
   const { colors } = useTheme();
   const [countdown, setCountdown] = useState(AD_DURATION);
   const [adComplete, setAdComplete] = useState(false);
@@ -34,23 +35,18 @@ export default function AudioAdModal({ visible, articleBody, onClose, onSubscrib
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoCloseRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Pulse animation for the close button
-  useEffect(() => {
-    if (adComplete) {
-      const loop = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1.2, duration: 600, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
-        ])
-      );
-      loop.start();
-      return () => loop.stop();
-    }
-  }, [adComplete, pulseAnim]);
-
-  // Countdown timer
   useEffect(() => {
     if (!visible) return;
+
+    // Premium users skip the mock ad and start reading immediately
+    if (isSubscribed) {
+      handleStartReading();
+      return () => {
+        if (timerRef.current) clearInterval(timerRef.current);
+        if (autoCloseRef.current) clearTimeout(autoCloseRef.current);
+        Speech.stop();
+      };
+    }
 
     setCountdown(AD_DURATION);
     setAdComplete(false);
@@ -61,7 +57,6 @@ export default function AudioAdModal({ visible, articleBody, onClose, onSubscrib
         if (prev <= 1) {
           if (timerRef.current) clearInterval(timerRef.current);
           setAdComplete(true);
-          // Auto‑close after 5 seconds
           autoCloseRef.current = setTimeout(() => {
             handleStartReading();
           }, AUTO_CLOSE_DELAY * 1000);
@@ -76,12 +71,11 @@ export default function AudioAdModal({ visible, articleBody, onClose, onSubscrib
       if (autoCloseRef.current) clearTimeout(autoCloseRef.current);
       Speech.stop();
     };
-  }, [visible]);
+  }, [visible, isSubscribed]);
 
   const handleStartReading = () => {
     setAdComplete(true);
     setIsReading(true);
-    // Read only the article body, not the title or metadata
     Speech.speak(articleBody, {
       language: 'en-ZA',
       pitch: 1.0,
@@ -107,7 +101,6 @@ export default function AudioAdModal({ visible, articleBody, onClose, onSubscrib
     <Modal visible={visible} animationType="fade" transparent onRequestClose={handleClose}>
       <View style={styles.overlay}>
         <View style={[styles.container, { backgroundColor: colors.surface }]}>
-          {/* Header */}
           <View style={styles.header}>
             <Ionicons name="megaphone-outline" size={20} color={colors.primary} />
             <Text style={[styles.headerText, { color: colors.text }]}>Sponsored Message</Text>
@@ -118,22 +111,20 @@ export default function AudioAdModal({ visible, articleBody, onClose, onSubscrib
             )}
           </View>
 
-          {/* Ad placeholder */}
           <View style={[styles.adPlaceholder, { backgroundColor: colors.divider }]}>
             <Ionicons name="image-outline" size={48} color={colors.textDisabled} />
             <Text style={[styles.adText, { color: colors.textSecondary }]}>
-              {isReading ? 'Audio Reader Active' : 'Your Ad Here'}
+              {isSubscribed ? 'Premium Audio Reader' : isReading ? 'Audio Reader Active' : 'Your Ad Here'}
             </Text>
-            {!isReading && (
+            {!isReading && !isSubscribed && (
               <Text style={[styles.adSubtext, { color: colors.textDisabled }]}>
                 Audio reader starts after the ad
               </Text>
             )}
           </View>
 
-          {/* Countdown / Audio status */}
           <View style={styles.controls}>
-            {!adComplete && !isReading && (
+            {!adComplete && !isReading && !isSubscribed && (
               <View style={styles.countdownRow}>
                 <Ionicons name="timer-outline" size={18} color={colors.textSecondary} />
                 <Text style={[styles.countdownText, { color: colors.textSecondary }]}>
@@ -156,8 +147,7 @@ export default function AudioAdModal({ visible, articleBody, onClose, onSubscrib
             )}
           </View>
 
-          {/* Subscribe link */}
-          {!adComplete && (
+          {!adComplete && !isSubscribed && (
             <TouchableOpacity style={styles.subscribeLink} onPress={onSubscribe}>
               <Text style={[styles.subscribeText, { color: colors.primary }]}>
                 Subscribe to remove ads

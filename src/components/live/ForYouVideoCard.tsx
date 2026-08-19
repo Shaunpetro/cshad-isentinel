@@ -67,7 +67,7 @@ export default function ForYouVideoCard({ item, isActive, onDoubleTapLike }: Pro
             videoId={item.videoId}
             play={playing}
             mute={muted}
-            webViewStyle={{ opacity: 0.99 }} // prevent flicker
+            webViewStyle={{ opacity: 0.99 }}
             initialPlayerParams={{
               controls: false,
               modestbranding: true,

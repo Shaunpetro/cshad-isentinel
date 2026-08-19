@@ -9,7 +9,7 @@ import i18n from "@/i18n";
 import { useAppReady } from "@/hooks/useAppReady";
 import { CustomSplashScreen } from "@/components/core/SplashScreen";
 import { useNotifications } from "@/hooks/useNotifications";
-import { ThemeProvider, useTheme } from "@/contexts";
+import { ThemeProvider, useTheme, PremiumProvider } from "@/contexts";
 import { UpdateBanner } from "@/components/common/UpdateBanner";
 import { LocationProvider } from "@/contexts/LocationContext";
 import { initializeAds } from "@/ads/AdMobService";
@@ -90,11 +90,13 @@ export default function RootLayout() {
   return (
     <I18nextProvider i18n={i18n}>
       <ThemeProvider>
-        <ErrorBoundary>
-          <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }} edges={["bottom"]}>
-            <RootLayoutInner />
-          </SafeAreaView>
-        </ErrorBoundary>
+        <PremiumProvider>
+          <ErrorBoundary>
+            <SafeAreaView style={{ flex: 1, backgroundColor: "transparent" }} edges={["bottom"]}>
+              <RootLayoutInner />
+            </SafeAreaView>
+          </ErrorBoundary>
+        </PremiumProvider>
       </ThemeProvider>
     </I18nextProvider>
   );

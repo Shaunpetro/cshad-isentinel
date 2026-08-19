@@ -18,7 +18,7 @@ import { BlurView } from 'expo-blur';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as WebBrowser from 'expo-web-browser';
-import { useTheme } from '@/contexts';
+import { useTheme, usePremium } from '@/contexts';
 import { Typography, Spacing, BorderRadius } from '@/config/theme';
 import { useCountdown } from '@/hooks/useCountdown';
 import { SubscriptionModal } from './SubscriptionModal';
@@ -36,9 +36,9 @@ const LOCK_HOURS = 36;
 
 export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onClose }: Props) {
   const { colors, isDark } = useTheme();
+  const { subscribe } = usePremium();
   const [subscriptionVisible, setSubscriptionVisible] = useState(false);
 
-  // Countdown hook always called before any early return
   const unlockTime = opportunity?.category === 'tender'
     ? new Date(opportunity.created_at).getTime() + LOCK_HOURS * 60 * 60 * 1000
     : 0;
@@ -46,7 +46,6 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
 
   if (!opportunity) return null;
 
-  // Lock only tenders during their 36‑hour window for free users
   const isPremiumLocked =
     opportunity.category === 'tender' && !isSubscribed && !isUnlocked;
 
@@ -82,11 +81,13 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
     }
   };
 
-  const handleSelectPlan = (plan: any) => {
+  const handleSelectPlan = async (plan: any) => {
+    await subscribe();
+    setSubscriptionVisible(false);
     Alert.alert(
       'Demo Subscription',
-      `You selected the ${plan.name} plan (${plan.price} ${plan.period}).\n\nIn the live app, this would start a payment flow.`,
-      [{ text: 'OK', onPress: () => setSubscriptionVisible(false) }]
+      `You selected the ${plan.name} plan (${plan.price} ${plan.period}).\n\nPremium activated!`,
+      [{ text: 'OK' }]
     );
   };
 
@@ -130,7 +131,7 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
           </Text>
         </View>
         {details ? (
-          <Text style={[styles.briefingDetails, { color: colors.textSecondary }]}>
+          <Text selectable style={[styles.briefingDetails, { color: colors.textSecondary }]}>
             {details}
           </Text>
         ) : null}
@@ -182,10 +183,10 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
               showsVerticalScrollIndicator={false}
               key={opportunity.id}
             >
-              <Text style={[styles.title, { color: colors.text }]}>{opportunity.title}</Text>
+              <Text selectable style={[styles.title, { color: colors.text }]}>{opportunity.title}</Text>
 
               {opportunity.company_name && (
-                <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+                <Text selectable style={[styles.subtitle, { color: colors.textSecondary }]}>
                   {opportunity.company_name}
                 </Text>
               )}
@@ -193,7 +194,7 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
               {opportunity.source_id && (
                 <View style={styles.row}>
                   <Ionicons name="document-text" size={14} color={colors.textSecondary} />
-                  <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                  <Text selectable style={[styles.metaText, { color: colors.textSecondary }]}>
                     <Text style={[styles.metaLabel, { color: colors.textSecondary }]}>
                       {isTender ? 'Tender Number:' : 'Reference:'}
                     </Text>{' '}
@@ -205,7 +206,7 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
               {opportunity.location_name && (
                 <View style={styles.row}>
                   <Ionicons name="location" size={14} color={colors.primary} />
-                  <Text style={[styles.metaText, { color: colors.primary }]}>
+                  <Text selectable style={[styles.metaText, { color: colors.primary }]}>
                     {opportunity.location_name}
                   </Text>
                 </View>
@@ -213,7 +214,7 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
               {opportunity.province && (
                 <View style={styles.row}>
                   <Ionicons name="map" size={14} color={colors.primary} />
-                  <Text style={[styles.metaText, { color: colors.primary }]}>
+                  <Text selectable style={[styles.metaText, { color: colors.primary }]}>
                     {opportunity.province}
                   </Text>
                 </View>
@@ -222,7 +223,7 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
               {opportunity.date_advertised && (
                 <View style={styles.row}>
                   <Ionicons name="calendar" size={14} color={colors.textSecondary} />
-                  <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                  <Text selectable style={[styles.metaText, { color: colors.textSecondary }]}>
                     <Text style={[styles.metaLabel, { color: colors.textSecondary }]}>Advertised:</Text>{' '}
                     {formatDateTime(opportunity.date_advertised)}
                   </Text>
@@ -230,7 +231,7 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
               )}
               <View style={styles.row}>
                 <Ionicons name="timer" size={14} color={colors.textSecondary} />
-                <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                <Text selectable style={[styles.metaText, { color: colors.textSecondary }]}>
                   <Text style={[styles.metaLabel, { color: colors.textSecondary }]}>Closing:</Text>{' '}
                   {formatDateTime(opportunity.closing_date)}
                 </Text>
@@ -238,7 +239,7 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
               {opportunity.submission_type && (
                 <View style={styles.row}>
                   <Ionicons name="send" size={14} color={colors.textSecondary} />
-                  <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                  <Text selectable style={[styles.metaText, { color: colors.textSecondary }]}>
                     <Text style={[styles.metaLabel, { color: colors.textSecondary }]}>Submission:</Text>{' '}
                     {opportunity.submission_type}
                   </Text>
@@ -247,10 +248,9 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
 
               {renderBriefing()}
 
-              {/* Description or locked preview with countdown */}
               {isPremiumLocked ? (
                 <View style={styles.premiumContainer}>
-                  <Text style={[styles.body, { color: colors.text }]} numberOfLines={4}>
+                  <Text selectable style={[styles.body, { color: colors.text }]} numberOfLines={4}>
                     {opportunity.body}
                   </Text>
                   <View style={styles.upgradeBanner}>
@@ -269,10 +269,9 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
                   </View>
                 </View>
               ) : (
-                <Text style={[styles.body, { color: colors.text }]}>{opportunity.body}</Text>
+                <Text selectable style={[styles.body, { color: colors.text }]}>{opportunity.body}</Text>
               )}
 
-              {/* Documents */}
               {docs.length > 0 && (
                 <View style={styles.section}>
                   <Text style={[styles.sectionTitle, { color: colors.text }]}>Documents</Text>
@@ -297,6 +296,7 @@ export function OpportunityDetailModal({ visible, opportunity, isSubscribed, onC
                         color={isPremiumLocked ? colors.textDisabled : colors.primary}
                       />
                       <Text
+                        selectable
                         style={[
                           styles.docName,
                           { color: isPremiumLocked ? colors.textDisabled : colors.text },

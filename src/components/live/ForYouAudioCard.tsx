@@ -1,7 +1,7 @@
-// src/components/live/ForYouVideoCard.tsx
+// src/components/live/ForYouAudioCard.tsx
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Pressable, Dimensions, TouchableWithoutFeedback } from 'react-native';
-import YouTubePlayer from 'react-native-youtube-iframe';
+import { View, Text, StyleSheet, Pressable, Dimensions, Animated, TouchableWithoutFeedback } from 'react-native';
+import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '@/contexts';
 import { ForYouItem } from '@/services/forYouFeed';
@@ -16,81 +16,109 @@ interface Props {
 const { width, height } = Dimensions.get('window');
 const CARD_HEIGHT = height * 0.78;
 
-export default function ForYouVideoCard({ item, isActive, onDoubleTapLike }: Props) {
+export default function ForYouAudioCard({ item, isActive, onDoubleTapLike }: Props) {
   const theme = useTheme();
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [playing, setPlaying] = useState(false);
-  const [muted, setMuted] = useState(true);
   const [liked, setLiked] = useState(false);
   const [showHeart, setShowHeart] = useState(false);
   const [commentsVisible, setCommentsVisible] = useState(false);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   const lastTap = useRef<number | null>(null);
 
   useEffect(() => {
-    if (isActive) {
-      setPlaying(true);
+    if (playing) {
+      const loop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, { toValue: 1.3, duration: 800, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        ])
+      );
+      loop.start();
+      return () => loop.stop();
     } else {
+      pulseAnim.setValue(1);
+    }
+  }, [playing, pulseAnim]);
+
+  const playAudio = async () => {
+    try {
+      const { sound } = await Audio.Sound.createAsync({ uri: item.mediaUrl! });
+      setSound(sound);
+      await sound.playAsync();
+      setPlaying(true);
+    } catch (err) {
+      console.warn('[ForYouAudioCard] play error', err);
+    }
+  };
+
+  const pauseAudio = async () => {
+    if (sound) {
+      await sound.pauseAsync();
       setPlaying(false);
     }
+  };
+
+  const togglePlayPause = async () => {
+    if (playing) {
+      await pauseAudio();
+    } else if (sound) {
+      await sound.playAsync();
+      setPlaying(true);
+    } else {
+      await playAudio();
+    }
+  };
+
+  useEffect(() => {
+    if (isActive && !playing) {
+      playAudio();
+    } else if (!isActive && playing) {
+      pauseAudio();
+    }
   }, [isActive]);
+
+  useEffect(() => {
+    return () => {
+      if (sound) sound.unloadAsync();
+    };
+  }, [sound]);
 
   const handleTap = () => {
     const now = Date.now();
     if (lastTap.current && now - lastTap.current < 300) {
-      // Double tap like
       setLiked(true);
       setShowHeart(true);
       setTimeout(() => setShowHeart(false), 800);
       onDoubleTapLike();
       lastTap.current = null;
     } else {
-      // Single tap toggles play/pause
-      setPlaying((prev) => !prev);
+      togglePlayPause();
       lastTap.current = now;
-      setTimeout(() => {
-        lastTap.current = null;
-      }, 300);
+      setTimeout(() => { lastTap.current = null; }, 300);
     }
-  };
-
-  const toggleMute = () => {
-    setMuted((prev) => !prev);
   };
 
   return (
     <View style={[styles.container, { height: CARD_HEIGHT, backgroundColor: theme.colors.background }]}>
       <TouchableWithoutFeedback onPress={handleTap}>
-        <View style={styles.videoContainer}>
-          <YouTubePlayer
-            height={CARD_HEIGHT}
-            width={width}
-            videoId={item.videoId}
-            play={playing}
-            mute={muted}
-            webViewStyle={{ opacity: 0.99 }} // prevent flicker
-            initialPlayerParams={{
-              controls: false,
-              modestbranding: true,
-              rel: false,
-            }}
-          />
+        <View style={styles.audioContainer}>
+          <View style={[styles.placeholder, { backgroundColor: theme.colors.surface }]}>
+            <Animated.View style={[styles.ripple, { transform: [{ scale: pulseAnim }], borderColor: theme.colors.primary }]}>
+              <Ionicons name="mic" size={48} color={theme.colors.primary} />
+            </Animated.View>
+            <Text style={[styles.audioHint, { color: theme.colors.textSecondary }]}>
+              {playing ? 'Playing…' : 'Tap to play'}
+            </Text>
+          </View>
 
-          {/* Top-right audio toggle */}
-          <Pressable
-            style={[styles.audioToggle, { backgroundColor: 'rgba(0,0,0,0.5)' }]}
-            onPress={toggleMute}
-          >
-            <Ionicons name={muted ? 'volume-mute' : 'volume-high'} size={22} color="#FFFFFF" />
-          </Pressable>
-
-          {/* Double-tap heart */}
           {showHeart && (
             <View style={styles.heartOverlay}>
               <Ionicons name="heart" size={96} color="#FF4757" />
             </View>
           )}
 
-          {/* Bottom overlay */}
           <View style={styles.bottomOverlay}>
             <View style={styles.bottomRow}>
               <Pressable style={styles.actionButton} onPress={() => setCommentsVisible(true)}>
@@ -122,17 +150,23 @@ export default function ForYouVideoCard({ item, isActive, onDoubleTapLike }: Pro
 
 const styles = StyleSheet.create({
   container: { width },
-  videoContainer: { flex: 1, position: 'relative' },
-  audioToggle: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  audioContainer: { flex: 1, position: 'relative' },
+  placeholder: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 10,
+  },
+  ripple: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  audioHint: {
+    fontSize: 14,
+    marginTop: 16,
   },
   heartOverlay: {
     ...StyleSheet.absoluteFillObject,

@@ -12,9 +12,11 @@ import {
   Share,
   Platform,
   ActivityIndicator,
+  Pressable,
 } from "react-native";
+import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from "react-i18next";
-import { Typography, Spacing } from "../../src/config/theme";
+import { Typography, Spacing, BorderRadius } from "../../src/config/theme";
 import { APP } from "../../src/config/constants";
 import {
   LegalModal,
@@ -31,7 +33,8 @@ import { CityPickerModal } from "../../src/components/news";
 import { PRIVACY_POLICY, TERMS_OF_SERVICE } from "../../src/content/legal";
 import { usePreferences } from "../../src/hooks/usePreferences";
 import { useLanguage, LanguageCode } from "../../src/hooks/useLanguage";
-import { useTheme } from "../../src/contexts";
+import { useTheme, usePremium } from "../../src/contexts";
+import { SubscriptionModal } from "../../src/components/opportunities/SubscriptionModal";
 import {
   AppearanceMode,
   NewsScope,
@@ -54,6 +57,7 @@ export default function SettingsScreen() {
     updateSoundEnabled,
     updateVibrationEnabled,
   } = usePreferences();
+  const { isSubscribed, subscribe, unsubscribe } = usePremium();
 
   const [privacyModalVisible, setPrivacyModalVisible] = useState(false);
   const [termsModalVisible, setTermsModalVisible] = useState(false);
@@ -64,6 +68,7 @@ export default function SettingsScreen() {
   const [scopePickerVisible, setScopePickerVisible] = useState(false);
   const [radiusPickerVisible, setRadiusPickerVisible] = useState(false);
   const [cityPickerVisible, setCityPickerVisible] = useState(false);
+  const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
 
   const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=cshad.isentinel.news";
 
@@ -185,6 +190,20 @@ export default function SettingsScreen() {
   const getRadiusLabel = () => `${preferences.newsRadius} km`;
   const getHomeLocationLabel = () => preferences.homeLocation?.name || t('common.unknown');
 
+  const handlePremiumPress = () => {
+    if (isSubscribed) {
+      unsubscribe();
+    } else {
+      setSubscriptionModalVisible(true);
+    }
+  };
+
+  const handleSelectPlan = (plan: any) => {
+    subscribe();
+    setSubscriptionModalVisible(false);
+    Alert.alert('Demo Subscription', `You selected ${plan.name}. Premium activated!`);
+  };
+
   if (isLoading) {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
@@ -196,6 +215,26 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
+      {/* Premium */}
+      <View style={[styles.section, { backgroundColor: colors.surface }]}>
+        <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>PREMIUM</Text>
+        <Pressable
+          style={[styles.premiumRow, { backgroundColor: isSubscribed ? colors.success + '20' : colors.warning + '20' }]}
+          onPress={handlePremiumPress}
+        >
+          <Ionicons name="star" size={24} color={isSubscribed ? colors.success : colors.warning} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.premiumTitle, { color: colors.text }]}>
+              {isSubscribed ? 'Premium Subscribed' : 'Upgrade to Premium'}
+            </Text>
+            <Text style={[styles.premiumSubtitle, { color: colors.textSecondary }]}>
+              {isSubscribed ? 'Ad-free experience, early tender access, and more.' : 'Remove ads, unlock full tender details and audio reader.'}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+        </Pressable>
+      </View>
+
       {/* Permissions */}
       <View style={[styles.section, { backgroundColor: colors.surface }]}>
         <Text style={[styles.sectionHeader, { color: colors.textSecondary }]}>PERMISSIONS</Text>
@@ -293,6 +332,7 @@ export default function SettingsScreen() {
       </View>
 
       {/* Modals */}
+      <SubscriptionModal visible={subscriptionModalVisible} onClose={() => setSubscriptionModalVisible(false)} onSelectPlan={handleSelectPlan} />
       <LegalModal visible={privacyModalVisible} onClose={() => setPrivacyModalVisible(false)} title={t('settings.privacyPolicy')} lastUpdated={PRIVACY_POLICY.lastUpdated} content={PRIVACY_POLICY.content} />
       <LegalModal visible={termsModalVisible} onClose={() => setTermsModalVisible(false)} title={t('settings.termsOfService')} lastUpdated={TERMS_OF_SERVICE.lastUpdated} content={TERMS_OF_SERVICE.content} />
       <PrivacyModal visible={privacyDashboardVisible} onClose={() => setPrivacyDashboardVisible(false)} />
@@ -320,4 +360,12 @@ const styles = StyleSheet.create({
   footer: { alignItems: "center", marginTop: Spacing.md, marginBottom: Spacing.xl },
   copyright: { fontSize: Typography.sizes.caption, fontFamily: Typography.fonts.medium },
   rights: { fontSize: Typography.sizes.label, fontFamily: Typography.fonts.regular, marginTop: Spacing.xs },
+  premiumRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    padding: Spacing.md,
+  },
+  premiumTitle: { fontSize: Typography.sizes.body, fontFamily: 'DMSans-Bold', marginBottom: 2 },
+  premiumSubtitle: { fontSize: Typography.sizes.caption, fontFamily: 'DMSans-Regular' },
 });

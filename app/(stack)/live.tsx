@@ -1,62 +1,50 @@
 // app/(stack)/live.tsx
-// Beta 4 – Live Hub: Live Now list + Discover vertical feed with interstitial
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  RefreshControl,
-  ActivityIndicator,
-  Dimensions,
-  Image,
+  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  RefreshControl, ActivityIndicator, Dimensions, Image,
 } from 'react-native';
-import { useTheme } from '@/contexts';
+import { useTheme, usePremium } from '@/contexts';
 import { useLiveStreams } from '../../src/hooks/useLiveStreams';
 import StreamCard from '../../src/components/live/StreamCard';
-import ForYouCard from '../../src/components/live/ForYouCard';
+import ForYouVideoCard from '../../src/components/live/ForYouVideoCard';
+import ForYouAudioCard from '../../src/components/live/ForYouAudioCard';
 import LivePlayer from '../../src/components/live/LivePlayer';
 import { AdBanner } from '@/ads/AdBanner';
 import { useInterstitialAd } from '@/ads/useInterstitialAd';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MOCK_FOR_YOU_FEED, ForYouItem } from '@/services/forYouFeed';
 import type { LiveStream } from '@/services/live/liveService';
 
 type Tab = 'liveNow' | 'discover';
 
-const PREMIUM_KEY = 'pshad_premium_subscribed';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const DISCOVER_ITEM_HEIGHT = SCREEN_HEIGHT * 0.75; // same as ForYouCard height
+const DISCOVER_ITEM_HEIGHT = SCREEN_HEIGHT * 0.78;
 
 export default function LiveHubScreen() {
   const theme = useTheme();
+  const { isSubscribed } = usePremium();
   const { liveNow, upcoming, isLoading, isRefreshing, error, refresh } = useLiveStreams();
   const [activeStream, setActiveStream] = useState<LiveStream | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('liveNow');
-  const [isSubscribed, setIsSubscribed] = useState(false);
   const { showIfReady } = useInterstitialAd();
-
-  useEffect(() => {
-    AsyncStorage.getItem(PREMIUM_KEY).then((val) => {
-      setIsSubscribed(val === 'true');
-    });
-  }, []);
+  const [forYouItems, setForYouItems] = useState<ForYouItem[]>(MOCK_FOR_YOU_FEED);
+  const [activeIndex, setActiveIndex] = useState(0);
 
   const handleOpenStream = useCallback(
     (stream: LiveStream) => {
-      if (!isSubscribed) {
-        // Try to show interstitial before playing video
-        const shown = showIfReady();
-        if (shown) {
-          // If interstitial shown, delay opening player until closed
-          // The hook reloads automatically on CLOSED event; we just open player immediately
-        }
-      }
+      if (!isSubscribed) showIfReady();
       setActiveStream(stream);
     },
     [isSubscribed, showIfReady]
   );
+
+  const handleDoubleTapLike = useCallback((itemId: string) => {
+    setForYouItems((prev) =>
+      prev.map((item) =>
+        item.id === itemId ? { ...item, likes: item.likes + 1 } : item
+      )
+    );
+  }, []);
 
   if (isLoading) {
     return (
@@ -74,11 +62,11 @@ export default function LiveHubScreen() {
     );
   }
 
-  const forYouStreams = liveNow.length > 0 ? liveNow : upcoming;
+  const upcomingForHeader = upcoming;
+  const forYouData = forYouItems;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Tab bar */}
       <View style={[styles.tabBar, { borderBottomColor: theme.colors.divider }]}>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'liveNow' && styles.activeTab]}
@@ -98,10 +86,9 @@ export default function LiveHubScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Live Now tab: existing horizontal list */}
       {activeTab === 'liveNow' && (
         <FlatList
-          data={liveNow}
+          data={liveNow.length > 0 ? liveNow : upcoming}
           renderItem={({ item }) => (
             <StreamCard stream={item} onPress={() => handleOpenStream(item)} />
           )}
@@ -109,7 +96,7 @@ export default function LiveHubScreen() {
           ListEmptyComponent={
             <View style={styles.centered}>
               <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>
-                No live streams right now.
+                No live or upcoming streams right now.
               </Text>
             </View>
           }
@@ -118,65 +105,77 @@ export default function LiveHubScreen() {
               <AdBanner />
             </View>
           }
-          refreshControl={
-            <RefreshControl refreshing={isRefreshing} onRefresh={refresh} colors={[theme.colors.primary]} />
-          }
+          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refresh} colors={[theme.colors.primary]} />}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
         />
       )}
 
-      {/* Discover tab: vertical For You feed with Upcoming carousel header */}
       {activeTab === 'discover' && (
         <FlatList
-          data={forYouStreams}
+          data={forYouData}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <ForYouCard stream={item} onPress={() => handleOpenStream(item)} />
-          )}
-          pagingEnabled
-          snapToAlignment="start"
+          renderItem={({ item, index }) =>
+            item.type === 'video' ? (
+              <ForYouVideoCard
+                item={item}
+                isActive={index === activeIndex}
+                onDoubleTapLike={() => handleDoubleTapLike(item.id)}
+              />
+            ) : (
+              <ForYouAudioCard
+                item={item}
+                isActive={index === activeIndex}
+                onDoubleTapLike={() => handleDoubleTapLike(item.id)}
+              />
+            )
+          }
           snapToInterval={DISCOVER_ITEM_HEIGHT}
           decelerationRate="fast"
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
-            <View style={{ paddingBottom: 16 }}>
-              {/* Upcoming horizontal carousel */}
-              <View style={styles.upcomingSection}>
-                <Text style={[styles.upcomingTitle, { color: theme.colors.text }]}>
-                  Upcoming
-                </Text>
-                <FlatList
-                  data={upcoming}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  keyExtractor={(item) => item.id}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      style={[styles.upcomingCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
-                      onPress={() => handleOpenStream(item)}
-                      activeOpacity={0.8}
-                    >
-                      <Image
-                        source={{ uri: item.thumbnailUrl }}
-                        style={styles.upcomingThumb}
-                        resizeMode="cover"
-                      />
-                      <Text style={[styles.upcomingCardTitle, { color: theme.colors.text }]} numberOfLines={2}>
-                        {item.title}
-                      </Text>
-                    </TouchableOpacity>
-                  )}
-                  contentContainerStyle={{ paddingHorizontal: 16 }}
-                />
+            upcomingForHeader.length > 0 ? (
+              <View style={{ paddingBottom: 16 }}>
+                <View style={styles.upcomingSection}>
+                  <Text style={[styles.upcomingTitle, { color: theme.colors.text }]}>Upcoming</Text>
+                  <FlatList
+                    data={upcomingForHeader}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    keyExtractor={(item) => item.id}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        style={[styles.upcomingCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
+                        onPress={() => handleOpenStream(item)}
+                        activeOpacity={0.8}
+                      >
+                        <Image source={{ uri: item.thumbnailUrl }} style={styles.upcomingThumb} resizeMode="cover" />
+                        <Text style={[styles.upcomingCardTitle, { color: theme.colors.text }]} numberOfLines={2}>
+                          {item.title}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                    contentContainerStyle={{ paddingHorizontal: 16 }}
+                  />
+                </View>
               </View>
+            ) : null
+          }
+          ListEmptyComponent={
+            <View style={styles.centered}>
+              <Text style={[styles.emptyText, { color: theme.colors.textSecondary }]}>No For You content yet.</Text>
             </View>
           }
-          contentContainerStyle={{ paddingBottom: 20 }}
+          refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refresh} colors={[theme.colors.primary]} />}
+          onViewableItemsChanged={({ viewableItems }) => {
+            if (viewableItems.length > 0) {
+              setActiveIndex(viewableItems[0].index ?? 0);
+            }
+          }}
+          viewabilityConfig={{ itemVisiblePercentThreshold: 80 }}
         />
       )}
 
-      {/* Immersive player modal */}
       {activeStream && (
         <LivePlayer
           videoId={activeStream.videoId}
@@ -211,13 +210,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
   },
-  upcomingThumb: {
-    width: '100%',
-    height: 90,
-  },
-  upcomingCardTitle: {
-    padding: 8,
-    fontSize: 14,
-    fontFamily: 'DMSans-Medium',
-  },
+  upcomingThumb: { width: '100%', height: 90 },
+  upcomingCardTitle: { padding: 8, fontSize: 14, fontFamily: 'DMSans-Medium' },
 });

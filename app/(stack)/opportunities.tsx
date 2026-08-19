@@ -14,8 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useTheme } from '@/contexts';
+import { useTheme, usePremium } from '@/contexts';
 import { useOpportunities } from '@/hooks/useOpportunities';
 import { OpportunityCard } from '@/components/opportunities/OpportunityCard';
 import { OpportunityDetailModal } from '@/components/opportunities/OpportunityDetailModal';
@@ -25,8 +24,6 @@ import { TenderSearchModal } from '@/components/opportunities/TenderSearchModal'
 import { AdBanner } from '@/ads/AdBanner';
 import { Typography, Spacing, BorderRadius } from '@/config/theme';
 import type { Opportunity } from '@/services/opportunities';
-
-const PREMIUM_KEY = 'pshad_premium_subscribed';
 
 type Category = 'tender' | 'job' | 'bursary';
 
@@ -39,40 +36,33 @@ const TOP_TABS: { key: Category; icon: string; labelKey: string }[] = [
 export default function OpportunitiesScreen() {
   const { colors } = useTheme();
   const { t } = useTranslation();
+  const { isSubscribed, subscribe, unsubscribe } = usePremium();
+
   const [activeCategory, setActiveCategory] = useState<Category>('tender');
   const { opportunities, isLoading, isRefreshing, error, refresh } = useOpportunities(activeCategory);
   const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
   const [searchVisible, setSearchVisible] = useState(false);
-
-  // Premium state with persistence
-  const [isSubscribed, setIsSubscribed] = useState<boolean>(false);
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
-
-  useEffect(() => {
-    AsyncStorage.getItem(PREMIUM_KEY).then((val) => {
-      if (val === 'true') setIsSubscribed(true);
-    });
-  }, []);
 
   const handleTogglePress = useCallback(() => {
     if (!isSubscribed) {
       setSubscriptionModalVisible(true);
     } else {
-      setIsSubscribed(false);
-      AsyncStorage.setItem(PREMIUM_KEY, 'false');
+      unsubscribe();
     }
-  }, [isSubscribed]);
+  }, [isSubscribed, unsubscribe]);
 
-  const handleSelectPlan = useCallback((plan: any) => {
-    setIsSubscribed(true);
-    AsyncStorage.setItem(PREMIUM_KEY, 'true');
-    setSubscriptionModalVisible(false);
-    Alert.alert('Demo Subscription', `You selected ${plan.name}. Premium activated!`);
-  }, []);
+  const handleSelectPlan = useCallback(
+    (plan: any) => {
+      subscribe();
+      setSubscriptionModalVisible(false);
+      Alert.alert('Demo Subscription', `You selected ${plan.name}. Premium activated!`);
+    },
+    [subscribe]
+  );
 
-  // Extract filter options
   const filterOptions = useMemo(() => {
     const provinces = new Set<string>();
     const subcategories = new Set<string>();
@@ -89,7 +79,6 @@ export default function OpportunitiesScreen() {
     };
   }, [opportunities]);
 
-  // Filter state
   const [selectedProvince, setSelectedProvince] = useState<string | null>(null);
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [selectedSubmissionType, setSelectedSubmissionType] = useState<string | null>(null);
@@ -125,7 +114,7 @@ export default function OpportunitiesScreen() {
     ({ item }: { item: Opportunity }) => (
       <OpportunityCard opportunity={item} onPress={() => handlePress(item)} isSubscribed={isSubscribed} />
     ),
-    [handlePress, isSubscribed],
+    [handlePress, isSubscribed]
   );
 
   const renderEmpty = () => {
@@ -145,7 +134,6 @@ export default function OpportunitiesScreen() {
     setSelectedSubmissionType(null);
   };
 
-  // Search button press – gated by premium
   const handleSearchPress = () => {
     if (!isSubscribed) {
       setSubscriptionModalVisible(true);
@@ -187,7 +175,6 @@ export default function OpportunitiesScreen() {
             </Pressable>
           ))}
         </View>
-        {/* Search icon (only for tenders) */}
         {activeCategory === 'tender' && (
           <Pressable style={styles.searchButton} onPress={handleSearchPress}>
             <Ionicons

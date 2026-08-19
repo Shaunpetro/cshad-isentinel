@@ -28,7 +28,6 @@ export interface SAProvince {
 
 export type NewsSeverity = "low" | "medium" | "high" | "critical";
 
-// All possible news categories from RSS feeds
 export type NewsCategory =
   | "crime"
   | "safety"
@@ -51,20 +50,21 @@ export interface NewsItem {
   id: string;
   title: string;
   summary: string;
-  body?: string;              // Optional - not all articles have full body
+  body?: string;              // Plain-text cleaned body (for audio, summaries)
+  rawBody?: string;           // Original HTML content for rich article display
   source: string;
   sourceType: NewsSourceType;
-  sourceUrl?: string;         // Optional - not all sources have URLs
+  sourceUrl?: string;
   imageUrl?: string;
   category: NewsCategory;
   severity: NewsSeverity;
   location?: GeoPoint;
   locationName?: string;
   province?: string;
-  publishedAt: string;        // ISO 8601
-  fetchedAt?: string;         // Optional - only set when fetched from API
+  publishedAt: string;
+  fetchedAt?: string;
   isVerified: boolean;
-  isBreaking?: boolean;       // For breaking news carousel
+  isBreaking?: boolean;
 }
 
 // ---- Tips ----
@@ -81,16 +81,15 @@ export type TipCategory =
 
 export interface AnonymousTip {
   id: string;
-  encryptedContent: string; // Encrypted tip text
+  encryptedContent: string;
   category: TipCategory;
   severity: NewsSeverity;
   location?: GeoPoint;
   locationName?: string;
   province?: string;
   status: TipStatus;
-  createdAt: string; // ISO 8601
+  createdAt: string;
   moderatedAt?: string;
-  // NO user ID, NO device ID, NO IP — zero traceability
 }
 
 // ---- Map ----
@@ -117,13 +116,13 @@ export interface PushAlert {
   body: string;
   level: AlertLevel;
   location?: GeoPoint;
-  radius?: number; // km
+  radius?: number;
   category: NewsCategory;
   createdAt: string;
   expiresAt?: string;
 }
 
-// ---- User Preferences (stored locally, never on server) ----
+// ---- User Preferences ----
 
 export interface UserPreferences {
   language: "en" | "af" | "zu";
@@ -142,8 +141,8 @@ export interface UserPreferences {
     showAlertPins: boolean;
   };
   privacy: {
-    analyticsOptIn: false; // Always false — never changes
-    locationSharing: "never" | "tip_only"; // Only used during tip submission
+    analyticsOptIn: false;
+    locationSharing: "never" | "tip_only";
   };
 }
 
